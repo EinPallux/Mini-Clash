@@ -101,7 +101,7 @@ export const FATHOM: ChampionDef = {
   visual: {
     model: 'chars/character-female-b',
     scale: 1,
-    props: [{ model: 'pirate/hand-cannon', socket: 'handRight', scale: 0.55 }],
+    props: [{ model: 'pirate/cannon-ball', socket: 'handRight', scale: 0.55 }],
     anim: {
       idle: { clip: 'idle', loop: true },
       run: { clip: 'sprint', loop: true },

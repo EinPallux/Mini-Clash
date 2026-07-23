@@ -28,9 +28,7 @@ async function waitForServer() {
   preview = spawn(
     'pnpm',
     ['--filter', '@mini-clash/client', 'preview', '--port', '4173', '--strictPort'],
-    {
-      stdio: 'inherit',
-    },
+    { stdio: 'inherit', detached: true },
   );
   for (let i = 0; i < 60; i++) {
     if (await serverUp()) return;
@@ -138,5 +136,11 @@ try {
   process.exitCode = 1;
 } finally {
   await browser?.close();
-  preview?.kill();
+  if (preview?.pid) {
+    try {
+      process.kill(-preview.pid, 'SIGTERM'); // whole pnpm→vite tree
+    } catch {
+      preview.kill();
+    }
+  }
 }

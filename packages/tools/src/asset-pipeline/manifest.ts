@@ -56,7 +56,6 @@ export const ASSET_MANIFEST: AssetEntry[] = [
     src: 'Kenney_Minidungeon/GLB format/shield-rectangle.glb',
     group: 'champion',
   },
-  { key: 'pirate/hand-cannon', src: 'Kenney_PirateKit/GLB format/cannon.glb', group: 'champion' },
 
   // Dummy body
   {

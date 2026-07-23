@@ -212,7 +212,13 @@ function AbilitySlot({ slot, champ }: { slot: Slot; champ: string }): React.Reac
           : undefined
       }
     >
-      {slotGlyph(champ, slot)}
+      <span
+        className="ability-icon"
+        style={{
+          maskImage: `url(/icons/${SLOT_ICONS[champ]?.[slot] ?? 'sword-clash'}.svg)`,
+          WebkitMaskImage: `url(/icons/${SLOT_ICONS[champ]?.[slot] ?? 'sword-clash'}.svg)`,
+        }}
+      />
       {ability.cost > 0 && <span className="cost">⚡{ability.cost}</span>}
       <span className="key">{SLOT_KEYS[slot]}</span>
       {cd > 0.05 && (
@@ -229,10 +235,8 @@ function AbilitySlot({ slot, champ }: { slot: Slot; champ: string }): React.Reac
   );
 }
 
-function slotGlyph(champ: string, slot: Slot): string {
-  const glyphs: Record<string, Record<Slot, string>> = {
-    rook: { q: '🛡', w: '🧱', r: '🏰' },
-    fathom: { q: '💣', w: '🛢', r: '🚢' },
-  };
-  return glyphs[champ]?.[slot] ?? SLOT_KEYS[slot];
-}
+/** game-icons.net glyphs (CC BY 3.0 — see CREDITS.md), recolored via CSS mask. */
+const SLOT_ICONS: Record<string, Record<Slot, string>> = {
+  rook: { q: 'sword-clash', w: 'brick-wall', r: 'tower-fall' },
+  fathom: { q: 'cannon-ball', w: 'barrel', r: 'galleon' },
+};

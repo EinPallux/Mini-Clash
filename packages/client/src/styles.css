@@ -573,6 +573,20 @@ input[type="range"] {
   height: 74px;
   border-color: var(--gold);
 }
+.ability .ability-icon {
+  width: 62%;
+  height: 62%;
+  background: var(--ink);
+  mask-repeat: no-repeat;
+  mask-position: center;
+  mask-size: contain;
+  -webkit-mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  -webkit-mask-size: contain;
+}
+.ability.r-slot .ability-icon {
+  background: #7a5b12;
+}
 .ability .key {
   position: absolute;
   bottom: 2px;

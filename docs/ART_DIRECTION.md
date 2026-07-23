@@ -20,7 +20,7 @@ The target: a match screenshot should read as **a toybox brought violently to li
 - Three.js, physically-inspired-but-stylized: `MeshToonMaterial`-family ramp shading (2.5-band ramp, soft terminator) on characters; flat-lit vertex-color environment with baked-style AO darkening at contact edges.
 - **One directional key** (warm 5600K, 35° elevation, from bottom-left of screen so telegraphs on ground read clearly) + sky hemisphere fill (cool). Single 2048 shadow cascade, soft PCF; champions get a blob contact-shadow booster for grounding.
 - **Rim light** in team color on all champions (fresnel, subtle 0.15 intensity; 0.4 on the *selected/hovered* target — targeting feedback baked into the light rig).
-- Post stack: subtle bloom (threshold high — only emissives/VFX bloom), vignette 8%, slight saturation lift, SMAA. Optional (settings): outline pass (1px color-graded, off by default — the packs read cleanly without it), reduced-VFX mode.
+- Post stack: vignette + tone-mapped output (v0.1; bloom deferred — UnrealBloomPass NaN-poisons on some drivers, so glow is carried by additive sprites/halos until a clamped bloom lands), slight saturation lift via ACES exposure. Optional (settings): outline pass (1px color-graded, off by default — the packs read cleanly without it), reduced-VFX mode.
 - Skyboxes: `skybox-day` (default Shatterbridge), `skybox-morning` & `skybox-night` (map palette variants post-1.0), `skybox-space`/`skybox-alien` reserved for future biomes. Void below the bridge: layered drifting cloud cards + depth fog gradient — falling chunks (Collapse) tumble into it.
 
 ## 4. Color script

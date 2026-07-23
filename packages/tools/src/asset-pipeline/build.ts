@@ -88,7 +88,9 @@ async function main(): Promise<void> {
       }
     }
 
-    await doc.transform(dedup(), prune());
+    // prune() can orphan secondary skins (stretched-vertex artifacts); skip it for rigged files.
+    if (root.listSkins().length > 0) await doc.transform(dedup());
+    else await doc.transform(dedup(), prune());
 
     const scene = root.getDefaultScene() ?? root.listScenes()[0];
     const bounds = scene ? getBounds(scene) : { min: [0, 0, 0], max: [1, 1, 1] };

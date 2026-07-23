@@ -56,6 +56,9 @@ export class GameRenderer {
   private profile: QualityProfile;
   private sun!: THREE.DirectionalLight;
 
+  /** True when running on a software rasterizer (SwiftShader/llvmpipe — CI, VMs). */
+  readonly softwareGl: boolean;
+
   constructor(readonly canvas: HTMLCanvasElement) {
     this.renderer = new THREE.WebGLRenderer({
       canvas,
@@ -67,10 +70,24 @@ export class GameRenderer {
     this.renderer.toneMappingExposure = 1.05;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.camera = new THREE.PerspectiveCamera(30, 1, 1, 220);
-    this.profile = resolveQuality(useSettings.getState().quality);
+
+    // Software rasterizers lose the GL context under load spikes; clamp them to the
+    // low profile regardless of the auto heuristic (real GPUs are unaffected).
+    const glInfo = this.rendererString();
+    this.softwareGl = /swiftshader|llvmpipe|software/i.test(glInfo);
+    canvas.addEventListener('webglcontextlost', (e) => {
+      e.preventDefault();
+      console.warn('WebGL context lost — awaiting restore');
+    });
+    canvas.addEventListener('webglcontextrestored', () => {
+      console.warn('WebGL context restored');
+      this.applyProfile();
+    });
+
+    this.profile = this.clamp(resolveQuality(useSettings.getState().quality));
     this.applyProfile();
     useSettings.subscribe((s) => {
-      const next = resolveQuality(s.quality);
+      const next = this.clamp(resolveQuality(s.quality));
       if (JSON.stringify(next) !== JSON.stringify(this.profile)) {
         this.profile = next;
         this.applyProfile();
@@ -78,6 +95,23 @@ export class GameRenderer {
     });
     window.addEventListener('resize', this.onResize);
     this.onResize();
+  }
+
+  private rendererString(): string {
+    try {
+      const gl = this.renderer.getContext();
+      const ext = gl.getExtension('WEBGL_debug_renderer_info');
+      return String(
+        ext ? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER),
+      );
+    } catch {
+      return '';
+    }
+  }
+
+  private clamp(p: QualityProfile): QualityProfile {
+    if (!this.softwareGl) return p;
+    return { pixelRatio: 1, shadows: false, shadowSize: 1024, post: false };
   }
 
   get quality(): QualityProfile {

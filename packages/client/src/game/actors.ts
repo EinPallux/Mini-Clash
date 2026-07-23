@@ -96,13 +96,6 @@ class ChampionActor implements Actor {
 
     for (const prop of this.def.visual.props) {
       const { root: propRoot } = instantiate(prop.model);
-      // Hand-cannon: barrel only, the carriage stays on the ship.
-      if (prop.model === 'pirate/hand-cannon') {
-        propRoot.traverse((o) => {
-          const m = o as THREE.Mesh;
-          if (m.isMesh && !m.name.toLowerCase().includes('cannon')) m.visible = false;
-        });
-      }
       const socket = findSocket(model, prop.socket);
       propRoot.scale.setScalar(prop.scale ?? 1);
       if (prop.position) propRoot.position.set(...prop.position);

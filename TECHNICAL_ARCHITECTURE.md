@@ -54,7 +54,7 @@ mini-clash/
 └─ compose.yaml, .github/workflows/, Caddyfile (added at v0.3)
 ```
 
-**Dependency rules (CI-enforced via dependency-cruiser):** `data → (nothing)` · `sim → data` · `protocol → data` · `client → sim, protocol, data` · `server → sim, protocol, data` · `api → data` · nothing imports `client`. `sim` bans imports of three/react/dom/node builtins by lint rule.
+**Dependency rules (CI-enforced via dependency-cruiser):** `data → (nothing)` · `sim → protocol, data` · `protocol → data` · `client → sim, protocol, data` · `server → sim, protocol, data` · `api → data` · nothing imports `client`. `sim` bans imports of three/react/dom/node builtins by lint rule.
 
 ## 4. Deterministic simulation (`packages/sim`)
 
@@ -67,7 +67,7 @@ mini-clash/
 
 ## 5. Content data (`packages/data`)
 
-JSON5 definitions validated by zod schemas at build + load: `champions/*.json5` (stats, growth, abilities as effect graphs, animation map, augment hooks), `items.json5`, `augments.json5`, `minis.json5`, `structures.json5`, `map.shatterbridge.json5` (geometry refs, navgrid source polygons, spawn/orb/event markers, collapse stages), `events.json5` (Living Bridge schedule pools), `bots/*.json5` (tier reaction curves, personality weights, augment affinities). Typed accessors generated (`pnpm codegen`). Balance changes = data PRs; the client hot-reloads data in dev for live tuning.
+Typed TS data modules (pure object literals — v0.1 revision: same data-driven intent as the originally planned JSON5 files, minus a parser dependency, plus HMR and compile-time checks; externalize to JSON5 later if live modding/hot-tuning demands it) validated by zod schemas in CI: `champions/*.json5` (stats, growth, abilities as effect graphs, animation map, augment hooks), `items.json5`, `augments.json5`, `minis.json5`, `structures.json5`, `map.shatterbridge.json5` (geometry refs, navgrid source polygons, spawn/orb/event markers, collapse stages), `events.json5` (Living Bridge schedule pools), `bots/*.json5` (tier reaction curves, personality weights, augment affinities). Typed accessors generated (`pnpm codegen`). Balance changes = data PRs; the client hot-reloads data in dev for live tuning.
 
 ## 6. Netcode
 

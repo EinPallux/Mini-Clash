@@ -31,7 +31,15 @@ Design and architecture are already decided. Implement from these documents; do 
 
 ## Commands
 
-No build system exists yet (planning phase). Once `v0.1` lands, this section must list: install (`pnpm i`), dev (`pnpm dev`), test (`pnpm test`), lint (`pnpm check`), asset pipeline (`pnpm assets:build`) — keep it current.
+- `pnpm install` — install workspace deps (Node 22+, pnpm 10)
+- `pnpm assets:build` — run the asset pipeline (required before first dev/build; output is gitignored)
+- `pnpm dev` — Vite dev server for the client
+- `pnpm build` — asset pipeline + production client build
+- `pnpm test` — Vitest (sim units, content validation, determinism)
+- `pnpm lint` / `pnpm lint:fix` — Biome
+- `pnpm typecheck` — per-package `tsc --noEmit`
+- `pnpm boundaries` — package dependency-rule check
+- `node scripts/smoke.mjs` — headless-Chromium visual smoke (builds must exist; screenshots to `test-results/smoke/`)
 
 ## Git
 
