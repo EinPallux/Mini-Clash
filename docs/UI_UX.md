@@ -1,6 +1,6 @@
 # Mini Clash — UI/UX Specification
 
-Every screen and flow in the product. Visual style per [ART_DIRECTION.md](ART_DIRECTION.md) §8; all UI is the React DOM overlay except in-world bars/telegraphs (Three.js). Every screen defined here includes hover/press states, loading, empty, error and disconnected variants — those states are part of the spec, not extras.
+Every screen and flow in the product. Visual style per [ART_DIRECTION.md](ART_DIRECTION.md) §8 — the hero-shooter menu language (sharp, skewed, flat; Overwatch/Marvel-Rivals DNA) is BINDING for every screen listed here. All UI is the React DOM overlay except in-world bars/telegraphs (Three.js). Every screen defined here includes hover/press states, loading, empty, error and disconnected variants — those states are part of the spec, not extras.
 
 ## 1. UX principles
 

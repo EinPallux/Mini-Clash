@@ -17,12 +17,12 @@ export function NameScreen(): React.ReactElement {
   };
 
   return (
-    <div className="screen">
-      <h1 className="title-hero" style={{ fontSize: '3rem' }}>
-        MINI <span className="clash">CLASH</span>
+    <div className="screen backdrop-dark">
+      <h1 className="wordmark" style={{ fontSize: '3.4rem' }}>
+        Mini <span className="clash">Clash</span>
       </h1>
-      <div className="panel col" style={{ width: 360, textAlign: 'center' }}>
-        <h2>{STRINGS.chooseName}</h2>
+      <div className="panel col" style={{ width: 380, textAlign: 'center' }}>
+        <h2 style={{ fontStyle: 'italic', fontSize: '1.5rem' }}>{STRINGS.chooseName}</h2>
         <div className="row">
           <input
             type="text"
@@ -42,7 +42,7 @@ export function NameScreen(): React.ReactElement {
               setName(randomName());
             }}
           >
-            🎲
+            ↻
           </button>
         </div>
         <button
@@ -53,7 +53,9 @@ export function NameScreen(): React.ReactElement {
         >
           {STRINGS.enter}
         </button>
-        <span className="subtle">{STRINGS.guestNotice}</span>
+        <span className="subtle-onvoid" style={{ textTransform: 'none', letterSpacing: 0 }}>
+          {STRINGS.guestNotice}
+        </span>
       </div>
     </div>
   );

@@ -7,6 +7,9 @@ Entry categories: `Added` · `Changed` · `Fixed` · `Balance` · `Content` · `
 
 ## [Unreleased] — v0.1.0 "Training Grounds" (in progress)
 
+### Changed
+- **UI direction locked (binding for all future screens):** hero-shooter menu language — sharp corners, skewX(−10°) parallelogram tabs/ribbons, italic-skewed Oswald display type + Barlow Semi Condensed UI text, flat panels with hairline borders and gold top edges, dark chrome nav bar, light diamond-pattern and dark streaked backdrops, gold selection accent, keycap hints, CSS-mask iconography (no emoji). Hub rebuilt as nav-bar + hero cards + mode tiles; HUD, settings, boot/name, Esc menu and death veil restyled to match. Spec lives in ART_DIRECTION §8.
+
 ### Added
 - **Monorepo & tooling:** pnpm workspaces (data/sim/protocol/client/tools), TypeScript strict, Biome, Vitest, package-boundary checker, GitHub Actions CI (check · test · build + headless visual smoke with screenshot artifacts).
 - **`@mini-clash/data`:** typed content definitions with zod validation — Rook & Fathom kits, dummy units, Training Grounds map, FX timelines, procedural SFX recipes, UI strings.

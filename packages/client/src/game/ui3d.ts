@@ -76,7 +76,7 @@ export class DamageNumbers {
     canvas.width = 192;
     canvas.height = 84;
     const g = canvas.getContext('2d')!;
-    g.font = `${big ? 58 : 44}px 'Lilita One', sans-serif`;
+    g.font = `600 ${big ? 58 : 44}px 'Oswald', 'Arial Narrow', sans-serif`;
     g.textAlign = 'center';
     g.textBaseline = 'middle';
     g.lineWidth = 9;

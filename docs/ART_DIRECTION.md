@@ -61,12 +61,18 @@ Data-driven timelines (see TECHNICAL_ARCHITECTURE §VFX). Grammar rules:
 - Every champion: `spawn` (fountain teleport-in = beam + pose), `entrance` (swap-in flourish ≤ 0.5 s), `dance` (emote), death (per-rig clip + prop scatter), plus the state machine in CHAMPIONS.md §2.
 - The **UI animates too**: cooldown radial wipes with end-flash, HP bar damage-chunk lag (white ghost segment), gold counter odometer, draft cards deal/flip physically. Menus use spring transitions (250–350 ms), never linear fades.
 
-## 8. UI art
+## 8. UI art — the hero-shooter menu language (BINDING for every screen)
 
-- Rounded-rectangle chunky panels, 2–3 px colored borders, soft drop shadows, cream/off-white surfaces on the deep navy void backdrop; big friendly buttons with press-squash.
-- Fonts (Google Fonts, OFL): **Lilita One** for display/numbers ("POW" energy), **Nunito** (700/800) for UI text. Numbers everywhere are big and proud (damage floaters use Lilita with size = damage magnitude, capped).
-- Iconography: Kenney game-icons + game-icons.net set, recolored to the palette; every ability icon is a 2-color glyph on a role-colored plate (auto-generated plates keep 12×4 icons consistent).
-- HUD philosophy: bottom-center personal (abilities/energy/swap), top-center match state (score, timer, event ticker), corners minimal. Full layouts in UI_UX.md.
+Reference DNA: Overwatch menus + Marvel Rivals hero gallery. Flat, angular, esport. Explicitly banned: large border radii (>3 px), soft "bubble" drop shadows, cream/pastel rounded cards, emoji-as-iconography.
+
+- **Geometry:** sharp corners (0–2 px). Diagonals everywhere: nav tabs and ribbons are skewX(−10°) parallelograms, hero headings italic-skewed, bars get clipped angled ends. Cards are straight rectangles that sit on skewed backdrop shapes — never rounded blobs.
+- **Type:** display = **Oswald** 500/600, UPPERCASE, italic-skewed for hero headings ("PLAY", mode titles) and numbers (damage floaters, cooldowns). UI text = **Barlow Semi Condensed** 500–700; buttons and labels uppercase with 0.04–0.07 em tracking. (Both OFL.)
+- **Surfaces:** dark chrome nav bar (#12161f) with light text; content sits on either the light diamond-pattern backdrop (hero-gallery style) or the dark streaked backdrop (play-menu style). Panels are flat fills with 1 px hairline borders + a 3 px gold top edge; shadows are short and hard, used for depth only.
+- **Cards:** image/color area on top, flat plate below — dark plate + white condensed name for hero cards (thin champion-color underline at the base), light plate + dark condensed title for mode tiles. Corner state = skewed ribbon tag ("AVAILABLE NOW", "NEW!", version locks). Hover = 2 px white outline + 2–3 px lift; selected = gold outline. No glow blobs.
+- **Accent:** gold #FFC72E owns selection/active/ready states (active tab underline wedge, selected card, ready ultimate). Team/threat colors stay per §4. Each mode tile may own one flat saturated hero color.
+- **Chrome furniture:** bottom-right keycap hints ("ESC — MENU"), bottom-left status/hint line, top-right currency chips + profile tile. These live on every full-screen view.
+- **Iconography:** game-icons.net glyphs recolored via CSS masks (white on dark, ink on light, gold for ultimates). Never emoji.
+- HUD philosophy unchanged: bottom-center personal (abilities/energy/swap), top-center match state, corners minimal. Full layouts in UI_UX.md.
 
 ## 9. Audio direction
 
