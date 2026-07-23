@@ -446,7 +446,6 @@ input[type="range"] {
   font-family: var(--font-ui);
   font-size: 0.55rem;
   font-weight: 700;
-  color: var(--chrome);
   background: #4a5468;
   color: var(--paper);
   padding: 0 0.3rem;
