@@ -1,0 +1,26 @@
+{
+  "name": "mini-clash",
+  "private": true,
+  "version": "0.1.0",
+  "packageManager": "pnpm@10.33.0",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "dev": "pnpm --filter @mini-clash/client dev",
+    "build": "pnpm assets:build && pnpm --filter @mini-clash/client build",
+    "preview": "pnpm --filter @mini-clash/client preview",
+    "assets:build": "pnpm --filter @mini-clash/tools assets:build",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "pnpm -r --sequential run typecheck",
+    "lint": "biome check .",
+    "lint:fix": "biome check --write .",
+    "check": "pnpm lint && pnpm typecheck && pnpm boundaries",
+    "boundaries": "node scripts/check-boundaries.mjs"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.4.4",
+    "@types/node": "^22.19.11",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.4"
+  }
+}
