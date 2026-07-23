@@ -80,7 +80,9 @@ export const ROOK: ChampionDef = {
       range: 3,
       aim: 'point',
       indicator: { kind: 'rect', length: 0.8, width: 3 },
-      actions: [{ t: 'wall', length: 3, thickness: 0.6, duration: 2.5, allyBuff: 'rook_rampart_haste' }],
+      actions: [
+        { t: 'wall', length: 3, thickness: 0.6, duration: 2.5, allyBuff: 'rook_rampart_haste' },
+      ],
     },
     r: {
       id: 'rook_r',

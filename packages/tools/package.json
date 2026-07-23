@@ -10,6 +10,8 @@
   },
   "dependencies": {
     "@gltf-transform/core": "^4.2.1",
-    "@gltf-transform/functions": "^4.2.1"
+    "@gltf-transform/extensions": "^4.4.1",
+    "@gltf-transform/functions": "^4.2.1",
+    "sharp": "^0.34.5"
   }
 }

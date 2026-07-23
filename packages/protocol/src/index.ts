@@ -145,8 +145,26 @@ export type EntitySnap = ChampionSnap | DummySnap | KegSnap | WallSnap | Project
 /* --------------------------------- Events --------------------------------- */
 
 export type SimEvent =
-  | { t: 'fx'; key: string; x: number; z: number; fx?: number; fz?: number; source?: EntityId; target?: EntityId }
-  | { t: 'damage'; target: EntityId; amount: number; dtype: 'physical' | 'arcane'; x: number; z: number }
+  | {
+      t: 'fx';
+      key: string;
+      x: number;
+      z: number;
+      fx?: number;
+      fz?: number;
+      ax?: number;
+      az?: number;
+      source?: EntityId;
+      target?: EntityId;
+    }
+  | {
+      t: 'damage';
+      target: EntityId;
+      amount: number;
+      dtype: 'physical' | 'arcane';
+      x: number;
+      z: number;
+    }
   | { t: 'death'; id: EntityId; x: number; z: number }
   | { t: 'respawn'; id: EntityId }
   | { t: 'levelup'; id: EntityId; level: number }

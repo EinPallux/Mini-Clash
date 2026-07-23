@@ -53,7 +53,14 @@ export function dealDamage(
   if (dealt <= 0) return 0;
 
   target.hp -= dealt;
-  w.emit({ t: 'damage', target: target.id, amount: Math.round(dealt), dtype, x: target.x, z: target.z });
+  w.emit({
+    t: 'damage',
+    target: target.id,
+    amount: Math.round(dealt),
+    dtype,
+    x: target.x,
+    z: target.z,
+  });
 
   if (target.dummy) {
     target.dummy.windowDmg += dealt;
@@ -97,7 +104,13 @@ export function kill(w: World, target: Entity): void {
 }
 
 /** Instant displacement (knockback / powder push) with wall clamping. */
-export function displace(w: World, target: Entity, dirX: number, dirZ: number, distance: number): void {
+export function displace(
+  w: World,
+  target: Entity,
+  dirX: number,
+  dirZ: number,
+  distance: number,
+): void {
   if (target.dead || distance <= 0) return;
   if (target.kind === 'dummy') return; // dummies are anchored
   const steps = Math.max(1, Math.ceil(distance / 0.2));

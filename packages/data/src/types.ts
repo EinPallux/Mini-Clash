@@ -3,7 +3,14 @@
 export type Team = 0 | 1;
 export type DamageType = 'physical' | 'arcane';
 export type Slot = 'q' | 'w' | 'r';
-export type Role = 'vanguard' | 'bruiser' | 'slayer' | 'gunner' | 'caster' | 'support' | 'specialist';
+export type Role =
+  | 'vanguard'
+  | 'bruiser'
+  | 'slayer'
+  | 'gunner'
+  | 'caster'
+  | 'support'
+  | 'specialist';
 
 /** `base + perLevel*(level-1) + adRatio*AD + apRatio*AP` — resolved by the sim. */
 export interface ScalingValue {
@@ -85,13 +92,38 @@ export interface ProjectileVisual {
 
 /** Declarative ability actions, interpreted by the sim at cast commit (and nested triggers). */
 export type Action =
-  | { t: 'areaDamage'; at: TargetPoint; shape: AreaShape; amount: ScalingValue; type: DamageType; cc?: CcSpec; alsoStructures?: boolean }
+  | {
+      t: 'areaDamage';
+      at: TargetPoint;
+      shape: AreaShape;
+      amount: ScalingValue;
+      type: DamageType;
+      cc?: CcSpec;
+      alsoStructures?: boolean;
+    }
   | { t: 'projectile'; proj: string }
-  | { t: 'buff'; buff: string; who: 'self' | 'alliesInShape' | 'enemiesInShape'; at?: TargetPoint; shape?: AreaShape }
+  | {
+      t: 'buff';
+      buff: string;
+      who: 'self' | 'alliesInShape' | 'enemiesInShape';
+      at?: TargetPoint;
+      shape?: AreaShape;
+    }
   | { t: 'leap'; toAim: true; duration: number; onLand: Action[] }
   | { t: 'wall'; length: number; thickness: number; duration: number; allyBuff?: string }
   | { t: 'summon'; unit: string; at: TargetPoint; arcToss?: boolean }
-  | { t: 'volley'; length: number; width: number; count: number; interval: number; startDelay?: number; pulseRadius: number; amount: ScalingValue; type: DamageType; maxHitsPerTarget: number }
+  | {
+      t: 'volley';
+      length: number;
+      width: number;
+      count: number;
+      interval: number;
+      startDelay?: number;
+      pulseRadius: number;
+      amount: ScalingValue;
+      type: DamageType;
+      maxHitsPerTarget: number;
+    }
   | { t: 'heal'; who: 'self'; amount: ScalingValue };
 
 export type TargetPoint = 'aim' | 'self';
@@ -108,7 +140,10 @@ export interface AbilityDef {
   range: number;
   aim: 'skillshot' | 'point' | 'self' | 'direction';
   /** Aim indicator for the client. */
-  indicator: AreaShape | { kind: 'line'; length: number; width: number } | { kind: 'point'; radius: number };
+  indicator:
+    | AreaShape
+    | { kind: 'line'; length: number; width: number }
+    | { kind: 'point'; radius: number };
   actions: Action[];
   /** Optional recast stage (Rook Q backswing). */
   recast?: { window: number; actions: Action[]; name: string };
@@ -212,7 +247,9 @@ export interface MapProp {
 
 export interface MapObstacle {
   /** Axis-aligned box blocking movement, or circle. */
-  shape: { kind: 'box'; x: number; z: number; w: number; d: number } | { kind: 'circle'; x: number; z: number; r: number };
+  shape:
+    | { kind: 'box'; x: number; z: number; w: number; d: number }
+    | { kind: 'circle'; x: number; z: number; r: number };
 }
 
 export interface MapDef {
@@ -228,22 +265,77 @@ export interface MapDef {
   skybox: string;
   spawns: { team: Team; x: number; z: number; facingDeg: number }[];
   dummies: { unit: string; x: number; z: number }[];
-  lighting: { sunDir: [number, number, number]; sunColor: number; skyColor: number; groundColor: number; sunIntensity: number; ambientIntensity: number };
+  lighting: {
+    sunDir: [number, number, number];
+    sunColor: number;
+    skyColor: number;
+    groundColor: number;
+    sunIntensity: number;
+    ambientIntensity: number;
+  };
 }
 
 /* ------------------------------- FX timelines ------------------------------- */
 
 export type FxOp =
-  | { t: 'burst'; at: FxAnchor; count: number; color: number; color2?: number; size: number; speed: number; spread?: number; up?: number; life: number; gravity?: number; shape?: 'spark' | 'puff' | 'shard' | 'ring'; offset?: [number, number, number] }
-  | { t: 'ring'; at: FxAnchor; color: number; radius: number; width?: number; life: number; offset?: [number, number, number] }
-  | { t: 'decal'; at: FxAnchor; kind: 'crack' | 'scorch' | 'splat'; color: number; radius: number; life: number; offset?: [number, number, number] }
+  | {
+      t: 'burst';
+      at: FxAnchor;
+      count: number;
+      color: number;
+      color2?: number;
+      size: number;
+      speed: number;
+      spread?: number;
+      up?: number;
+      life: number;
+      gravity?: number;
+      shape?: 'spark' | 'puff' | 'shard' | 'ring';
+      offset?: [number, number, number];
+    }
+  | {
+      t: 'ring';
+      at: FxAnchor;
+      color: number;
+      radius: number;
+      width?: number;
+      life: number;
+      offset?: [number, number, number];
+    }
+  | {
+      t: 'decal';
+      at: FxAnchor;
+      kind: 'crack' | 'scorch' | 'splat';
+      color: number;
+      radius: number;
+      life: number;
+      offset?: [number, number, number];
+    }
   | { t: 'flash'; at: FxAnchor; color: number; life: number }
   | { t: 'light'; at: FxAnchor; color: number; intensity: number; radius: number; life: number }
   | { t: 'shake'; power: 's' | 'm' | 'l' }
   | { t: 'hitstop'; ms: number }
   | { t: 'sound'; cue: string; volume?: number }
-  | { t: 'ribbonSweep'; at: FxAnchor; color: number; radius: number; angleDeg: number; life: number }
-  | { t: 'prop'; model: string; at: FxAnchor; scale?: number; life: number; toss?: boolean; spinSpeed?: number; riseFrom?: number; sink?: boolean; offset?: [number, number, number] };
+  | {
+      t: 'ribbonSweep';
+      at: FxAnchor;
+      color: number;
+      radius: number;
+      angleDeg: number;
+      life: number;
+    }
+  | {
+      t: 'prop';
+      model: string;
+      at: FxAnchor;
+      scale?: number;
+      life: number;
+      toss?: boolean;
+      spinSpeed?: number;
+      riseFrom?: number;
+      sink?: boolean;
+      offset?: [number, number, number];
+    };
 
 export type FxAnchor = 'origin' | 'aim' | 'target' | 'self';
 

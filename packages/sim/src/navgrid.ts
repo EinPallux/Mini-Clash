@@ -104,7 +104,14 @@ export class NavGrid {
   }
 
   /** Stamp a temporary wall segment (center, unit facing, length, thickness). Returns stamped cell indices. */
-  stampWall(cx: number, cz: number, fx: number, fz: number, length: number, thickness: number): number[] {
+  stampWall(
+    cx: number,
+    cz: number,
+    fx: number,
+    fz: number,
+    length: number,
+    thickness: number,
+  ): number[] {
     const cells: number[] = [];
     const half = length / 2;
     const ht = thickness / 2 + CLEARANCE;
@@ -150,8 +157,8 @@ export class NavGrid {
 
   /** Nearest open cell center to a (possibly blocked) point. */
   nearestOpen(x: number, z: number): [number, number] {
-    let c = this.toCol(x);
-    let r = this.toRow(z);
+    const c = this.toCol(x);
+    const r = this.toRow(z);
     if (!this.isBlockedCell(c, r)) return [x, z];
     for (let ring = 1; ring < 30; ring++) {
       for (let dr = -ring; dr <= ring; dr++) {
@@ -224,7 +231,7 @@ export class NavGrid {
     const hDist = (c: number, r: number): number => {
       const dc = Math.abs(c - goalC);
       const dr = Math.abs(r - goalR);
-      return (Math.max(dc, dr) + 0.41421356 * Math.min(dc, dr)) * this.cell;
+      return (Math.max(dc, dr) + (Math.SQRT2 - 1) * Math.min(dc, dr)) * this.cell;
     };
     push(hDist(startC, startR), startI);
 
@@ -233,10 +240,10 @@ export class NavGrid {
       [-1, 0, 1],
       [0, 1, 1],
       [0, -1, 1],
-      [1, 1, 1.41421356],
-      [1, -1, 1.41421356],
-      [-1, 1, 1.41421356],
-      [-1, -1, 1.41421356],
+      [1, 1, Math.SQRT2],
+      [1, -1, Math.SQRT2],
+      [-1, 1, Math.SQRT2],
+      [-1, -1, Math.SQRT2],
     ] as const;
 
     let found = false;
@@ -256,7 +263,12 @@ export class NavGrid {
         const nr = cr + dr;
         if (this.isBlockedCell(nc, nr)) continue;
         // No diagonal corner-cutting.
-        if (dc !== 0 && dr !== 0 && (this.isBlockedCell(cc + dc, cr) || this.isBlockedCell(cc, cr + dr))) continue;
+        if (
+          dc !== 0 &&
+          dr !== 0 &&
+          (this.isBlockedCell(cc + dc, cr) || this.isBlockedCell(cc, cr + dr))
+        )
+          continue;
         const ni = this.idx(nc, nr);
         if (closed[ni]) continue;
         const g = gScore[cur] + cost * this.cell;
@@ -273,7 +285,10 @@ export class NavGrid {
     const cellsRev: number[] = [];
     for (let i = goalI; i !== -1; i = from[i]) cellsRev.push(i);
     cellsRev.reverse();
-    const pts: [number, number][] = cellsRev.map((i) => [this.colX(i % this.cols), this.rowZ((i / this.cols) | 0)]);
+    const pts: [number, number][] = cellsRev.map((i) => [
+      this.colX(i % this.cols),
+      this.rowZ((i / this.cols) | 0),
+    ]);
     pts[pts.length - 1] = [bx, bz];
 
     const out: [number, number][] = [];

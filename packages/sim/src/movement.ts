@@ -28,7 +28,11 @@ export function updateMovement(w: World, e: Entity, dt: number): void {
     goalX = t.x;
     goalZ = t.z;
     // Chase: straight-ish path, re-request when target moved.
-    if (c.path.length === 0 || dist(c.path[c.path.length - 1][0], c.path[c.path.length - 1][1], goalX, goalZ) > 1.2 || c.pathVersion !== w.nav.version) {
+    if (
+      c.path.length === 0 ||
+      dist(c.path[c.path.length - 1][0], c.path[c.path.length - 1][1], goalX, goalZ) > 1.2 ||
+      c.pathVersion !== w.nav.version
+    ) {
       c.path = w.nav.findPath(e.x, e.z, goalX, goalZ);
       c.pathVersion = w.nav.version;
     }

@@ -6,10 +6,22 @@ import type { SynthCue } from './types';
  * low-passed noise for booms, triangle chirps for UI.
  */
 export const SOUND_CUES: Record<string, SynthCue> = {
-  ui_click: { id: 'ui_click', layers: [{ wave: 'square', freq: 880, freqEnd: 620, attack: 0.001, decay: 0.07, volume: 0.22 }] },
-  ui_hover: { id: 'ui_hover', layers: [{ wave: 'sine', freq: 540, freqEnd: 600, attack: 0.001, decay: 0.045, volume: 0.1 }] },
-  ui_back: { id: 'ui_back', layers: [{ wave: 'square', freq: 620, freqEnd: 420, attack: 0.001, decay: 0.08, volume: 0.18 }] },
-  move_ping: { id: 'move_ping', layers: [{ wave: 'sine', freq: 960, freqEnd: 720, attack: 0.001, decay: 0.09, volume: 0.13 }] },
+  ui_click: {
+    id: 'ui_click',
+    layers: [{ wave: 'square', freq: 880, freqEnd: 620, attack: 0.001, decay: 0.07, volume: 0.22 }],
+  },
+  ui_hover: {
+    id: 'ui_hover',
+    layers: [{ wave: 'sine', freq: 540, freqEnd: 600, attack: 0.001, decay: 0.045, volume: 0.1 }],
+  },
+  ui_back: {
+    id: 'ui_back',
+    layers: [{ wave: 'square', freq: 620, freqEnd: 420, attack: 0.001, decay: 0.08, volume: 0.18 }],
+  },
+  move_ping: {
+    id: 'move_ping',
+    layers: [{ wave: 'sine', freq: 960, freqEnd: 720, attack: 0.001, decay: 0.09, volume: 0.13 }],
+  },
 
   rook_q_swing: {
     id: 'rook_q_swing',
@@ -46,7 +58,12 @@ export const SOUND_CUES: Record<string, SynthCue> = {
       { wave: 'square', freq: 120, freqEnd: 55, attack: 0.001, decay: 0.3, volume: 0.16 },
     ],
   },
-  rook_r_leap: { id: 'rook_r_leap', layers: [{ wave: 'sawtooth', freq: 190, freqEnd: 540, attack: 0.02, decay: 0.32, volume: 0.18 }] },
+  rook_r_leap: {
+    id: 'rook_r_leap',
+    layers: [
+      { wave: 'sawtooth', freq: 190, freqEnd: 540, attack: 0.02, decay: 0.32, volume: 0.18 },
+    ],
+  },
   rook_r_slam: {
     id: 'rook_r_slam',
     layers: [
@@ -84,8 +101,16 @@ export const SOUND_CUES: Record<string, SynthCue> = {
       { wave: 'triangle', freq: 680, freqEnd: 290, attack: 0.001, decay: 0.11, volume: 0.15 },
     ],
   },
-  keg_toss: { id: 'keg_toss', layers: [{ wave: 'triangle', freq: 290, freqEnd: 520, attack: 0.005, decay: 0.16, volume: 0.16 }] },
-  keg_fuse: { id: 'keg_fuse', layers: [{ wave: 'noise', freq: 1, attack: 0.02, decay: 0.55, volume: 0.09, lowpass: 3200 }] },
+  keg_toss: {
+    id: 'keg_toss',
+    layers: [
+      { wave: 'triangle', freq: 290, freqEnd: 520, attack: 0.005, decay: 0.16, volume: 0.16 },
+    ],
+  },
+  keg_fuse: {
+    id: 'keg_fuse',
+    layers: [{ wave: 'noise', freq: 1, attack: 0.02, decay: 0.55, volume: 0.09, lowpass: 3200 }],
+  },
   explosion_big: {
     id: 'explosion_big',
     layers: [
@@ -110,7 +135,10 @@ export const SOUND_CUES: Record<string, SynthCue> = {
     ],
   },
 
-  hit_generic: { id: 'hit_generic', layers: [{ wave: 'square', freq: 430, freqEnd: 180, attack: 0.001, decay: 0.06, volume: 0.16 }] },
+  hit_generic: {
+    id: 'hit_generic',
+    layers: [{ wave: 'square', freq: 430, freqEnd: 180, attack: 0.001, decay: 0.06, volume: 0.16 }],
+  },
   death_poof: {
     id: 'death_poof',
     layers: [
@@ -140,6 +168,14 @@ export const SOUND_CUES: Record<string, SynthCue> = {
       { wave: 'triangle', freq: 1420, freqEnd: 880, attack: 0.001, decay: 0.1, volume: 0.14 },
     ],
   },
-  dummy_reset: { id: 'dummy_reset', layers: [{ wave: 'triangle', freq: 390, freqEnd: 660, attack: 0.004, decay: 0.16, volume: 0.16 }] },
-  cast_denied: { id: 'cast_denied', layers: [{ wave: 'square', freq: 210, freqEnd: 160, attack: 0.001, decay: 0.09, volume: 0.14 }] },
+  dummy_reset: {
+    id: 'dummy_reset',
+    layers: [
+      { wave: 'triangle', freq: 390, freqEnd: 660, attack: 0.004, decay: 0.16, volume: 0.16 },
+    ],
+  },
+  cast_denied: {
+    id: 'cast_denied',
+    layers: [{ wave: 'square', freq: 210, freqEnd: 160, attack: 0.001, decay: 0.09, volume: 0.14 }],
+  },
 };

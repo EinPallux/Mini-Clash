@@ -17,11 +17,29 @@ const cc = z.object({
 
 const shape = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('circle'), radius: z.number().positive() }),
-  z.object({ kind: z.literal('cone'), radius: z.number().positive(), angleDeg: z.number().positive().max(360) }),
-  z.object({ kind: z.literal('rect'), length: z.number().positive(), width: z.number().positive() }),
+  z.object({
+    kind: z.literal('cone'),
+    radius: z.number().positive(),
+    angleDeg: z.number().positive().max(360),
+  }),
+  z.object({
+    kind: z.literal('rect'),
+    length: z.number().positive(),
+    width: z.number().positive(),
+  }),
 ]);
 
-const statKey = z.enum(['hpMax', 'ad', 'ap', 'attackSpeed', 'moveSpeed', 'armor', 'ward', 'haste', 'range']);
+const statKey = z.enum([
+  'hpMax',
+  'ad',
+  'ap',
+  'attackSpeed',
+  'moveSpeed',
+  'armor',
+  'ward',
+  'haste',
+  'range',
+]);
 
 export const buffSchema = z.object({
   id: z.string().min(1),
@@ -38,13 +56,54 @@ const targetPoint = z.enum(['aim', 'self']);
 
 const action: z.ZodType<unknown> = z.lazy(() =>
   z.discriminatedUnion('t', [
-    z.object({ t: z.literal('areaDamage'), at: targetPoint, shape, amount: scaling, type: z.enum(['physical', 'arcane']), cc: cc.optional(), alsoStructures: z.boolean().optional() }),
+    z.object({
+      t: z.literal('areaDamage'),
+      at: targetPoint,
+      shape,
+      amount: scaling,
+      type: z.enum(['physical', 'arcane']),
+      cc: cc.optional(),
+      alsoStructures: z.boolean().optional(),
+    }),
     z.object({ t: z.literal('projectile'), proj: z.string() }),
-    z.object({ t: z.literal('buff'), buff: z.string(), who: z.enum(['self', 'alliesInShape', 'enemiesInShape']), at: targetPoint.optional(), shape: shape.optional() }),
-    z.object({ t: z.literal('leap'), toAim: z.literal(true), duration: z.number().positive(), onLand: z.array(action) }),
-    z.object({ t: z.literal('wall'), length: z.number().positive(), thickness: z.number().positive(), duration: z.number().positive(), allyBuff: z.string().optional() }),
-    z.object({ t: z.literal('summon'), unit: z.string(), at: targetPoint, arcToss: z.boolean().optional() }),
-    z.object({ t: z.literal('volley'), length: z.number().positive(), width: z.number().positive(), count: z.number().int().positive(), interval: z.number().positive(), startDelay: z.number().min(0).optional(), pulseRadius: z.number().positive(), amount: scaling, type: z.enum(['physical', 'arcane']), maxHitsPerTarget: z.number().int().positive() }),
+    z.object({
+      t: z.literal('buff'),
+      buff: z.string(),
+      who: z.enum(['self', 'alliesInShape', 'enemiesInShape']),
+      at: targetPoint.optional(),
+      shape: shape.optional(),
+    }),
+    z.object({
+      t: z.literal('leap'),
+      toAim: z.literal(true),
+      duration: z.number().positive(),
+      onLand: z.array(action),
+    }),
+    z.object({
+      t: z.literal('wall'),
+      length: z.number().positive(),
+      thickness: z.number().positive(),
+      duration: z.number().positive(),
+      allyBuff: z.string().optional(),
+    }),
+    z.object({
+      t: z.literal('summon'),
+      unit: z.string(),
+      at: targetPoint,
+      arcToss: z.boolean().optional(),
+    }),
+    z.object({
+      t: z.literal('volley'),
+      length: z.number().positive(),
+      width: z.number().positive(),
+      count: z.number().int().positive(),
+      interval: z.number().positive(),
+      startDelay: z.number().min(0).optional(),
+      pulseRadius: z.number().positive(),
+      amount: scaling,
+      type: z.enum(['physical', 'arcane']),
+      maxHitsPerTarget: z.number().int().positive(),
+    }),
     z.object({ t: z.literal('heal'), who: z.literal('self'), amount: scaling }),
   ]),
 );
@@ -55,7 +114,15 @@ export const projectileSchema = z.object({
   radius: z.number().positive(),
   maxRange: z.number().positive(),
   pierces: z.enum(['none', 'all']).optional(),
-  pulses: z.array(z.object({ atDistance: z.number().positive(), radius: z.number().positive(), damageMul: z.number().positive() })).optional(),
+  pulses: z
+    .array(
+      z.object({
+        atDistance: z.number().positive(),
+        radius: z.number().positive(),
+        damageMul: z.number().positive(),
+      }),
+    )
+    .optional(),
   pulseFx: z.string().optional(),
   damage: z.object({ amount: scaling, type: z.enum(['physical', 'arcane']) }).optional(),
   cc: cc.optional(),
@@ -73,7 +140,11 @@ export const projectileSchema = z.object({
 
 const indicator = z.union([
   shape,
-  z.object({ kind: z.literal('line'), length: z.number().positive(), width: z.number().positive() }),
+  z.object({
+    kind: z.literal('line'),
+    length: z.number().positive(),
+    width: z.number().positive(),
+  }),
   z.object({ kind: z.literal('point'), radius: z.number().positive() }),
 ]);
 
@@ -89,7 +160,9 @@ export const abilitySchema = z.object({
   aim: z.enum(['skillshot', 'point', 'self', 'direction']),
   indicator,
   actions: z.array(action).min(1),
-  recast: z.object({ window: z.number().positive(), actions: z.array(action).min(1), name: z.string() }).optional(),
+  recast: z
+    .object({ window: z.number().positive(), actions: z.array(action).min(1), name: z.string() })
+    .optional(),
   unlocksAt: z.number().optional(),
 });
 
@@ -118,23 +191,40 @@ export const championSchema = z.object({
   attack: z.object({
     kind: z.enum(['melee', 'ranged']),
     windupFrac: z.number().min(0).max(1),
-    missile: z.object({ speed: z.number().positive(), size: z.number().positive(), color: z.number() }).optional(),
+    missile: z
+      .object({ speed: z.number().positive(), size: z.number().positive(), color: z.number() })
+      .optional(),
   }),
-  passive: z.object({ id: z.string(), name: z.string(), description: z.string(), params: z.record(z.string(), z.number()) }),
+  passive: z.object({
+    id: z.string(),
+    name: z.string(),
+    description: z.string(),
+    params: z.record(z.string(), z.number()),
+  }),
   abilities: z.object({ q: abilitySchema, w: abilitySchema, r: abilitySchema }),
-  entrance: z.object({ id: z.string(), name: z.string(), description: z.string(), params: z.record(z.string(), z.number()) }),
+  entrance: z.object({
+    id: z.string(),
+    name: z.string(),
+    description: z.string(),
+    params: z.record(z.string(), z.number()),
+  }),
   visual: z.object({
     model: z.string(),
     scale: z.number().positive(),
-    props: z.array(z.object({
-      model: z.string(),
-      socket: z.enum(['handRight', 'handLeft', 'back', 'root']),
-      scale: z.number().optional(),
-      position: z.tuple([z.number(), z.number(), z.number()]).optional(),
-      rotationDeg: z.tuple([z.number(), z.number(), z.number()]).optional(),
-    })),
+    props: z.array(
+      z.object({
+        model: z.string(),
+        socket: z.enum(['handRight', 'handLeft', 'back', 'root']),
+        scale: z.number().optional(),
+        position: z.tuple([z.number(), z.number(), z.number()]).optional(),
+        rotationDeg: z.tuple([z.number(), z.number(), z.number()]).optional(),
+      }),
+    ),
     tints: z.record(z.string(), z.number()).optional(),
-    anim: z.record(z.string(), z.object({ clip: z.string(), speed: z.number().optional(), loop: z.boolean().optional() })),
+    anim: z.record(
+      z.string(),
+      z.object({ clip: z.string(), speed: z.number().optional(), loop: z.boolean().optional() }),
+    ),
     portraitColor: z.number(),
   }),
 });
@@ -148,14 +238,21 @@ export const unitSchema = z.object({
   radius: z.number().positive(),
   behavior: z.enum(['dummy', 'destructible']),
   resetAfter: z.number().positive().optional(),
-  explode: z.object({
-    delay: z.number().positive(),
-    radius: z.number().positive(),
-    amount: scaling,
-    type: z.enum(['physical', 'arcane']),
-    cc: cc.optional(),
-  }).optional(),
-  visual: z.object({ model: z.string().optional(), prim: z.enum(['barrel']).optional(), scale: z.number().positive(), tint: z.number().optional() }),
+  explode: z
+    .object({
+      delay: z.number().positive(),
+      radius: z.number().positive(),
+      amount: scaling,
+      type: z.enum(['physical', 'arcane']),
+      cc: cc.optional(),
+    })
+    .optional(),
+  visual: z.object({
+    model: z.string().optional(),
+    prim: z.enum(['barrel']).optional(),
+    scale: z.number().positive(),
+    tint: z.number().optional(),
+  }),
 });
 
 export const mapSchema = z.object({
@@ -164,22 +261,44 @@ export const mapSchema = z.object({
   width: z.number().positive(),
   height: z.number().positive(),
   navCell: z.number().positive(),
-  obstacles: z.array(z.object({
-    shape: z.discriminatedUnion('kind', [
-      z.object({ kind: z.literal('box'), x: z.number(), z: z.number(), w: z.number().positive(), d: z.number().positive() }),
-      z.object({ kind: z.literal('circle'), x: z.number(), z: z.number(), r: z.number().positive() }),
-    ]),
-  })),
-  props: z.array(z.object({
-    model: z.string(),
-    position: z.tuple([z.number(), z.number(), z.number()]),
-    rotationDeg: z.number().optional(),
-    scale: z.number().optional(),
-    tint: z.number().optional(),
-  })),
+  obstacles: z.array(
+    z.object({
+      shape: z.discriminatedUnion('kind', [
+        z.object({
+          kind: z.literal('box'),
+          x: z.number(),
+          z: z.number(),
+          w: z.number().positive(),
+          d: z.number().positive(),
+        }),
+        z.object({
+          kind: z.literal('circle'),
+          x: z.number(),
+          z: z.number(),
+          r: z.number().positive(),
+        }),
+      ]),
+    }),
+  ),
+  props: z.array(
+    z.object({
+      model: z.string(),
+      position: z.tuple([z.number(), z.number(), z.number()]),
+      rotationDeg: z.number().optional(),
+      scale: z.number().optional(),
+      tint: z.number().optional(),
+    }),
+  ),
   floor: z.object({ tile: z.string(), accentTile: z.string(), size: z.number().positive() }),
   skybox: z.string(),
-  spawns: z.array(z.object({ team: z.union([z.literal(0), z.literal(1)]), x: z.number(), z: z.number(), facingDeg: z.number() })),
+  spawns: z.array(
+    z.object({
+      team: z.union([z.literal(0), z.literal(1)]),
+      x: z.number(),
+      z: z.number(),
+      facingDeg: z.number(),
+    }),
+  ),
   dummies: z.array(z.object({ unit: z.string(), x: z.number(), z: z.number() })),
   lighting: z.object({
     sunDir: z.tuple([z.number(), z.number(), z.number()]),
@@ -193,20 +312,26 @@ export const mapSchema = z.object({
 
 export const fxTimelineSchema = z.object({
   id: z.string().min(1),
-  events: z.array(z.object({ time: z.number().min(0), op: z.object({ t: z.string() }).passthrough() })),
+  events: z.array(
+    z.object({ time: z.number().min(0), op: z.object({ t: z.string() }).passthrough() }),
+  ),
 });
 
 export const synthCueSchema = z.object({
   id: z.string().min(1),
-  layers: z.array(z.object({
-    wave: z.enum(['sine', 'square', 'sawtooth', 'triangle', 'noise']),
-    freq: z.number().positive(),
-    freqEnd: z.number().positive().optional(),
-    attack: z.number().min(0),
-    decay: z.number().positive(),
-    volume: z.number().positive().max(1.5),
-    delay: z.number().min(0).optional(),
-    lowpass: z.number().positive().optional(),
-    slide: z.enum(['lin', 'exp']).optional(),
-  })).min(1),
+  layers: z
+    .array(
+      z.object({
+        wave: z.enum(['sine', 'square', 'sawtooth', 'triangle', 'noise']),
+        freq: z.number().positive(),
+        freqEnd: z.number().positive().optional(),
+        attack: z.number().min(0),
+        decay: z.number().positive(),
+        volume: z.number().positive().max(1.5),
+        delay: z.number().min(0).optional(),
+        lowpass: z.number().positive().optional(),
+        slide: z.enum(['lin', 'exp']).optional(),
+      }),
+    )
+    .min(1),
 });

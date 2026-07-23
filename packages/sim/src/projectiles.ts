@@ -20,7 +20,10 @@ export function updateProjectile(w: World, e: Entity, dt: number): void {
 
   const def = p.def;
   if (def?.pulses) {
-    while (p.pulsesFired < def.pulses.length && p.traveled >= def.pulses[p.pulsesFired].atDistance) {
+    while (
+      p.pulsesFired < def.pulses.length &&
+      p.traveled >= def.pulses[p.pulsesFired].atDistance
+    ) {
       const pulse = def.pulses[p.pulsesFired];
       p.pulsesFired++;
       // Exact pulse position (independent of tick granularity).
@@ -77,12 +80,19 @@ function updateHoming(w: World, e: Entity, dt: number): void {
   e.z += p.dirZ * step;
   p.traveled += step;
 
-  if (target && !target.dead && dist(e.x, e.z, target.x, target.z) <= p.size + target.radius + 0.15) {
+  if (
+    target &&
+    !target.dead &&
+    dist(e.x, e.z, target.x, target.z) <= p.size + target.radius + 0.15
+  ) {
     const owner = w.get(p.owner);
     const src = owner ?? e;
     const dealt = dealDamage(w, { source: src }, target, p.damage * (p.luckyMul ?? 1), p.dtype);
     const champId = owner?.champ?.def.id ?? 'generic';
-    w.fx(dealt > 0 ? `${champId}.aa.hit` : 'generic.hit', target.x, target.z, { source: p.owner, target: target.id });
+    w.fx(dealt > 0 ? `${champId}.aa.hit` : 'generic.hit', target.x, target.z, {
+      source: p.owner,
+      target: target.id,
+    });
     if (p.powder && owner) {
       powderBlast(w, owner, target);
       displace(w, target, p.dirX, p.dirZ, owner.champ?.def.passive.params.push ?? 0.5);

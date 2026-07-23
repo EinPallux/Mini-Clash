@@ -1,11 +1,11 @@
 import {
   CHAMPIONS,
-  LEVELUP_HEAL_PCT,
   LEVEL_MAX,
+  LEVELUP_HEAL_PCT,
+  type MapDef,
   TICK_DT,
   TRAINING_MAP,
   UNITS,
-  type MapDef,
 } from '@mini-clash/data';
 import type {
   ChampionSnap,
@@ -16,20 +16,14 @@ import type {
   Snapshot,
   TrainerCmd,
 } from '@mini-clash/protocol';
-import {
-  applySpawnEffects,
-  canAttack,
-  tryCast,
-  updateAutoAttack,
-  updateCasts,
-} from './abilities';
+import { applySpawnEffects, canAttack, tryCast, updateAutoAttack, updateCasts } from './abilities';
 import { applyBuffById, applyCc, tickBuffs } from './buffs';
 import { dealDamage } from './combat';
-import { championStats, resolveScaling } from './stats';
 import { applySeparation, updateMovement } from './movement';
 import { NavGrid } from './navgrid';
 import { updateProjectile } from './projectiles';
 import { Pcg32 } from './rng';
+import { championStats, resolveScaling } from './stats';
 import { dist } from './vec';
 import { type Entity, World } from './world';
 
@@ -114,7 +108,16 @@ export class Sim {
         airborne: 0,
         airborneTotal: 0,
         buffs: [],
-        dummy: { def, windowDmg: 0, windowT: 0, active: false, sinceHit: 0, hitPulse: 0, homeX: d.x, homeZ: d.z },
+        dummy: {
+          def,
+          windowDmg: 0,
+          windowT: 0,
+          active: false,
+          sinceHit: 0,
+          hitPulse: 0,
+          homeX: d.x,
+          homeZ: d.z,
+        },
       });
     }
   }
@@ -286,7 +289,10 @@ export class Sim {
     // 1. Casts, cooldowns, resources, leaps.
     for (const e of [...w.entities]) {
       if (e.champ && !e.dead) {
-        const flags = this.trainer.get(e.champ.player) ?? { noCooldowns: false, infiniteEnergy: false };
+        const flags = this.trainer.get(e.champ.player) ?? {
+          noCooldowns: false,
+          infiniteEnergy: false,
+        };
         updateCasts(w, e, dt, flags.noCooldowns);
         if (flags.infiniteEnergy) e.champ.energy = 100;
         if (flags.noCooldowns) e.champ.cds = { q: 0, w: 0, r: 0 };
@@ -508,14 +514,30 @@ export class Sim {
         dps: Math.round(dps),
         windowActive: d.active,
         hitPulse: d.hitPulse,
-        ccKind: e.airborne > 0 ? 'knockup' : e.buffs.some((b) => b.id.startsWith('cc_slow')) ? 'slow' : undefined,
+        ccKind:
+          e.airborne > 0
+            ? 'knockup'
+            : e.buffs.some((b) => b.id.startsWith('cc_slow'))
+              ? 'slow'
+              : undefined,
       };
     }
     if (e.keg) {
-      return { ...base, kind: 'keg', fuseLeft: Math.max(0, e.keg.fuseLeft), tossPhase: e.keg.tossPhase < 1 ? e.keg.tossPhase : undefined };
+      return {
+        ...base,
+        kind: 'keg',
+        fuseLeft: Math.max(0, e.keg.fuseLeft),
+        tossPhase: e.keg.tossPhase < 1 ? e.keg.tossPhase : undefined,
+      };
     }
     if (e.wall) {
-      return { ...base, kind: 'wall', length: e.wall.length, tLeft: e.wall.tLeft, duration: e.wall.duration };
+      return {
+        ...base,
+        kind: 'wall',
+        length: e.wall.length,
+        tLeft: e.wall.tLeft,
+        duration: e.wall.duration,
+      };
     }
     const p = e.proj;
     if (p) {

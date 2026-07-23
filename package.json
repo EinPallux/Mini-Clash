@@ -3,7 +3,9 @@
   "private": true,
   "version": "0.1.0",
   "packageManager": "pnpm@10.33.0",
-  "engines": { "node": ">=22" },
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "dev": "pnpm --filter @mini-clash/client dev",
     "build": "pnpm assets:build && pnpm --filter @mini-clash/client build",
@@ -20,6 +22,7 @@
   "devDependencies": {
     "@biomejs/biome": "^2.4.4",
     "@types/node": "^22.19.11",
+    "playwright": "^1.61.1",
     "typescript": "^5.9.3",
     "vitest": "^3.2.4"
   }

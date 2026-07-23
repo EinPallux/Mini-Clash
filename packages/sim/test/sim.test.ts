@@ -1,6 +1,6 @@
 import type { Intent, IntentMsg, MatchConfig, Snapshot } from '@mini-clash/protocol';
 import { describe, expect, it } from 'vitest';
-import { Sim, mitigate, stateHash } from '../src';
+import { mitigate, Sim, stateHash } from '../src';
 
 const CFG: MatchConfig = {
   mode: 'training',
@@ -29,7 +29,7 @@ function run(sim: Sim, seconds: number, collect?: Snapshot[]): Snapshot {
 
 function champ(snap: Snapshot) {
   const c = snap.entities.find((e) => e.kind === 'champion');
-  if (!c || c.kind !== 'champion') throw new Error('no champion');
+  if (c?.kind !== 'champion') throw new Error('no champion');
   return c;
 }
 function dummies(snap: Snapshot) {
@@ -173,7 +173,10 @@ describe('Fathom kit', () => {
     sim.applyIntents([msg({ t: 'attackTarget', target: dummyEnt.id })]);
     const snaps: Snapshot[] = [];
     run(sim, 8, snaps);
-    const fxKeys = snaps.flatMap((s) => s.events).filter((e) => e.t === 'fx').map((e) => (e.t === 'fx' ? e.key : ''));
+    const fxKeys = snaps
+      .flatMap((s) => s.events)
+      .filter((e) => e.t === 'fx')
+      .map((e) => (e.t === 'fx' ? e.key : ''));
     expect(fxKeys.filter((k) => k === 'fathom.aa.fire').length).toBeGreaterThan(4);
     expect(fxKeys).toContain('fathom.aa.hit');
     expect(fxKeys).toContain('fathom.passive.blast');
@@ -244,7 +247,7 @@ describe('dummies & trainer', () => {
     sim.applyIntents([msg({ t: 'attackTarget', target: dummyEnt.id })]);
     let snap = run(sim, 3);
     const hurt = dummies(snap).find((d) => d.id === dummyEnt.id)!;
-    expect(hurt.kind === 'dummy' && hurt.dps).toBeGreaterThan(0);
+    expect(hurt.kind === 'dummy' ? hurt.dps : 0).toBeGreaterThan(0);
     expect(hurt.hp).toBeLessThan(hurt.hpMax);
     sim.applyIntents([msg({ t: 'stop' })]);
     const snaps: Snapshot[] = [];

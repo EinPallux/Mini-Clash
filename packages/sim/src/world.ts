@@ -56,7 +56,10 @@ export interface ChampState {
   recast: { slot: Slot; tLeft: number; ability: AbilityDef } | null;
   leap: LeapState | null;
   /** Move / attack-move orders */
-  order: { kind: 'move' | 'attackMove'; x: number; z: number } | { kind: 'attackTarget'; target: EntityId } | null;
+  order:
+    | { kind: 'move' | 'attackMove'; x: number; z: number }
+    | { kind: 'attackTarget'; target: EntityId }
+    | null;
   pendingOrder: ChampState['order'];
   path: [number, number][];
   pathVersion: number;
@@ -191,7 +194,19 @@ export class World {
     this.events.push(ev);
   }
 
-  fx(key: string, x: number, z: number, extra?: { fx?: number; fz?: number; source?: EntityId; target?: EntityId }): void {
+  fx(
+    key: string,
+    x: number,
+    z: number,
+    extra?: {
+      fx?: number;
+      fz?: number;
+      ax?: number;
+      az?: number;
+      source?: EntityId;
+      target?: EntityId;
+    },
+  ): void {
     this.emit({ t: 'fx', key, x, z, ...extra });
   }
 
@@ -202,7 +217,9 @@ export class World {
 
   runDueTasks(): void {
     if (this.tasks.length === 0) return;
-    const due = this.tasks.filter((t) => t.atTick <= this.tick).sort((a, b) => a.atTick - b.atTick || a.seq - b.seq);
+    const due = this.tasks
+      .filter((t) => t.atTick <= this.tick)
+      .sort((a, b) => a.atTick - b.atTick || a.seq - b.seq);
     if (due.length === 0) return;
     this.tasks = this.tasks.filter((t) => t.atTick > this.tick);
     for (const t of due) t.run(this);

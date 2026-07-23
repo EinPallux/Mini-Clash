@@ -13,14 +13,14 @@ const IZ = H / 2 - 2; // inner wall line z = ±14
 const props: MapProp[] = [];
 const obstacles: MapObstacle[] = [];
 
-// Perimeter walls every 4u with corner towers.
-for (let x = -IX + 4; x <= IX - 4; x += 4) {
-  props.push({ model: 'arena/wall', position: [x, 0, -IZ], rotationDeg: 0, scale: 4 });
-  props.push({ model: 'arena/wall', position: [x, 0, IZ], rotationDeg: 180, scale: 4 });
+// Perimeter walls every 2u with corner towers (wall.glb is a 1u segment; ×2 = chunky, not towering).
+for (let x = -IX + 2; x <= IX - 2; x += 2) {
+  props.push({ model: 'arena/wall', position: [x, 0, -IZ], rotationDeg: 0, scale: 2 });
+  props.push({ model: 'arena/wall', position: [x, 0, IZ], rotationDeg: 180, scale: 2 });
 }
-for (let z = -IZ + 4; z <= IZ - 4; z += 4) {
-  props.push({ model: 'arena/wall', position: [-IX, 0, z], rotationDeg: 90, scale: 4 });
-  props.push({ model: 'arena/wall', position: [IX, 0, z], rotationDeg: -90, scale: 4 });
+for (let z = -IZ + 2; z <= IZ - 2; z += 2) {
+  props.push({ model: 'arena/wall', position: [-IX, 0, z], rotationDeg: 90, scale: 2 });
+  props.push({ model: 'arena/wall', position: [IX, 0, z], rotationDeg: -90, scale: 2 });
 }
 for (const [cx, cz, rot] of [
   [-IX, -IZ, 0],
@@ -28,7 +28,7 @@ for (const [cx, cz, rot] of [
   [IX, IZ, 180],
   [-IX, IZ, 90],
 ] as const) {
-  props.push({ model: 'arena/wall-corner', position: [cx, 0, cz], rotationDeg: rot, scale: 4 });
+  props.push({ model: 'arena/wall-corner', position: [cx, 0, cz], rotationDeg: rot, scale: 2 });
 }
 obstacles.push({ shape: { kind: 'box', x: 0, z: -IZ, w: W, d: 1.2 } });
 obstacles.push({ shape: { kind: 'box', x: 0, z: IZ, w: W, d: 1.2 } });

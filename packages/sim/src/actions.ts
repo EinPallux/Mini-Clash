@@ -40,7 +40,12 @@ export function executeActions(ctx: ActionCtx, actions: readonly Action[]): void
   for (const a of actions) executeAction(ctx, a);
 }
 
-function shapeTargets(ctx: ActionCtx, at: 'aim' | 'self', shape: AreaShape, team: 'enemies' | 'allies'): Entity[] {
+function shapeTargets(
+  ctx: ActionCtx,
+  at: 'aim' | 'self',
+  shape: AreaShape,
+  team: 'enemies' | 'allies',
+): Entity[] {
   const { w, caster } = ctx;
   const px = at === 'aim' ? ctx.aimX : ctx.ox;
   const pz = at === 'aim' ? ctx.aimZ : ctx.oz;
@@ -53,7 +58,17 @@ function shapeTargets(ctx: ActionCtx, at: 'aim' | 'self', shape: AreaShape, team
     if (shape.kind === 'circle') {
       hit = dist(px, pz, u.x, u.z) <= shape.radius + u.radius;
     } else if (shape.kind === 'cone') {
-      hit = inCone(px, pz, ctx.fx, ctx.fz, cosHalf(shape.angleDeg), shape.radius, u.x, u.z, u.radius);
+      hit = inCone(
+        px,
+        pz,
+        ctx.fx,
+        ctx.fz,
+        cosHalf(shape.angleDeg),
+        shape.radius,
+        u.x,
+        u.z,
+        u.radius,
+      );
     } else {
       hit = inRect(px, pz, ctx.fx, ctx.fz, shape.length, shape.width, u.x, u.z, u.radius);
     }
@@ -89,7 +104,9 @@ function executeAction(ctx: ActionCtx, a: Action): void {
       const def = PROJECTILES[a.proj];
       if (!def) throw new Error(`unknown projectile '${a.proj}'`);
       const [dx, dz] = norm(ctx.aimX - ctx.ox, ctx.aimZ - ctx.oz);
-      const damage = def.damage ? resolveScaling(def.damage.amount, c.level, stats.ad, stats.ap) : 0;
+      const damage = def.damage
+        ? resolveScaling(def.damage.amount, c.level, stats.ad, stats.ap)
+        : 0;
       w.add({
         kind: 'projectile',
         team: caster.team,
@@ -170,7 +187,14 @@ function executeAction(ctx: ActionCtx, a: Action): void {
         airborne: 0,
         airborneTotal: 0,
         buffs: [],
-        wall: { tLeft: a.duration, duration: a.duration, length: a.length, cells, allyBuff: a.allyBuff, owner: caster.id },
+        wall: {
+          tLeft: a.duration,
+          duration: a.duration,
+          length: a.length,
+          cells,
+          allyBuff: a.allyBuff,
+          owner: caster.id,
+        },
       });
       break;
     }

@@ -31,20 +31,20 @@ export class Pcg32 {
     const b1 = mLo >>> 16;
 
     let c0 = a0 * b0;
-    let c1 = (c0 >>> 16) + a1 * b0 + a0 * b1;
+    const c1 = (c0 >>> 16) + a1 * b0 + a0 * b1;
     c0 &= 0xffff;
     const newLo = ((c1 << 16) | c0) >>> 0;
     let carryHi = (a1 * b1 + (c1 >>> 16)) >>> 0;
     carryHi = (carryHi + Math.imul(this.lo, mHi) + Math.imul(this.hi, mLo)) >>> 0;
 
-    let lo = (newLo + this.incLo) >>> 0;
-    let carry = lo < this.incLo ? 1 : 0;
-    let hi = (carryHi + this.incHi + carry) >>> 0;
+    const lo = (newLo + this.incLo) >>> 0;
+    const carry = lo < this.incLo ? 1 : 0;
+    const hi = (carryHi + this.incHi + carry) >>> 0;
     this.lo = lo;
     this.hi = hi;
 
     // XSH-RR output
-    const xored = ((this.hi ^ (this.hi >>> 13)) ^ (this.lo >>> 27)) >>> 0;
+    const xored = (this.hi ^ (this.hi >>> 13) ^ (this.lo >>> 27)) >>> 0;
     const rot = this.hi >>> 27;
     return ((xored >>> rot) | (xored << ((32 - rot) & 31))) >>> 0;
   }

@@ -1,7 +1,7 @@
 import type { AbilityDef, Slot } from '@mini-clash/data';
+import { executeActions } from './actions';
 import { applyBuffById } from './buffs';
 import { dealDamage } from './combat';
-import { executeActions } from './actions';
 import { championStats, resolveScaling } from './stats';
 import { dist, norm } from './vec';
 import type { Entity, World } from './world';
@@ -17,7 +17,15 @@ export function canAttack(attacker: Entity, target: Entity): boolean {
   return target.team !== attacker.team && (target.kind === 'champion' || target.kind === 'dummy');
 }
 
-export function tryCast(w: World, e: Entity, slot: Slot, aimX: number, aimZ: number, noCooldowns: boolean, infiniteEnergy: boolean): DenyReason | null {
+export function tryCast(
+  w: World,
+  e: Entity,
+  slot: Slot,
+  aimX: number,
+  aimZ: number,
+  noCooldowns: boolean,
+  infiniteEnergy: boolean,
+): DenyReason | null {
   const c = e.champ;
   if (!c) return null;
   if (e.dead) return 'dead';
@@ -28,7 +36,10 @@ export function tryCast(w: World, e: Entity, slot: Slot, aimX: number, aimZ: num
     const [fx, fz] = norm(aimX - e.x, aimZ - e.z);
     e.fx = fx;
     e.fz = fz;
-    executeActions({ w, caster: e, ability, ox: e.x, oz: e.z, aimX, aimZ, fx, fz }, ability.recast?.actions ?? []);
+    executeActions(
+      { w, caster: e, ability, ox: e.x, oz: e.z, aimX, aimZ, fx, fz },
+      ability.recast?.actions ?? [],
+    );
     w.fx(`${c.def.id}.${slot}.recast`, e.x, e.z, { fx, fz, source: e.id });
     c.cds[slot] = noCooldowns ? 0 : ability.cooldown;
     c.recast = null;
@@ -70,7 +81,14 @@ export function tryCast(w: World, e: Entity, slot: Slot, aimX: number, aimZ: num
   c.dancing = false;
 
   if (ability.castTime > 0) {
-    c.cast = { kind: slot, ability, tLeft: ability.castTime, tTotal: ability.castTime, aimX: ax, aimZ: az };
+    c.cast = {
+      kind: slot,
+      ability,
+      tLeft: ability.castTime,
+      tTotal: ability.castTime,
+      aimX: ax,
+      aimZ: az,
+    };
     w.fx(`${c.def.id}.${slot}.windup`, e.x, e.z, { fx, fz, source: e.id });
   } else {
     commitAbility(w, e, ability, ax, az, noCooldowns);
@@ -78,12 +96,19 @@ export function tryCast(w: World, e: Entity, slot: Slot, aimX: number, aimZ: num
   return null;
 }
 
-export function commitAbility(w: World, e: Entity, ability: AbilityDef, aimX: number, aimZ: number, noCooldowns: boolean): void {
+export function commitAbility(
+  w: World,
+  e: Entity,
+  ability: AbilityDef,
+  aimX: number,
+  aimZ: number,
+  noCooldowns: boolean,
+): void {
   const c = e.champ;
   if (!c) return;
   const [fx, fz] = norm(aimX - e.x, aimZ - e.z);
   executeActions({ w, caster: e, ability, ox: e.x, oz: e.z, aimX, aimZ, fx, fz }, ability.actions);
-  w.fx(`${c.def.id}.${ability.slot}.cast`, e.x, e.z, { fx, fz, source: e.id });
+  w.fx(`${c.def.id}.${ability.slot}.cast`, e.x, e.z, { fx, fz, ax: aimX, az: aimZ, source: e.id });
 
   if (ability.recast) {
     // Cooldown waits until the recast resolves or its window closes.
@@ -108,7 +133,8 @@ export function updateCasts(w: World, e: Entity, dt: number, noCooldowns: boolea
   for (const s of ['q', 'w', 'r'] as const) c.cds[s] = Math.max(0, c.cds[s] - dt);
   c.aaCd = Math.max(0, c.aaCd - dt);
   c.energy = Math.min(100, c.energy + 4 * dt);
-  if (c.passive.stonewallCd !== undefined) c.passive.stonewallCd = Math.max(0, c.passive.stonewallCd - dt);
+  if (c.passive.stonewallCd !== undefined)
+    c.passive.stonewallCd = Math.max(0, c.passive.stonewallCd - dt);
 
   if (c.recast) {
     c.recast.tLeft -= dt;
@@ -199,7 +225,14 @@ export function updateAutoAttack(w: World, e: Entity, _dt: number): void {
   const interval = 1 / stats.attackSpeed;
   const windup = interval * c.def.attack.windupFrac;
   // aaCd is charged at COMMIT, so cancelling a windup (orb-walking) costs nothing.
-  c.cast = { kind: 'aa', tLeft: windup, tTotal: windup, aimX: target.x, aimZ: target.z, target: target.id };
+  c.cast = {
+    kind: 'aa',
+    tLeft: windup,
+    tTotal: windup,
+    aimX: target.x,
+    aimZ: target.z,
+    target: target.id,
+  };
   if (c.def.attack.kind === 'ranged') {
     w.fx(`${c.def.id}.aa.fire`, e.x, e.z, { fx, fz, source: e.id });
   }
@@ -299,7 +332,12 @@ export function powderBlast(w: World, owner: Entity, target: Entity): void {
   if (!c) return;
   const stats = championStats(owner);
   const p = c.def.passive.params;
-  const bonus = resolveScaling({ base: p.bonusBase, adRatio: p.bonusAdRatio }, c.level, stats.ad, 0);
+  const bonus = resolveScaling(
+    { base: p.bonusBase, adRatio: p.bonusAdRatio },
+    c.level,
+    stats.ad,
+    0,
+  );
   for (const u of w.enemiesOf(owner.team)) {
     if (u.kind === 'keg') continue;
     if (dist(target.x, target.z, u.x, u.z) <= p.splashRadius + u.radius) {
