@@ -1,0 +1,17 @@
+{
+  "name": "@mini-clash/tools",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "assets:build": "node --experimental-strip-types src/asset-pipeline/build.ts",
+    "assets:inspect": "node --experimental-strip-types src/asset-pipeline/inspect.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@gltf-transform/core": "^4.2.1",
+    "@gltf-transform/extensions": "^4.4.1",
+    "@gltf-transform/functions": "^4.2.1",
+    "sharp": "^0.34.5"
+  }
+}

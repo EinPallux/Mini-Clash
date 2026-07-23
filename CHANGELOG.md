@@ -5,9 +5,18 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 Entry categories: `Added` · `Changed` · `Fixed` · `Balance` · `Content` · `Assets` · `Docs`
 
-## [Unreleased]
+## [Unreleased] — v0.1.0 "Training Grounds" (in progress)
 
-_Nothing yet. Next planned release: **v0.1.0 "Training Grounds"** — see ROADMAP.md._
+### Added
+- **Monorepo & tooling:** pnpm workspaces (data/sim/protocol/client/tools), TypeScript strict, Biome, Vitest, package-boundary checker, GitHub Actions CI (check · test · build + headless visual smoke with screenshot artifacts).
+- **`@mini-clash/data`:** typed content definitions with zod validation — Rook & Fathom kits, dummy units, Training Grounds map, FX timelines, procedural SFX recipes, UI strings.
+- **`@mini-clash/sim`:** deterministic 30 Hz simulation — PCG32 seeded RNG, navgrid A* with string-pulling and dynamic wall stamping, declarative ability-action interpreter, auto-attacks with homing missiles, champion passives, powder kegs, volleys, leaps/knock-ups, target dummies with DPS windows, trainer commands, state hashing for replay tests.
+- **`@mini-clash/protocol`:** intent/snapshot/event contract shared by the worker link (and the v0.3 server later).
+- **Asset pipeline:** manifest-driven gltf-transform optimization of the CC0 packs (23 shipped assets, 1.4 MiB total incl. skybox), per-asset metadata (bounds, clips, skeletons), budget enforcement.
+- **Client:** boot → guest name → hub flow, settings (video/audio/controls/accessibility with live remapping), Three.js toon-ramp renderer with follow camera, shake and hit-stop, worker-hosted offline sim, snapshot interpolation, animated champion actors with prop sockets, instanced particle system, data-driven FX runner, WebAudio synth engine, in-world health bars/damage numbers/aim telegraphs, Training Grounds HUD (ability cooldown wipes, trainer panel, dummy DPS readouts, champion switcher, death/respawn flow, Esc menu).
+
+### Fixed (during headless visual verification)
+- zustand object-selector infinite re-render on the HUD; instanced floor vanishing to frustum culling; clicks using a frame-stale cursor; UnrealBloom NaN blackout (bloom removed, glow via additive sprites); black characters from missing normals on unlit exports; software-GL context loss (SwiftShader now clamps to the low quality profile); arena wall scale; shadow acne.
 
 ## [0.0.2] — 2026-07-23
 

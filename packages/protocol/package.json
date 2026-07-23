@@ -1,0 +1,15 @@
+{
+  "name": "@mini-clash/protocol",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@mini-clash/data": "workspace:*"
+  }
+}
