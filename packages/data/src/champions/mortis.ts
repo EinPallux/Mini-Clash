@@ -122,7 +122,7 @@ export const MORTIS: ChampionDef = {
   visual: {
     model: 'skeletons/mage',
     scale: 1,
-    props: [{ model: 'skeletons/staff-crystal', socket: 'handRight', scale: 1 }],
+    props: [{ model: 'weapons/staff-crystal', socket: 'handRight', scale: 1 }],
     anim: {
       idle: { clip: 'Idle_A', loop: true },
       run: { clip: 'Running_A', loop: true },

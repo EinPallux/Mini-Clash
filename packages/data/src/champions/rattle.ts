@@ -121,7 +121,7 @@ export const RATTLE: ChampionDef = {
   visual: {
     model: 'skeletons/rogue',
     scale: 1,
-    props: [{ model: 'skeletons/dagger', socket: 'handRight', scale: 1 }],
+    props: [{ model: 'weapons/dagger', socket: 'handRight', scale: 1 }],
     anim: {
       idle: { clip: 'Idle_A', loop: true },
       run: { clip: 'Running_A', loop: true },

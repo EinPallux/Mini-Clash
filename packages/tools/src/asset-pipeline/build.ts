@@ -11,7 +11,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { getBounds, NodeIO } from '@gltf-transform/core';
 import { ALL_EXTENSIONS } from '@gltf-transform/extensions';
-import { dedup, prune } from '@gltf-transform/functions';
+import { dedup, prune, quantize, resample } from '@gltf-transform/functions';
 import { ASSET_MANIFEST } from './manifest.ts';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -32,7 +32,9 @@ interface AssetMeta {
 }
 
 const BUDGET_BYTES: Record<string, number> = {
-  champion: 400_000,
+  // Kenney rigs land well under; KayKit champions carry ~12 grafted library clips
+  // (resampled + quantized) and cap out around 430 KB.
+  champion: 440_000,
   'match-core': 600_000,
   boot: 300_000,
 };
@@ -75,6 +77,20 @@ async function main(): Promise<void> {
     const doc = await io.read(srcPath);
     const root = doc.getRoot();
 
+    // KayKit retarget path: graft library clips onto the model's identical rig by
+    // node name (the Skeletons pack ships characters and animations separately).
+    if (entry.mergeAnims) {
+      for (const animSrc of entry.mergeAnims) {
+        const animPath = join(assetsRoot, animSrc);
+        if (!existsSync(animPath)) {
+          failures.push(`${entry.key}: anim library missing (${animSrc})`);
+          continue;
+        }
+        const animDoc = await io.read(animPath);
+        mergeAnimations(doc, animDoc, entry.key, failures, entry.keepClips);
+      }
+    }
+
     // Strip unused animation clips before pruning so their data falls away.
     if (entry.keepClips) {
       const keep = new Set(entry.keepClips);
@@ -84,12 +100,15 @@ async function main(): Promise<void> {
           failures.push(`${entry.key}: required clip '${wanted}' missing in source`);
       }
       for (const anim of root.listAnimations()) {
-        if (!keep.has(anim.getName())) anim.dispose();
+        if (!keep.has(anim.getName())) disposeAnimationDeep(anim);
       }
     }
 
-    // prune() can orphan secondary skins (stretched-vertex artifacts); skip it for rigged files.
-    if (root.listSkins().length > 0) await doc.transform(dedup());
+    // prune() can orphan secondary skins (stretched-vertex artifacts); skip it for rigged
+    // files. Rigged files instead get keyframe resampling + quantization — the animation
+    // libraries ship dense curves that dwarf the mesh data.
+    if (root.listSkins().length > 0)
+      await doc.transform(resample({ tolerance: 0.01 }), dedup(), quantize());
     else await doc.transform(dedup(), prune());
 
     const scene = root.getDefaultScene() ?? root.listScenes()[0];
@@ -140,6 +159,83 @@ async function main(): Promise<void> {
   console.info(
     `assets: ${ASSET_MANIFEST.length} entries, ${(total / 1024).toFixed(0)} KiB → ${outDir}`,
   );
+}
+
+/** Dispose an animation together with its channels, samplers and orphaned accessors. */
+function disposeAnimationDeep(anim: import('@gltf-transform/core').Animation): void {
+  const accessors: import('@gltf-transform/core').Accessor[] = [];
+  for (const s of anim.listSamplers()) {
+    const i = s.getInput();
+    const o = s.getOutput();
+    if (i) accessors.push(i);
+    if (o) accessors.push(o);
+  }
+  for (const ch of anim.listChannels()) ch.dispose();
+  for (const s of anim.listSamplers()) s.dispose();
+  anim.dispose();
+  for (const a of accessors) {
+    const parents = a.listParents().filter((p) => p.propertyType !== 'Root');
+    if (parents.length === 0) a.dispose();
+  }
+}
+
+/** Copy every animation from `animDoc` onto same-named nodes in `target`. */
+function mergeAnimations(
+  target: import('@gltf-transform/core').Document,
+  animDoc: import('@gltf-transform/core').Document,
+  key: string,
+  failures: string[],
+  keepClips?: string[],
+): void {
+  const wanted = keepClips ? new Set(keepClips) : null;
+  const targetNodes = new Map<string, import('@gltf-transform/core').Node>();
+  for (const n of target.getRoot().listNodes()) targetNodes.set(n.getName(), n);
+  const buffer = target.getRoot().listBuffers()[0] ?? target.createBuffer();
+  let grafted = 0;
+
+  for (const anim of animDoc.getRoot().listAnimations()) {
+    if (wanted && !wanted.has(anim.getName())) continue;
+    const newAnim = target.createAnimation(anim.getName());
+    for (const ch of anim.listChannels()) {
+      const srcNode = ch.getTargetNode();
+      const tNode = srcNode ? targetNodes.get(srcNode.getName()) : undefined;
+      const s = ch.getSampler();
+      const input = s?.getInput();
+      const output = s?.getOutput();
+      const path = ch.getTargetPath();
+      if (!tNode || !s || !input || !output || !path) continue;
+      const inArr = input.getArray();
+      const outArr = output.getArray();
+      if (!inArr || !outArr) continue;
+      const ni = target
+        .createAccessor()
+        .setType(input.getType())
+        .setArray(inArr.slice())
+        .setBuffer(buffer);
+      const no = target
+        .createAccessor()
+        .setType(output.getType())
+        .setArray(outArr.slice())
+        .setBuffer(buffer);
+      const ns = target
+        .createAnimationSampler()
+        .setInput(ni)
+        .setOutput(no)
+        .setInterpolation(s.getInterpolation());
+      const nc = target
+        .createAnimationChannel()
+        .setTargetNode(tNode)
+        .setTargetPath(path)
+        .setSampler(ns);
+      newAnim.addSampler(ns).addChannel(nc);
+    }
+    if (newAnim.listChannels().length === 0) {
+      newAnim.dispose();
+    } else {
+      grafted++;
+    }
+  }
+  if (grafted === 0) failures.push(`${key}: no clips grafted (rig node names mismatch?)`);
 }
 
 await main();

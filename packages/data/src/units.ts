@@ -114,7 +114,7 @@ export const UNITS: Record<string, UnitDef> = {
     ward: 0,
     radius: 0.3,
     behavior: 'destructible',
-    visual: { model: 'graveyard/skull', scale: 0.8 },
+    visual: { model: 'dungeon/skull', scale: 0.8 },
   },
   powder_keg: {
     id: 'powder_keg',

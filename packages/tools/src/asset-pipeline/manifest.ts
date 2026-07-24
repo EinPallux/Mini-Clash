@@ -11,7 +11,30 @@ export interface AssetEntry {
   group: 'boot' | 'match-core' | 'champion';
   /** Keep only these animation clips (characters); omit = keep all. */
   keepClips?: string[];
+  /** Animation-library files whose clips graft onto this model's rig (KayKit path). */
+  mergeAnims?: string[];
 }
+
+/** KayKit Rig_Medium clip subset the champion state machine uses. */
+const KAYKIT_CLIPS = [
+  'Idle_A',
+  'Idle_B',
+  'Running_A',
+  'Throw',
+  'Use_Item',
+  'Hit_A',
+  'Hit_B',
+  'Death_A',
+  'Death_B',
+  'Spawn_Ground',
+  'Interact',
+  'Jump_Full_Short',
+];
+
+const KAYKIT_SKELETON_ANIMS = [
+  'KayKit_Skeletons_1.1_FREE/Animations/gltf/Rig_Medium/Rig_Medium_General.glb',
+  'KayKit_Skeletons_1.1_FREE/Animations/gltf/Rig_Medium/Rig_Medium_MovementBasic.glb',
+];
 
 const CHAR_CLIPS = [
   'idle',
@@ -27,6 +50,7 @@ const CHAR_CLIPS = [
   'holding-right-shoot',
   'attack-melee-right',
   'attack-melee-left',
+  'attack-kick-right',
   'interact-right',
   'interact-left',
   'static',
@@ -55,6 +79,64 @@ export const ASSET_MANIFEST: AssetEntry[] = [
     key: 'dungeon/shield-rectangle',
     src: 'Kenney_Minidungeon/GLB format/shield-rectangle.glb',
     group: 'champion',
+  },
+
+  // v0.2 champions — KayKit skeletons (clips grafted from the pack's animation library)
+  {
+    key: 'skeletons/mage',
+    src: 'KayKit_Skeletons_1.1_FREE/characters/gltf/Skeleton_Mage.glb',
+    group: 'champion',
+    mergeAnims: KAYKIT_SKELETON_ANIMS,
+    keepClips: KAYKIT_CLIPS,
+  },
+  {
+    key: 'skeletons/rogue',
+    src: 'KayKit_Skeletons_1.1_FREE/characters/gltf/Skeleton_Rogue.glb',
+    group: 'champion',
+    mergeAnims: KAYKIT_SKELETON_ANIMS,
+    keepClips: KAYKIT_CLIPS,
+  },
+  {
+    key: 'dungeon/character-orc',
+    src: 'Kenney_Minidungeon/GLB format/character-orc.glb',
+    group: 'champion',
+    keepClips: CHAR_CLIPS,
+  },
+  {
+    key: 'chars/character-female-d',
+    src: 'Kenney_CuteCharacters/GLB format/character-female-d.glb',
+    group: 'champion',
+    keepClips: CHAR_CLIPS,
+  },
+  {
+    key: 'weapons/staff-crystal',
+    src: 'KayKit_FantasyWeaponsBits_1.0_FREE/Assets/gltf/staff_A.gltf',
+    group: 'champion',
+  },
+  {
+    key: 'weapons/staff-nature',
+    src: 'KayKit_FantasyWeaponsBits_1.0_FREE/Assets/gltf/staff_B.gltf',
+    group: 'champion',
+  },
+  {
+    key: 'weapons/dagger',
+    src: 'KayKit_FantasyWeaponsBits_1.0_FREE/Assets/gltf/dagger_A.gltf',
+    group: 'champion',
+  },
+  {
+    key: 'dungeon/weapon-spear',
+    src: 'Kenney_Minidungeon/GLB format/weapon-spear.glb',
+    group: 'champion',
+  },
+  {
+    key: 'dungeon/shield-round',
+    src: 'Kenney_Minidungeon/GLB format/shield-round.glb',
+    group: 'champion',
+  },
+  {
+    key: 'dungeon/skull',
+    src: 'KayKit_Dungeon/Models/Characters/gltf/extra heads/skull.gltf.glb',
+    group: 'match-core',
   },
 
   // Dummy body

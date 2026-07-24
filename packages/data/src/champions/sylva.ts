@@ -123,7 +123,7 @@ export const SYLVA: ChampionDef = {
   visual: {
     model: 'chars/character-female-d',
     scale: 1,
-    props: [{ model: 'tools/staff-gnarled', socket: 'handRight', scale: 1.1 }],
+    props: [{ model: 'weapons/staff-nature', socket: 'handRight', scale: 1.1 }],
     tints: { body: 0x8ade6a },
     anim: {
       idle: { clip: 'idle', loop: true },
