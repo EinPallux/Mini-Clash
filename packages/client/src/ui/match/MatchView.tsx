@@ -1,6 +1,7 @@
-import { CHAMPIONS, STRINGS } from '@mini-clash/data';
+import { BRIDGE, CHAMPIONS, STRINGS } from '@mini-clash/data';
 import { useEffect, useRef, useState } from 'react';
 import { uiSound } from '../../game/audio';
+import { useHud } from '../../game/hudStore';
 import { MatchRuntime } from '../../game/match';
 import { useSession } from '../../state/session';
 import { SettingsModal } from '../SettingsModal';
@@ -20,6 +21,8 @@ export function MatchView(): React.ReactElement {
   const mode = useSession((s) => s.matchMode);
   const lineup = useSession((s) => s.bridgeLineup);
   const goto = useSession((s) => s.goto);
+  const matchTime = useHud((s) => s.match?.time ?? 0);
+  const matchOver = useHud((s) => s.match?.over ?? false);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: the runtime owns champion switching after boot — never restart the match on championId change
   useEffect(() => {
@@ -116,6 +119,22 @@ export function MatchView(): React.ReactElement {
               >
                 ⚙ {STRINGS.settings}
               </button>
+              {mode === 'bridge' && !matchOver && (
+                <button
+                  type="button"
+                  className="btn"
+                  disabled={matchTime < BRIDGE.surrenderAt}
+                  title={matchTime < BRIDGE.surrenderAt ? STRINGS.surrenderGate : undefined}
+                  style={matchTime < BRIDGE.surrenderAt ? { opacity: 0.45 } : undefined}
+                  onClick={() => {
+                    uiSound('ui_back');
+                    runtimeRef.current?.surrender();
+                    setMenuOpen(false);
+                  }}
+                >
+                  🏳 {STRINGS.surrender}
+                </button>
+              )}
               <button
                 type="button"
                 className="btn"

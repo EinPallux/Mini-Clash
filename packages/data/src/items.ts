@@ -34,7 +34,7 @@ export const ITEMS: Record<string, ItemDef> = {
     name: 'Sharpened Fang',
     tier: 1,
     cost: 500,
-    icon: 'sword-clash',
+    icon: 'saber-tooth',
     add: { ad: 12 },
   },
   spark_crystal: {
@@ -42,7 +42,7 @@ export const ITEMS: Record<string, ItemDef> = {
     name: 'Spark Crystal',
     tier: 1,
     cost: 500,
-    icon: 'tower-fall',
+    icon: 'crystal-growth',
     add: { ap: 18 },
   },
   iron_plate: {
@@ -50,7 +50,7 @@ export const ITEMS: Record<string, ItemDef> = {
     name: 'Iron Plate',
     tier: 1,
     cost: 500,
-    icon: 'checked-shield',
+    icon: 'metal-plate',
     add: { hpMax: 150 },
   },
   bulwark_scrap: {
@@ -58,7 +58,7 @@ export const ITEMS: Record<string, ItemDef> = {
     name: 'Bulwark Scrap',
     tier: 1,
     cost: 500,
-    icon: 'checked-shield',
+    icon: 'cracked-shield',
     add: { armor: 15 },
   },
   hex_charm: {
@@ -66,7 +66,7 @@ export const ITEMS: Record<string, ItemDef> = {
     name: 'Hex Charm',
     tier: 1,
     cost: 500,
-    icon: 'barrel',
+    icon: 'magic-swirl',
     add: { ward: 15 },
   },
   whetstone: {
@@ -74,7 +74,7 @@ export const ITEMS: Record<string, ItemDef> = {
     name: 'Whetstone',
     tier: 1,
     cost: 500,
-    icon: 'sword-clash',
+    icon: 'rock',
     add: { attackSpeed: 0.15 },
   },
 
@@ -84,7 +84,7 @@ export const ITEMS: Record<string, ItemDef> = {
     name: 'Windrunner Charm',
     tier: 2,
     cost: 1150,
-    icon: 'three-friends',
+    icon: 'wingfoot',
     buildsFrom: 'whetstone',
     add: { moveSpeed: 0.35, attackSpeed: 0.08 },
     passive: {
@@ -98,7 +98,7 @@ export const ITEMS: Record<string, ItemDef> = {
     name: "Executioner's Edge",
     tier: 2,
     cost: 1150,
-    icon: 'sword-clash',
+    icon: 'battle-axe',
     buildsFrom: 'sharpened_fang',
     add: { ad: 25 },
     passive: {
@@ -112,7 +112,7 @@ export const ITEMS: Record<string, ItemDef> = {
     name: 'Stormweaver Focus',
     tier: 2,
     cost: 1150,
-    icon: 'tower-fall',
+    icon: 'lightning-storm',
     buildsFrom: 'spark_crystal',
     add: { ap: 35, haste: 0.1 },
     passive: {
@@ -126,7 +126,7 @@ export const ITEMS: Record<string, ItemDef> = {
     name: 'Juggernaut Mail',
     tier: 2,
     cost: 1150,
-    icon: 'checked-shield',
+    icon: 'scale-mail',
     buildsFrom: 'iron_plate',
     add: { hpMax: 280, armor: 20 },
     passive: {
@@ -140,7 +140,7 @@ export const ITEMS: Record<string, ItemDef> = {
     name: 'Nullwave Cloak',
     tier: 2,
     cost: 1150,
-    icon: 'barrel',
+    icon: 'cloak-dagger',
     buildsFrom: 'hex_charm',
     add: { hpMax: 250, ward: 20 },
     passive: {
@@ -154,7 +154,7 @@ export const ITEMS: Record<string, ItemDef> = {
     name: 'Vampire Seal',
     tier: 2,
     cost: 1150,
-    icon: 'cannon-ball',
+    icon: 'bleeding-heart',
     buildsFrom: 'sharpened_fang',
     add: { ad: 20 },
     passive: {
@@ -170,7 +170,7 @@ export const ITEMS: Record<string, ItemDef> = {
     name: 'Dragonfang Blade',
     tier: 3,
     cost: 2300,
-    icon: 'sword-clash',
+    icon: 'dragon-head',
     buildsFrom: 'executioners_edge',
     add: { ad: 45, attackSpeed: 0.2 },
     passive: {
@@ -184,7 +184,7 @@ export const ITEMS: Record<string, ItemDef> = {
     name: 'Starcore Staff',
     tier: 3,
     cost: 2300,
-    icon: 'tower-fall',
+    icon: 'star-swirl',
     buildsFrom: 'stormweaver_focus',
     add: { ap: 75, haste: 0.15 },
     passive: {
@@ -198,7 +198,7 @@ export const ITEMS: Record<string, ItemDef> = {
     name: "Titan's Bastion",
     tier: 3,
     cost: 2300,
-    icon: 'checked-shield',
+    icon: 'white-tower',
     buildsFrom: 'juggernaut_mail',
     add: { hpMax: 450, armor: 30, ward: 30 },
     passive: {
@@ -212,7 +212,7 @@ export const ITEMS: Record<string, ItemDef> = {
     name: 'Phantom Anchor',
     tier: 3,
     cost: 2300,
-    icon: 'galleon',
+    icon: 'anchor',
     buildsFrom: 'windrunner_charm',
     add: { ad: 35, moveSpeed: 0.3 },
     passive: {
@@ -226,7 +226,7 @@ export const ITEMS: Record<string, ItemDef> = {
     name: 'Lifebloom Idol',
     tier: 3,
     cost: 2300,
-    icon: 'three-friends',
+    icon: 'totem-head',
     buildsFrom: 'stormweaver_focus',
     add: { ap: 60 },
     passive: {
@@ -240,7 +240,7 @@ export const ITEMS: Record<string, ItemDef> = {
     name: 'Overclock Gauntlet',
     tier: 3,
     cost: 2300,
-    icon: 'brick-wall',
+    icon: 'fist',
     buildsFrom: 'vampire_seal',
     add: { ad: 20, attackSpeed: 0.25, haste: 0.1 },
     passive: {
@@ -257,7 +257,7 @@ export const RELICS: Record<string, RelicDef> = {
     name: 'Blink Prism',
     cost: 800,
     cooldown: 75,
-    icon: 'tower-fall',
+    icon: 'prism',
     description: 'Blink 4.5u toward your cursor.',
     params: { distance: 4.5 },
   },
@@ -266,7 +266,7 @@ export const RELICS: Record<string, RelicDef> = {
     name: 'Purge Bell',
     cost: 800,
     cooldown: 75,
-    icon: 'barrel',
+    icon: 'bell-shield',
     description: 'Cleanse crowd control on yourself.',
     params: {},
   },
@@ -275,7 +275,7 @@ export const RELICS: Record<string, RelicDef> = {
     name: 'Ember Flask',
     cost: 800,
     cooldown: 45,
-    icon: 'cannon-ball',
+    icon: 'fire-bottle',
     description: 'Cone burn: 180 arcane damage + 25% slow for 2s.',
     params: { damage: 180, apRatio: 0.3, slow: 0.25, slowDuration: 2, radius: 4, angleDeg: 70 },
   },
@@ -284,7 +284,7 @@ export const RELICS: Record<string, RelicDef> = {
     name: 'Horn of Rally',
     cost: 800,
     cooldown: 60,
-    icon: 'three-friends',
+    icon: 'horn-internal',
     description: 'Allies within 6u gain a 140 shield for 3s.',
     params: { shield: 140, radius: 6, duration: 3 },
   },

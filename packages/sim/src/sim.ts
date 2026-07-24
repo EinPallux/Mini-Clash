@@ -86,6 +86,21 @@ export class Sim {
         suddenDeath: false,
       };
       spawnStructures(w, battle);
+      // Offline test hook: pre-damage the enemy core so smokes can reach the win
+      // sequence in seconds. The authoritative server (v0.3) never honors rig.
+      if (config.rig) {
+        const human = config.players.find((pl) => !pl.bot);
+        const enemyTeam = human && human.team === 1 ? 0 : 1;
+        for (const ent of w.entities) {
+          if (ent.team !== enemyTeam) continue;
+          if (ent.kind === 'core' && config.rig.enemyCoreHp !== undefined) {
+            ent.hp = Math.max(1, Math.min(ent.hpMax, config.rig.enemyCoreHp));
+          }
+          if (ent.kind === 'tower' && config.rig.enemyTowerHp !== undefined) {
+            ent.hp = Math.max(1, Math.min(ent.hpMax, config.rig.enemyTowerHp));
+          }
+        }
+      }
     } else {
       w.match = {
         mode: 'training',
@@ -144,6 +159,7 @@ export class Sim {
           itemState: {},
           lastCombatAt: -100,
           lastDamagedAt: -100,
+          lastPingAt: -100,
           lastChampHitAt: -100,
           lastActionAt: -100,
           inBrush: false,
@@ -242,6 +258,28 @@ export class Sim {
       case 'sell':
         trySell(w, e, it.itemId);
         return;
+      case 'ping': {
+        // Map awareness works from the death screen too. Rate-limited per player.
+        const c = e.champ;
+        if (!c) return;
+        if (w.time - c.lastPingAt < 0.8) return;
+        c.lastPingAt = w.time;
+        w.pings.push({ team: e.team, kind: it.kind, x: it.x, z: it.z, tick: w.tick });
+        w.emit({ t: 'ping', player: m.player, team: e.team, kind: it.kind, x: it.x, z: it.z });
+        return;
+      }
+      case 'surrender': {
+        // From 8:00 (UI_UX §8). Solo vs bots: the lone human's vote passes at once;
+        // the vote UI proper arrives with multiplayer in v0.3.
+        const match = w.match;
+        if (!match || match.mode !== 'bridge' || match.over) return;
+        if (w.time < BRIDGE.surrenderAt) return;
+        const winner = e.team === 0 ? 1 : 0;
+        match.over = { winner };
+        w.emit({ t: 'surrendered', team: e.team });
+        w.emit({ t: 'matchOver', winner });
+        return;
+      }
       default:
         break;
     }
@@ -389,7 +427,10 @@ export class Sim {
       return this.snapshot();
     }
 
-    // 0. Bot brains issue intents through the same pipe as players.
+    // 0. Trim stale team pings (~5 s), then bot brains issue intents through the
+    // same pipe as players.
+    if (w.pings.length > 0) w.pings = w.pings.filter((pg) => w.tick - pg.tick <= 150);
+    // Bot brains read the world (incl. pings) and answer with ordinary intents.
     if (this.brains.size > 0) {
       const intents = thinkBots(w, this.map, this.brains);
       for (const m of intents) this.applyIntent(m);

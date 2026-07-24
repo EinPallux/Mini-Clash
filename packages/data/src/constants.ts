@@ -65,6 +65,8 @@ export const BRIDGE = {
   /** 16:00 Corebreaker: Cores take double damage, waves turn all-Ram (GAME_DESIGN §5/§9). */
   overtime: { at: 960, coreDamageMul: 2, waveRams: 4 },
   /** 20:00 Sudden Death: both Cores decay; higher-HP Core survives (§5). */
+  /** Surrender unlocks at 8:00 (UI_UX §8). Solo-vs-bots concedes immediately. */
+  surrenderAt: 480,
   suddenDeath: { at: 1200, decayPctPerSec: 0.01 },
   /** Brush: attacking/casting reveals you for this long. */
   brushRevealAfterAction: 1.5,

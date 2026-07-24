@@ -1,5 +1,11 @@
 import { CHAMPION_LIST, CHAMPIONS, SHATTERBRIDGE_MAP, TRAINING_MAP } from '@mini-clash/data';
-import type { ChampionSnap, MatchPlayerConfig, SimEvent, TrainerCmd } from '@mini-clash/protocol';
+import type {
+  ChampionSnap,
+  MatchPlayerConfig,
+  PingKind,
+  SimEvent,
+  TrainerCmd,
+} from '@mini-clash/protocol';
 import * as THREE from 'three';
 import { paletteColors, useSettings } from '../state/settings';
 import { ActorManager } from './actors';
@@ -112,19 +118,29 @@ export class MatchRuntime {
 
     this.link = new WorkerLink();
     this.link.onSnapshot = (snap) => this.buffer.push(snap);
+    // ?rig=win pre-damages enemy structures AND idles the enemy seats — offline
+    // smoke hook so acceptance tests reach the win sequence in ~2 minutes
+    // (harmless vs bots, and the v0.3 server ignores rig).
+    const rigged =
+      mode === 'bridge' && new URLSearchParams(window.location.search).get('rig') === 'win';
+    const rig = rigged ? { enemyCoreHp: 1, enemyTowerHp: 1 } : undefined;
     await this.link.start({
       mode,
       seed: (Math.random() * 0xffffffff) >>> 0,
       mapId: map.id,
+      rig,
       players:
         mode === 'bridge'
-          ? (roster ?? bridgeRoster(championId))
+          ? (roster ?? bridgeRoster(championId)).map((p) =>
+              rigged && p.team === 1 ? { ...p, bot: undefined } : p,
+            )
           : [{ id: SELF_PLAYER, championId, team: 0 }],
     });
     onProgress(0.95);
 
     this.input = new InputManager(canvas, this.camera, {
       send: (intent) => this.link.send(SELF_PLAYER, intent),
+      quickPing: mode === 'bridge' ? () => this.ping('attack') : undefined,
       pickEntity: (nx, ny) => this.pick(nx, ny),
       onEscape: () => this.onEscape?.(),
       moveMarker: (x, z, kind) => {
@@ -174,8 +190,89 @@ export class MatchRuntime {
     this.link.send(SELF_PLAYER, { t: 'trainer', cmd: { k: 'switchChampion', championId } });
   }
 
+  /** Ping at the current cursor ground position (wheel/quick-ping UI). */
+  ping(kind: PingKind): void {
+    const g = this.input.cursorGround;
+    this.link.send(SELF_PLAYER, { t: 'ping', kind, x: g.x, z: g.z });
+  }
+
+  surrender(): void {
+    this.link.send(SELF_PLAYER, { t: 'surrender' });
+  }
+
+  buy(itemId: string): void {
+    this.link.send(SELF_PLAYER, { t: 'buy', itemId });
+  }
+
+  buyRelic(relicId: string): void {
+    this.link.send(SELF_PLAYER, { t: 'buyRelic', relicId });
+  }
+
+  sell(itemId: string): void {
+    this.link.send(SELF_PLAYER, { t: 'sell', itemId });
+  }
+
+  /** Lane-strip minimap payload (drawn by the HUD at ~10 Hz). */
+  minimap(): {
+    width: number;
+    deckHalf: number;
+    marks: { x: number; z: number; kind: string; team: number; self: boolean; dead?: boolean }[];
+  } {
+    const snap = this.buffer.current;
+    const marks: {
+      x: number;
+      z: number;
+      kind: string;
+      team: number;
+      self: boolean;
+      dead?: boolean;
+    }[] = [];
+    if (snap) {
+      for (const e of snap.entities) {
+        if (
+          e.kind === 'champion' ||
+          e.kind === 'tower' ||
+          e.kind === 'core' ||
+          e.kind === 'orb' ||
+          e.kind === 'mini'
+        ) {
+          marks.push({
+            x: e.x,
+            z: e.z,
+            kind: e.kind,
+            team: e.team,
+            self: e.kind === 'champion' && e.player === SELF_PLAYER,
+            dead: (e.kind === 'champion' || e.kind === 'tower') && e.dead ? true : undefined,
+          });
+        }
+      }
+    }
+    return { width: SHATTERBRIDGE_MAP.width, deckHalf: 11, marks };
+  }
+
   trainer(cmd: TrainerCmd): void {
     this.link.send(SELF_PLAYER, { t: 'trainer', cmd });
+  }
+
+  private seatName(player: number): { name: string; championId: string; team: number } {
+    const snap = this.buffer.current;
+    for (const e of snap?.entities ?? []) {
+      if (e.kind === 'champion' && e.player === player) {
+        return {
+          name: e.player === SELF_PLAYER ? 'You' : e.name,
+          championId: e.championId,
+          team: e.team,
+        };
+      }
+    }
+    const seat = useHud.getState().seats.find((s2) => s2.player === player);
+    return seat
+      ? {
+          name: seat.player === SELF_PLAYER ? 'You' : seat.name,
+          championId: seat.championId,
+          team: seat.team,
+        }
+      : { name: '—', championId: 'rook', team: 0 };
   }
 
   private handleEvents(events: SimEvent[]): void {
@@ -200,9 +297,53 @@ export class MatchRuntime {
           hud.denied(ev.reason);
           playCue('cast_denied', { bus: 'ui', volume: 0.7 });
           break;
-        case 'towerDown':
+        case 'kill': {
+          const victim = this.seatName(ev.victim);
+          const killer = ev.killer !== null ? this.seatName(ev.killer) : null;
+          hud.addFeed({
+            kind: 'kill',
+            killerChamp: killer?.championId,
+            victimChamp: victim.championId,
+            killerName: killer?.name ?? 'The bridge',
+            victimName: victim.name,
+            team: killer?.team ?? (victim.team === 0 ? 1 : 0),
+          });
+          break;
+        }
+        case 'towerDown': {
           // Big moment regardless of position — the fx timeline covers local presentation.
           this.camera.shake('m');
+          hud.addFeed({
+            kind: 'tower',
+            team: ev.byTeam,
+            text: `${ev.tier === 'outer' ? 'Outer' : 'Inner'} watchtower down`,
+          });
+          break;
+        }
+        case 'purchase':
+          if (ev.player === SELF_PLAYER) {
+            hud.shopResult(ev.ok, ev.reason);
+            playCue(ev.ok ? 'shop_buy' : 'cast_denied', { bus: 'ui', volume: 0.7 });
+          }
+          break;
+        case 'ping': {
+          const colors: Record<string, number> = {
+            danger: 0xff5a3c,
+            attack: 0xffc72e,
+            omw: 0x3ba7ff,
+            help: 0x6fe0a8,
+          };
+          const color = colors[ev.kind] ?? 0xffffff;
+          this.rings.spawn(ev.x, ev.z, color, 1.6, 0.55, 0.5);
+          this.rings.spawn(ev.x, ev.z, color, 0.7, 0.9, 0.35);
+          playCue(ev.kind === 'danger' ? 'ping_danger' : 'ping_mark', {
+            bus: 'ui',
+            volume: 0.8,
+          });
+          break;
+        }
+        case 'surrendered':
+          hud.addFeed({ kind: 'surrender', team: ev.team, text: 'Surrendered' });
           break;
         case 'matchOver':
           this.camera.shake('l');
