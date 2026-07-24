@@ -27,9 +27,24 @@ export interface HudDummy {
   hpFrac: number;
 }
 
+export interface HudMatch {
+  mode: 'training' | 'bridge';
+  /** Whole seconds since match start. */
+  time: number;
+  barrierDown: boolean;
+  teamKills: [number, number];
+  towersDown: [number, number];
+  winner: number | null;
+  over: boolean;
+  nextOrbIn: number | null;
+  overtime: boolean;
+  suddenDeath: boolean;
+}
+
 interface HudState {
   champion: HudChampion | null;
   dummies: HudDummy[];
+  match: HudMatch | null;
   deniedAt: number;
   deniedReason: string;
   fps: number;
@@ -45,6 +60,7 @@ interface HudState {
 export const useHud = create<HudState>()((set) => ({
   champion: null,
   dummies: [],
+  match: null,
   deniedAt: 0,
   deniedReason: '',
   fps: 0,
@@ -53,8 +69,21 @@ export const useHud = create<HudState>()((set) => ({
   setFlags: (f) => set(f),
   denied: (reason) => set({ deniedAt: Date.now(), deniedReason: reason }),
   setFps: (fps) => set({ fps }),
-  reset: () => set({ champion: null, dummies: [], noCooldowns: false, infiniteEnergy: false }),
+  reset: () =>
+    set({ champion: null, dummies: [], match: null, noCooldowns: false, infiniteEnergy: false }),
   applySnapshot: (snap, selfPlayer) => {
+    const match: HudMatch = {
+      mode: snap.match.mode,
+      time: Math.floor(snap.match.time),
+      barrierDown: snap.match.barrierDown,
+      teamKills: snap.match.teamKills,
+      towersDown: snap.match.towersDown,
+      winner: snap.match.over?.winner ?? null,
+      over: snap.match.over !== null,
+      nextOrbIn: snap.match.nextOrbIn === null ? null : Math.ceil(snap.match.nextOrbIn),
+      overtime: snap.match.overtime,
+      suddenDeath: snap.match.suddenDeath,
+    };
     let champion: HudChampion | null = null;
     const dummies: HudDummy[] = [];
     for (const e of snap.entities) {
@@ -91,11 +120,12 @@ export const useHud = create<HudState>()((set) => ({
       // Cheap dirty check to skip identical frames.
       if (
         JSON.stringify(s.champion) === JSON.stringify(champion) &&
-        JSON.stringify(s.dummies) === JSON.stringify(dummies)
+        JSON.stringify(s.dummies) === JSON.stringify(dummies) &&
+        JSON.stringify(s.match) === JSON.stringify(match)
       ) {
         return s;
       }
-      return { champion, dummies };
+      return { champion, dummies, match };
     });
   },
 }));

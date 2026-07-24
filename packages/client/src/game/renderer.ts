@@ -196,7 +196,8 @@ export class GameRenderer {
       root.position.set(prop.position[0], prop.position[1], prop.position[2]);
       root.rotation.y = ((prop.rotationDeg ?? 0) * Math.PI) / 180;
       const s = prop.scale ?? 1;
-      root.scale.setScalar(s);
+      if (Array.isArray(s)) root.scale.set(s[0], s[1], s[2]);
+      else root.scale.setScalar(s);
       this.scene.add(root);
     }
   }
@@ -205,6 +206,17 @@ export class GameRenderer {
     const size = map.floor.size;
     const cols = Math.ceil(map.width / size) + 2;
     const rows = Math.ceil(map.height / size) + 2;
+    // Sky-bridge maps clip the floor to the deck and fray the outermost rows so the
+    // silhouette reads fractured over the void (deterministic hash pattern).
+    const deckHalf = map.floor.deckHalf ?? Number.POSITIVE_INFINITY;
+    const masked = (c: number, r: number): boolean => {
+      const z = (r - rows / 2) * size + size / 2;
+      if (Math.abs(z) > deckHalf) return true;
+      if (map.floor.frayEnds && Math.abs(z) > deckHalf - size) {
+        return (c * 31 + r * 17) % 7 < 2;
+      }
+      return false;
+    };
     const placeTiles = (key: string, filter: (c: number, r: number) => boolean): void => {
       const { root } = instantiate(key);
       let tileMesh: THREE.Mesh | null = null;
@@ -234,8 +246,8 @@ export class GameRenderer {
       });
       this.scene.add(inst);
     };
-    placeTiles(map.floor.tile, (c, r) => (c * 7 + r * 13) % 9 !== 0);
-    placeTiles(map.floor.accentTile, (c, r) => (c * 7 + r * 13) % 9 === 0);
+    placeTiles(map.floor.tile, (c, r) => !masked(c, r) && (c * 7 + r * 13) % 9 !== 0);
+    placeTiles(map.floor.accentTile, (c, r) => !masked(c, r) && (c * 7 + r * 13) % 9 === 0);
   }
 
   render(): void {

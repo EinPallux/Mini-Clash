@@ -36,6 +36,9 @@ const KAYKIT_SKELETON_ANIMS = [
   'KayKit_Skeletons_1.1_FREE/Animations/gltf/Rig_Medium/Rig_Medium_MovementBasic.glb',
 ];
 
+/** Mini crowd bodies keep only the states their actor drives (bytes matter ×30 on screen). */
+const MINI_CLIPS = ['idle', 'walk', 'attack-melee-right', 'holding-right-shoot', 'die'];
+
 const CHAR_CLIPS = [
   'idle',
   'walk',
@@ -138,6 +141,12 @@ export const ASSET_MANIFEST: AssetEntry[] = [
     src: 'KayKit_Dungeon/Models/Characters/gltf/extra heads/skull.gltf.glb',
     group: 'match-core',
   },
+  // Mortis W grave marker (fx timeline prop)
+  {
+    key: 'graveyard/gravestone',
+    src: 'Kenney_GraveyardKit/GLB format/gravestone-bevel.glb',
+    group: 'champion',
+  },
 
   // Dummy body
   {
@@ -145,6 +154,111 @@ export const ASSET_MANIFEST: AssetEntry[] = [
     src: 'Kenney_BlockyCharacters/GLB format/character-r.glb',
     group: 'match-core',
     keepClips: ['static', 'idle', 'die'],
+  },
+
+  // Mini bodies (ASSET_CATALOG: BlockyCharacters = all Minis, team-palette tints)
+  {
+    key: 'chars-blocky/character-d',
+    src: 'Kenney_BlockyCharacters/GLB format/character-d.glb',
+    group: 'match-core',
+    keepClips: MINI_CLIPS,
+  },
+  {
+    key: 'chars-blocky/character-p',
+    src: 'Kenney_BlockyCharacters/GLB format/character-p.glb',
+    group: 'match-core',
+    keepClips: MINI_CLIPS,
+  },
+  {
+    key: 'castle/siege-ram',
+    src: 'Kenney_CastleKit/GLB format/siege-ram.glb',
+    group: 'match-core',
+  },
+  {
+    key: 'castle/siege-ram-broken',
+    src: 'Kenney_CastleKit/GLB format/siege-ram-demolished.glb',
+    group: 'match-core',
+  },
+
+  // Watchtower stack (Castle bodies per ASSET_CATALOG) + TD ballista on top
+  {
+    key: 'castle/tower-base',
+    src: 'Kenney_CastleKit/GLB format/tower-hexagon-base.glb',
+    group: 'match-core',
+  },
+  {
+    key: 'castle/tower-mid',
+    src: 'Kenney_CastleKit/GLB format/tower-hexagon-mid.glb',
+    group: 'match-core',
+  },
+  {
+    key: 'castle/tower-top',
+    src: 'Kenney_CastleKit/GLB format/tower-hexagon-top-wood.glb',
+    group: 'match-core',
+  },
+  {
+    key: 'castle/tower-roof',
+    src: 'Kenney_CastleKit/GLB format/tower-hexagon-roof.glb',
+    group: 'match-core',
+  },
+  {
+    key: 'td/weapon-ballista',
+    src: 'Kenney_TDKit/GLB format/weapon-ballista.glb',
+    group: 'match-core',
+  },
+
+  // Clash Core: castle plinth + floating crystal
+  {
+    key: 'castle/core-base',
+    src: 'Kenney_CastleKit/GLB format/tower-square-base.glb',
+    group: 'match-core',
+  },
+  {
+    key: 'td/crystal',
+    src: 'Kenney_TDKit/GLB format/detail-crystal-large.glb',
+    group: 'match-core',
+  },
+
+  // Battlefield dressing: orb/fountain pads, void pillars, rubble, team flags
+  { key: 'td/spawn-pad', src: 'Kenney_TDKit/GLB format/spawn-round.glb', group: 'match-core' },
+  {
+    key: 'castle/bridge-pillar',
+    src: 'Kenney_CastleKit/GLB format/bridge-straight-pillar.glb',
+    group: 'match-core',
+  },
+  {
+    key: 'castle/rocks-large',
+    src: 'Kenney_CastleKit/GLB format/rocks-large.glb',
+    group: 'match-core',
+  },
+  {
+    key: 'castle/rocks-small',
+    src: 'Kenney_CastleKit/GLB format/rocks-small.glb',
+    group: 'match-core',
+  },
+  { key: 'castle/flag', src: 'Kenney_CastleKit/GLB format/flag.glb', group: 'match-core' },
+  {
+    key: 'castle/flag-banner',
+    src: 'Kenney_CastleKit/GLB format/flag-banner-long.glb',
+    group: 'match-core',
+  },
+
+  // Brush pockets + Sylva flowers (NatureKit)
+  {
+    key: 'nature/bush-large',
+    src: 'Kenney_NatureKit/GLTF format/plant_bushLarge.glb',
+    group: 'match-core',
+  },
+  {
+    key: 'nature/bush',
+    src: 'Kenney_NatureKit/GLTF format/plant_bushDetailed.glb',
+    group: 'match-core',
+  },
+  { key: 'nature/grass', src: 'Kenney_NatureKit/GLTF format/grass_large.glb', group: 'match-core' },
+  {
+    key: 'nature/flower-purple',
+    src: 'Kenney_NatureKit/GLTF format/flower_purpleA.glb',
+    group: 'match-core',
   },
 
   // Fathom kit props

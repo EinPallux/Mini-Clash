@@ -7,13 +7,18 @@ interface Profile {
   name: string;
 }
 
+export type MatchMode = 'training' | 'bridge';
+
 interface SessionState {
   screen: Screen;
   profile: Profile | null;
+  /** Mode the next match launches into. */
+  matchMode: MatchMode;
   /** Champion chosen for the next Training session. */
   trainingChampion: string;
   goto: (s: Screen) => void;
   setProfile: (name: string) => void;
+  setMatchMode: (m: MatchMode) => void;
   setTrainingChampion: (id: string) => void;
 }
 
@@ -34,6 +39,7 @@ function loadProfile(): Profile | null {
 export const useSession = create<SessionState>()((set) => ({
   screen: 'boot',
   profile: loadProfile(),
+  matchMode: 'training',
   trainingChampion: 'rook',
   goto: (s) => set({ screen: s }),
   setProfile: (name) => {
@@ -42,6 +48,7 @@ export const useSession = create<SessionState>()((set) => ({
     localStorage.setItem(PROFILE_KEY, JSON.stringify(profile));
     set({ profile });
   },
+  setMatchMode: (m) => set({ matchMode: m }),
   setTrainingChampion: (id) => set({ trainingChampion: id }),
 }));
 

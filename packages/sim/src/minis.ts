@@ -85,6 +85,7 @@ export function updateMini(w: World, e: Entity, battle: Battle, dt: number): voi
   const m = e.mini;
   if (!m) return;
   if (e.dead) {
+    w.fx(`mini.${m.def.mini?.kind ?? 'bruiser'}.death`, e.x, e.z, {});
     w.remove(e.id);
     return;
   }

@@ -56,7 +56,18 @@ export const UNITS: Record<string, UnitDef> = {
       vsMinis: 2.5,
       scalePerMin: 0.03,
     },
-    visual: { model: 'chars-blocky/character-r', scale: 0.75 },
+    visual: {
+      model: 'chars-blocky/character-d',
+      scale: 1,
+      anim: {
+        idle: { clip: 'idle', loop: true },
+        run: { clip: 'walk', loop: true },
+        attack: { clip: 'attack-melee-right', speed: 1.25 },
+        death: { clip: 'die' },
+      },
+      // Prop scale is in arm-node space (the body itself is ~0.4×) — oversize to read.
+      props: [{ model: 'dungeon/weapon-spear', socket: 'handRight', scale: 2.2 }],
+    },
   },
   mini_zapper: {
     id: 'mini_zapper',
@@ -80,7 +91,16 @@ export const UNITS: Record<string, UnitDef> = {
       vsMinis: 2.5,
       scalePerMin: 0.03,
     },
-    visual: { model: 'chars-blocky/character-r', scale: 0.7 },
+    visual: {
+      model: 'chars-blocky/character-p',
+      scale: 0.88,
+      anim: {
+        idle: { clip: 'idle', loop: true },
+        run: { clip: 'walk', loop: true },
+        attack: { clip: 'holding-right-shoot', speed: 1.1 },
+        death: { clip: 'die' },
+      },
+    },
   },
   mini_ram: {
     id: 'mini_ram',
@@ -104,7 +124,8 @@ export const UNITS: Record<string, UnitDef> = {
       vsMinis: 1,
       scalePerMin: 0.03,
     },
-    visual: { model: 'chars-blocky/character-r', scale: 0.95 },
+    // Castle siege engine — no clips; the actor rolls wheels/bobs procedurally.
+    visual: { model: 'castle/siege-ram', scale: 1 },
   },
   rattle_skull: {
     id: 'rattle_skull',

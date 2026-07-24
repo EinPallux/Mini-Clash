@@ -35,7 +35,7 @@ Attribution is not required but we do it anyway: maintain `CREDITS.md` (create a
 | `Kenney_PirateKit` (72) | Fathom kit (cannon, barrel, cannon-ball, bottle), **`ship-ghost` for Broadside**, dock props for hub harbor |
 | `Kenney_WatercraftKit` (46) | Hub harbor dressing; future naval event |
 | `Kenney_FactoryKit` (143) | Core machinery greebles, Patch's backpack/scrap, future factory biome |
-| `Kenney_GraveyardKit` (86 props) | Wisp R props, spooky palette variant of the bridge (post-1.0) |
+| `Kenney_GraveyardKit` (86 props) | Mortis W grave marker, Wisp R props, spooky palette variant of the bridge (post-1.0) |
 | `KayKit_Dungeon` (192 glb) | Underdeck details, Mortis W props (shelves/bones), dungeon biome (post-1.0) |
 | `KayKit_Medieval_Hexagon` (221) | **Hub island terrain** (hex build style for the meta scene) |
 | `KayKit_Spooktober` (46) | Halloween seasonal event dressing (post-1.0), candles/pumpkins for Wisp palette |

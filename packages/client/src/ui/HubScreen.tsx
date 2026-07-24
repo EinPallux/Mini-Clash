@@ -16,6 +16,10 @@ const ROLE_ICON: Record<string, string> = {
 const CHAMP_THEME: Record<string, { from: string; to: string; line: string }> = {
   rook: { from: '#8a94a6', to: '#3d4656', line: '#aab6cc' },
   fathom: { from: '#2e5aa8', to: '#14274d', line: '#3ba7ff' },
+  mortis: { from: '#6c4a8a', to: '#2a1a3d', line: '#b36bff' },
+  rattle: { from: '#8a2f3c', to: '#3d1420', line: '#ff5a6b' },
+  grukk: { from: '#4a7a3a', to: '#1f3a17', line: '#8ade6a' },
+  sylva: { from: '#c47a3a', to: '#5c3417', line: '#ffb35c' },
 };
 
 export function HubScreen(): React.ReactElement {
@@ -23,18 +27,31 @@ export function HubScreen(): React.ReactElement {
   const goto = useSession((s) => s.goto);
   const champion = useSession((s) => s.trainingChampion);
   const setChampion = useSession((s) => s.setTrainingChampion);
+  const setMatchMode = useSession((s) => s.setMatchMode);
   const [settingsOpen, setSettingsOpen] = useState(false);
 
+  const play = (mode: 'training' | 'bridge'): void => {
+    uiSound('ui_click');
+    setMatchMode(mode);
+    goto('match');
+  };
+
   useEffect(() => {
+    // Ignore the Enter that submitted the name screen: React flushes this effect
+    // while that keydown is still bubbling toward window, so it would instantly
+    // launch a match the player never asked for.
+    const mountedAt = performance.now();
     const onKey = (e: KeyboardEvent): void => {
+      if (performance.now() - mountedAt < 300) return;
       if (e.code === 'Enter' && !settingsOpen) {
         uiSound('ui_click');
+        setMatchMode('bridge');
         goto('match');
       }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [goto, settingsOpen]);
+  }, [goto, setMatchMode, settingsOpen]);
 
   return (
     <div className="hub-root backdrop-light">
@@ -122,14 +139,30 @@ export function HubScreen(): React.ReactElement {
 
         <div className="section-label">Game modes</div>
         <div className="mode-row">
-          <button
-            type="button"
-            className="mode-card"
-            onClick={() => {
-              uiSound('ui_click');
-              goto('match');
-            }}
-          >
+          <button type="button" className="mode-card" onClick={() => play('bridge')}>
+            <span className="ribbon">
+              <span>New</span>
+            </span>
+            <div
+              className="hero"
+              style={{ background: 'linear-gradient(135deg, #b23a3a, #6e1c1c)' }}
+            >
+              <span
+                className="glyph"
+                style={{
+                  maskImage: 'url(/icons/tower-fall.svg)',
+                  WebkitMaskImage: 'url(/icons/tower-fall.svg)',
+                }}
+              />
+            </div>
+            <div className="info">
+              <div className="mode-kind">4v4 · vs Bots</div>
+              <h3>Bridge Brawl</h3>
+              <div className="desc">The full ARAM on the Shatterbridge.</div>
+            </div>
+          </button>
+
+          <button type="button" className="mode-card" onClick={() => play('training')}>
             <span className="ribbon">
               <span>Available now</span>
             </span>
@@ -151,29 +184,6 @@ export function HubScreen(): React.ReactElement {
               <div className="desc">{STRINGS.trainingDesc}</div>
             </div>
           </button>
-
-          <div className="mode-card locked" aria-disabled>
-            <span className="ribbon dim">
-              <span>v0.2</span>
-            </span>
-            <div
-              className="hero"
-              style={{ background: 'linear-gradient(135deg, #b23a3a, #6e1c1c)' }}
-            >
-              <span
-                className="glyph"
-                style={{
-                  maskImage: 'url(/icons/tower-fall.svg)',
-                  WebkitMaskImage: 'url(/icons/tower-fall.svg)',
-                }}
-              />
-            </div>
-            <div className="info">
-              <div className="mode-kind">4v4 · vs Bots</div>
-              <h3>Bridge Brawl</h3>
-              <div className="desc">The full ARAM on the Shatterbridge.</div>
-            </div>
-          </div>
 
           <div className="mode-card locked" aria-disabled>
             <span className="ribbon dim">
@@ -200,7 +210,7 @@ export function HubScreen(): React.ReactElement {
         </div>
       </div>
 
-      <div className="hintbar on-light">Mini Clash v0.1 — Training Grounds</div>
+      <div className="hintbar on-light">Mini Clash v0.2 — Shatterbridge</div>
       <div className="keyhint on-light">
         <span className="cap">ENTER</span>
         <span className="lbl">Play</span>

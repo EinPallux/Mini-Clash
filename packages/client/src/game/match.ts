@@ -1,10 +1,11 @@
-import { CHAMPIONS, TRAINING_MAP } from '@mini-clash/data';
-import type { ChampionSnap, SimEvent, TrainerCmd } from '@mini-clash/protocol';
+import { CHAMPION_LIST, CHAMPIONS, SHATTERBRIDGE_MAP, TRAINING_MAP } from '@mini-clash/data';
+import type { ChampionSnap, MatchPlayerConfig, SimEvent, TrainerCmd } from '@mini-clash/protocol';
 import * as THREE from 'three';
 import { paletteColors, useSettings } from '../state/settings';
 import { ActorManager } from './actors';
 import { loadManifest, preload } from './assets';
 import { playCue } from './audio';
+import { BridgeSet } from './bridge';
 import { FollowCamera } from './camera';
 import { ParticleSystem } from './fx/particles';
 import { FxRunner } from './fx/runner';
@@ -18,6 +19,32 @@ import { AimIndicator, DamageNumbers, DecalPool, RingPool, SweepPool } from './u
 /** MatchRuntime: owns the render loop, systems, worker sim and their lifecycles. */
 
 const SELF_PLAYER = 1;
+export type MatchMode = 'training' | 'bridge';
+
+const BOT_NAMES = ['Krag', 'Nyx', 'Piston', 'Moxie', 'Thorn', 'Ember', 'Gruff', 'Fizz'];
+
+/** 7 bot seats for Bridge Brawl: fill both teams from the roster, no duplicate champs
+ * until the pool runs dry. Personalities/tiers live sim-side; Veteran is the default. */
+function bridgeRoster(selfChampionId: string): MatchPlayerConfig[] {
+  const pool = CHAMPION_LIST.map((c) => c.id).filter((id) => id !== selfChampionId);
+  for (let i = pool.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [pool[i], pool[j]] = [pool[j], pool[i]];
+  }
+  const pick = (): string =>
+    pool.shift() ?? CHAMPION_LIST[Math.floor(Math.random() * CHAMPION_LIST.length)].id;
+  const players: MatchPlayerConfig[] = [{ id: SELF_PLAYER, championId: selfChampionId, team: 0 }];
+  for (let i = 0; i < 7; i++) {
+    players.push({
+      id: SELF_PLAYER + 1 + i,
+      championId: pick(),
+      team: i < 3 ? 0 : 1,
+      bot: 'veteran',
+      name: BOT_NAMES[i],
+    });
+  }
+  return players;
+}
 
 export class MatchRuntime {
   private renderer!: GameRenderer;
@@ -33,6 +60,7 @@ export class MatchRuntime {
   private aim!: AimIndicator;
   private fx!: FxRunner;
   private buffer = new SnapshotBuffer();
+  private bridge: BridgeSet | null = null;
   private raf = 0;
   private lastT = 0;
   private lastRender = 0;
@@ -46,14 +74,16 @@ export class MatchRuntime {
     canvas: HTMLCanvasElement,
     championId: string,
     onProgress: (p: number) => void,
+    mode: MatchMode = 'training',
   ): Promise<void> {
+    const map = mode === 'bridge' ? SHATTERBRIDGE_MAP : TRAINING_MAP;
     const manifest = await loadManifest();
     onProgress(0.08);
     const keys = Object.keys(manifest.assets);
     await preload(keys, (done, total) => onProgress(0.08 + (done / total) * 0.62));
 
     this.renderer = new GameRenderer(canvas);
-    await this.renderer.buildEnvironment(TRAINING_MAP);
+    await this.renderer.buildEnvironment(map);
     onProgress(0.8);
 
     this.camera = new FollowCamera(this.renderer.camera);
@@ -62,7 +92,8 @@ export class MatchRuntime {
     this.decals = new DecalPool(this.renderer.scene);
     this.sweeps = new SweepPool(this.renderer.scene);
     this.numbers = new DamageNumbers(this.renderer.scene);
-    this.actors = new ActorManager(this.renderer.scene, SELF_PLAYER);
+    this.actors = new ActorManager(this.renderer.scene, SELF_PLAYER, 0, this.particles);
+    if (mode === 'bridge') this.bridge = new BridgeSet(this.renderer.scene, map);
     this.aim = new AimIndicator(
       this.renderer.scene,
       paletteColors(useSettings.getState().palette).ally,
@@ -81,10 +112,11 @@ export class MatchRuntime {
     this.link = new WorkerLink();
     this.link.onSnapshot = (snap) => this.buffer.push(snap);
     await this.link.start({
-      mode: 'training',
+      mode,
       seed: (Math.random() * 0xffffffff) >>> 0,
-      mapId: TRAINING_MAP.id,
-      players: [{ id: SELF_PLAYER, championId, team: 0 }],
+      mapId: map.id,
+      players:
+        mode === 'bridge' ? bridgeRoster(championId) : [{ id: SELF_PLAYER, championId, team: 0 }],
     });
     onProgress(0.95);
 
@@ -98,7 +130,7 @@ export class MatchRuntime {
       },
     });
 
-    const spawn = TRAINING_MAP.spawns[0];
+    const spawn = map.spawns.find((s) => s.team === 0) ?? map.spawns[0];
     this.camera.setTarget(spawn.x, spawn.z);
     this.camera.snap();
     onProgress(1);
@@ -164,6 +196,13 @@ export class MatchRuntime {
         case 'castDenied':
           hud.denied(ev.reason);
           playCue('cast_denied', { bus: 'ui', volume: 0.7 });
+          break;
+        case 'towerDown':
+          // Big moment regardless of position — the fx timeline covers local presentation.
+          this.camera.shake('m');
+          break;
+        case 'matchOver':
+          this.camera.shake('l');
           break;
         default:
           break;
@@ -256,7 +295,11 @@ export class MatchRuntime {
     this.numbers.update(dt);
 
     const snap = this.buffer.current;
-    if (snap) useHud.getState().applySnapshot(snap, SELF_PLAYER);
+    if (snap) {
+      useHud.getState().applySnapshot(snap, SELF_PLAYER);
+      this.bridge?.apply(snap.match);
+    }
+    this.bridge?.update(dt);
 
     this.renderer.render();
 
@@ -279,6 +322,7 @@ export class MatchRuntime {
     this.link?.dispose();
     this.fx?.dispose();
     this.actors?.dispose();
+    this.bridge?.dispose();
     this.renderer?.dispose();
     useHud.getState().reset();
   }

@@ -1197,3 +1197,116 @@ input[type="range"] {
   opacity: 0;
   pointer-events: none;
 }
+
+/* ------------------------------ Bridge HUD ------------------------------- */
+
+.match-strip {
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%) skewX(var(--skew));
+  display: flex;
+  align-items: stretch;
+  background: linear-gradient(180deg, rgba(16, 20, 34, 0.94), rgba(10, 13, 24, 0.94));
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-top: 3px solid var(--gold);
+  min-width: 300px;
+}
+.match-strip > * {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0.3rem 0.9rem;
+}
+.match-strip .side {
+  min-width: 84px;
+  justify-content: flex-end;
+}
+.match-strip .side.ally {
+  border-right: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: inset 4px 0 0 var(--ally);
+  justify-content: space-between;
+}
+.match-strip .side.enemy {
+  border-left: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: inset -4px 0 0 var(--enemy);
+  justify-content: space-between;
+}
+.match-strip .kills {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-weight: 700;
+  font-size: 1.5rem;
+  color: #fff;
+  transform: skewX(calc(var(--skew) * -1));
+}
+.match-strip .pips {
+  display: flex;
+  gap: 4px;
+}
+.match-strip .pip {
+  width: 9px;
+  height: 12px;
+  background: rgba(255, 255, 255, 0.85);
+  clip-path: polygon(0 25%, 50% 0, 100% 25%, 100% 100%, 0 100%);
+}
+.match-strip .pip.down {
+  background: rgba(255, 255, 255, 0.18);
+}
+.match-strip .clock-block {
+  flex-direction: column;
+  gap: 0;
+  justify-content: center;
+  min-width: 86px;
+}
+.match-strip .clock {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-weight: 600;
+  font-size: 1.25rem;
+  color: #fff;
+  line-height: 1.1;
+  transform: skewX(calc(var(--skew) * -1));
+}
+.match-strip .clock.hot {
+  color: #ff8a5c;
+}
+.match-strip .sub {
+  font-size: 0.66rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--gold);
+  transform: skewX(calc(var(--skew) * -1));
+}
+.match-strip .sub.orb {
+  color: #6fe0a8;
+}
+
+.escalation-banner {
+  position: absolute;
+  top: 74px;
+  left: 50%;
+  transform: translateX(-50%) skewX(var(--skew));
+  background: linear-gradient(180deg, rgba(178, 58, 58, 0.95), rgba(110, 28, 28, 0.95));
+  border: 1px solid rgba(255, 138, 92, 0.6);
+  padding: 0.25rem 1.4rem;
+  animation: bannerpulse 1.6s ease-in-out infinite;
+}
+.escalation-banner > span {
+  display: inline-block;
+  transform: skewX(calc(var(--skew) * -1));
+  font-family: var(--font-display);
+  font-style: italic;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  color: #ffe2d6;
+}
+@keyframes bannerpulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 rgba(255, 90, 60, 0);
+  }
+  50% {
+    box-shadow: 0 0 22px rgba(255, 90, 60, 0.55);
+  }
+}

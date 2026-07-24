@@ -352,6 +352,23 @@ export const unitSchema = z.object({
     prim: z.enum(['barrel']).optional(),
     scale: z.number().positive(),
     tint: z.number().optional(),
+    anim: z
+      .record(
+        z.string(),
+        z.object({ clip: z.string(), speed: z.number().optional(), loop: z.boolean().optional() }),
+      )
+      .optional(),
+    props: z
+      .array(
+        z.object({
+          model: z.string(),
+          socket: z.enum(['handRight', 'handLeft', 'back', 'root']),
+          scale: z.number().optional(),
+          position: z.tuple([z.number(), z.number(), z.number()]).optional(),
+          rotationDeg: z.tuple([z.number(), z.number(), z.number()]).optional(),
+        }),
+      )
+      .optional(),
   }),
 });
 
@@ -385,11 +402,17 @@ export const mapSchema = z.object({
       model: z.string(),
       position: z.tuple([z.number(), z.number(), z.number()]),
       rotationDeg: z.number().optional(),
-      scale: z.number().optional(),
+      scale: z.union([z.number(), z.tuple([z.number(), z.number(), z.number()])]).optional(),
       tint: z.number().optional(),
     }),
   ),
-  floor: z.object({ tile: z.string(), accentTile: z.string(), size: z.number().positive() }),
+  floor: z.object({
+    tile: z.string(),
+    accentTile: z.string(),
+    size: z.number().positive(),
+    deckHalf: z.number().positive().optional(),
+    frayEnds: z.boolean().optional(),
+  }),
   skybox: z.string(),
   spawns: z.array(
     z.object({

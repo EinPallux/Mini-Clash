@@ -536,6 +536,13 @@ export const SOUND_CUES: Record<string, SynthCue> = {
     id: 'mini_thump',
     layers: [{ wave: 'noise', freq: 1, attack: 0.002, decay: 0.06, volume: 0.1, lowpass: 1200 }],
   },
+  mini_pop: {
+    id: 'mini_pop',
+    layers: [
+      { wave: 'square', freq: 340, freqEnd: 120, attack: 0.001, decay: 0.11, volume: 0.1 },
+      { wave: 'noise', freq: 1, attack: 0.001, decay: 0.08, volume: 0.07, lowpass: 2400 },
+    ],
+  },
   relic_blink: {
     id: 'relic_blink',
     layers: [

@@ -4,6 +4,7 @@ import { uiSound } from '../../game/audio';
 import { MatchRuntime } from '../../game/match';
 import { useSession } from '../../state/session';
 import { SettingsModal } from '../SettingsModal';
+import { BridgeHud } from './BridgeHud';
 import { TrainingHud } from './TrainingHud';
 
 /** The match screen: canvas + loading veil + HUD + Esc menu. */
@@ -16,6 +17,7 @@ export function MatchView(): React.ReactElement {
   const [menuOpen, setMenuOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const championId = useSession((s) => s.trainingChampion);
+  const mode = useSession((s) => s.matchMode);
   const goto = useSession((s) => s.goto);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: the runtime owns champion switching after boot — never restart the match on championId change
@@ -27,7 +29,7 @@ export function MatchView(): React.ReactElement {
     runtime.onEscape = () => setMenuOpen((v) => !v);
     let alive = true;
     runtime
-      .start(canvas, championId, (p) => alive && setProgress(p))
+      .start(canvas, championId, (p) => alive && setProgress(p), mode)
       .then(() => alive && setReady(true))
       .catch((err: unknown) => alive && setError(err instanceof Error ? err.message : String(err)));
     return () => {
@@ -41,13 +43,18 @@ export function MatchView(): React.ReactElement {
     <div className="match-root">
       <canvas ref={canvasRef} style={{ width: '100%', height: '100%' }} />
 
-      {ready && <TrainingHud runtime={() => runtimeRef.current} />}
+      {ready &&
+        (mode === 'bridge' ? (
+          <BridgeHud runtime={() => runtimeRef.current} />
+        ) : (
+          <TrainingHud runtime={() => runtimeRef.current} />
+        ))}
 
       {(!ready || error) && (
         <div className="loading-veil backdrop-dark">
           <div className="screen" style={{ position: 'static' }}>
             <h1 className="wordmark" style={{ fontSize: '3rem' }}>
-              {STRINGS.training}
+              {mode === 'bridge' ? 'BRIDGE BRAWL' : STRINGS.training}
             </h1>
             {error ? (
               <>
