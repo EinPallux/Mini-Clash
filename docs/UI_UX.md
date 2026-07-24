@@ -54,9 +54,10 @@ Backdrop: the 3D hub island (Medieval-Hexagon terrain, harbor with Pirate/Waterc
 
 ## 5. Party & Custom Lobby
 
-- **Party dock (ambient):** avatar chips; + opens invite sheet — 6-char code + copy-link (`playminiclash.example/j/ABC123`); joining puts you in the leader's dock. Party persists through matches; leader crown transfers on leave.
-- **Custom Lobby screen:** two team columns of 4 seats; each seat = player chip / **bot chip** (difficulty dropdown per bot: Recruit/Veteran/Elite) / empty. Drag chips between teams; spectator row post-1.0. Right panel: lobby code (huge), mode summary, bot-fill toggle ("fill empty seats on start"). Leader's **START** requires ≥1 human. Non-leaders see readiness toggle.
-- Edge states: leader disconnect → crown migrates + toast; joining a full/dead code → friendly error with "make your own lobby" CTA.
+- **Party dock (ambient):** avatar chips; + opens invite sheet — 6-char code + copy-link (`?join=ABC123` query link — works on any static host); joining puts you in the leader's dock. Party persists through matches; leader crown transfers on leave. *(v0.3 form: the dock shows your connected lobby — code + member chips — and rides the hub while you browse; the lobby connection survives matches for Play Again.)*
+- **Custom Lobby screen:** two team columns of 4 seats; each seat = player chip / **bot chip** (per-bot difficulty: Recruit/Veteran/Elite) / empty. Seat management is tap-first per principle #5: tap an empty seat to sit there; leaders tap bot tiers directly on the chip (drag lands with the spectator row post-1.0). Right panel: lobby code (huge), mode summary, bot-fill toggle ("fill empty seats on start"). Leader's **START** requires ≥1 human and every seated human readied. Non-leaders see a readiness toggle.
+- Edge states: leader disconnect → crown migrates + toast; joining a full/dead code → friendly error with "make your own lobby" CTA; leaving mid-select turns your seat into a Veteran bot that keeps your pick.
+- *(v0.3)* START runs the champion-select deal **server-side** — per-human deal + 2 rerolls, shared team bench with atomic swaps, 45 s auto-lock — then every human receives a private seat reservation into the match room. Enemy picks never cross the wire before load.
 
 ## 6. Champion Select (the Deal)
 

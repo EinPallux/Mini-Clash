@@ -2,6 +2,7 @@ import type {
   Intent,
   IntentMsg,
   MatchConfig,
+  MatchPlayerConfig,
   Snapshot,
   WorkerToClient,
 } from '@mini-clash/protocol';
@@ -22,6 +23,8 @@ export interface NetLink {
   readonly rttMs: number;
   /** Last intent sequence the authority confirmed applying (reconciliation). */
   readonly ackedSeq: number;
+  /** Authoritative roster (server-sent online; null offline — config wins). */
+  readonly roster: MatchPlayerConfig[] | null;
   start(config: MatchConfig): Promise<void>;
   /** Queue an intent; returns its sequence number. */
   send(intent: Intent): number;
@@ -36,6 +39,7 @@ export class WorkerLink implements NetLink {
   onDropped: ((reason: string) => void) | null = null;
   readonly playerId: number;
   readonly rttMs = 0;
+  readonly roster = null;
   ackedSeq = -1;
 
   constructor(playerId: number) {
@@ -86,6 +90,11 @@ export function serverEndpoint(): string {
   return `${proto}://${window.location.host}/ws`;
 }
 
+export interface SocketJoin {
+  roomId: string;
+  token: string;
+}
+
 export class SocketLink implements NetLink {
   private room: Room | null = null;
   private seq = 0;
@@ -97,29 +106,35 @@ export class SocketLink implements NetLink {
   playerId = 0;
   /** Last intent sequence the server acknowledged applying (reconciliation). */
   ackedSeq = -1;
+  /** Authoritative roster from the server's seat message. */
+  roster: MatchPlayerConfig[] | null = null;
 
-  constructor(
-    private endpoint = serverEndpoint(),
-    private joinName?: string,
-  ) {}
+  constructor(private opts: { endpoint?: string; name?: string; join?: SocketJoin } = {}) {}
 
   get rttMs(): number {
     return this.rtt;
   }
 
   async start(config: MatchConfig): Promise<void> {
-    const client = new ColyseusClient(this.endpoint);
-    const room = await client.create('bridge', {
-      name: this.joinName,
-      roster: config.players,
-      seed: config.seed,
-      rig: config.rig,
-    });
+    const client = new ColyseusClient(this.opts.endpoint ?? serverEndpoint());
+    // Lobby matches join a reserved seat by token; solo online creates a room.
+    const room = this.opts.join
+      ? await client.joinById(this.opts.join.roomId, {
+          name: this.opts.name,
+          token: this.opts.join.token,
+        })
+      : await client.create('bridge', {
+          name: this.opts.name,
+          roster: config.players,
+          seed: config.seed,
+          rig: config.rig,
+        });
     this.room = room;
 
     const seated = new Promise<void>((resolve) => {
-      room.onMessage('seat', (msg: { player: number }) => {
+      room.onMessage('seat', (msg: { player: number; roster?: MatchPlayerConfig[] }) => {
         this.playerId = msg.player;
+        if (Array.isArray(msg.roster)) this.roster = msg.roster;
         resolve();
       });
     });

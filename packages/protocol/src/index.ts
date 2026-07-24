@@ -300,6 +300,65 @@ export interface Snapshot {
   events: SimEvent[];
 }
 
+/* ---------------------------------- Lobby --------------------------------- */
+
+/** One of 8 lobby seats (two team columns × 4). */
+export interface LobbySeatSnap {
+  team: Team;
+  /** 0..3 within the team column. */
+  idx: number;
+  occupant:
+    | { kind: 'human'; key: string; name: string; ready: boolean; leader: boolean }
+    | { kind: 'bot'; tier: BotTier }
+    | null;
+}
+
+/** Broadcast to every member on any lobby mutation. */
+export interface LobbySnap {
+  code: string;
+  phase: 'lobby' | 'select';
+  seats: LobbySeatSnap[];
+  botFill: boolean;
+  /** Why START is unavailable right now (null = leader can start). */
+  startBlocked: string | null;
+}
+
+/** Per-client champion-select view — enemy picks never cross the wire. */
+export interface LobbySelectSnap {
+  timeLeft: number;
+  you: { champion: string; rerolls: number; locked: boolean };
+  /** Your team's four cards in seat order (includes you). */
+  team: {
+    key: string;
+    name: string;
+    champion: string;
+    locked: boolean;
+    bot: boolean;
+    you: boolean;
+  }[];
+  /** Shared team bench (rerolled champions, first-come swaps). */
+  bench: string[];
+  /** Enemy cards to draw face-down. */
+  enemyCount: number;
+}
+
+/** Handoff into the authoritative match room once everyone locked. */
+export interface LobbyMatchMsg {
+  roomId: string;
+  token: string;
+  seat: PlayerId;
+}
+
+export type LobbyClientMsg =
+  | { t: 'seat'; team: Team; idx: number }
+  | { t: 'bot'; team: Team; idx: number; tier: BotTier | null }
+  | { t: 'fill'; on: boolean }
+  | { t: 'ready'; on: boolean }
+  | { t: 'start' }
+  | { t: 'reroll' }
+  | { t: 'swap'; championId: string }
+  | { t: 'lock' };
+
 /* ------------------------------- Worker link ------------------------------ */
 
 export type ClientToWorker =

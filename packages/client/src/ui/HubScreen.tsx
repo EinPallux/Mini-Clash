@@ -1,6 +1,7 @@
 import { CHAMPION_LIST, STRINGS } from '@mini-clash/data';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { uiSound } from '../game/audio';
+import { useLobby } from '../state/lobby';
 import { useSession } from '../state/session';
 import { SettingsModal } from './SettingsModal';
 
@@ -29,12 +30,25 @@ export function HubScreen(): React.ReactElement {
   const setChampion = useSession((s) => s.setTrainingChampion);
   const setMatchMode = useSession((s) => s.setMatchMode);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [friendsOpen, setFriendsOpen] = useState(false);
+  const lobbyStatus = useLobby((s) => s.status);
+  const lobbySnap = useLobby((s) => s.snap);
+  const pendingCode = useLobby((s) => s.pendingCode);
 
   const play = (mode: 'training' | 'bridge'): void => {
     uiSound('ui_click');
     setMatchMode(mode);
     goto(mode === 'bridge' ? 'select' : 'match');
   };
+
+  // ?join=CODE deep link: land in the join flow once (with the code prefilled).
+  const consumedDeepLink = useRef(false);
+  useEffect(() => {
+    if (pendingCode && !consumedDeepLink.current && lobbyStatus === 'idle') {
+      consumedDeepLink.current = true;
+      setFriendsOpen(true);
+    }
+  }, [pendingCode, lobbyStatus]);
 
   useEffect(() => {
     // Ignore the Enter that submitted the name screen: React flushes this effect
@@ -43,7 +57,7 @@ export function HubScreen(): React.ReactElement {
     const mountedAt = performance.now();
     const onKey = (e: KeyboardEvent): void => {
       if (performance.now() - mountedAt < 300) return;
-      if (e.code === 'Enter' && !settingsOpen) {
+      if (e.code === 'Enter' && !settingsOpen && !friendsOpen) {
         uiSound('ui_click');
         setMatchMode('bridge');
         goto('select');
@@ -51,7 +65,7 @@ export function HubScreen(): React.ReactElement {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [goto, setMatchMode, settingsOpen]);
+  }, [goto, setMatchMode, settingsOpen, friendsOpen]);
 
   return (
     <div className="hub-root backdrop-light">
@@ -185,9 +199,17 @@ export function HubScreen(): React.ReactElement {
             </div>
           </button>
 
-          <div className="mode-card locked" aria-disabled>
-            <span className="ribbon dim">
-              <span>v0.3</span>
+          <button
+            type="button"
+            className="mode-card"
+            onClick={() => {
+              uiSound('ui_click');
+              if (lobbyStatus === 'in') goto('lobby');
+              else setFriendsOpen(true);
+            }}
+          >
+            <span className="ribbon">
+              <span>New</span>
             </span>
             <div
               className="hero"
@@ -204,11 +226,39 @@ export function HubScreen(): React.ReactElement {
             <div className="info">
               <div className="mode-kind">Online · Custom lobby</div>
               <h3>Play with friends</h3>
-              <div className="desc">Invite codes, bots fill empty seats.</div>
+              <div className="desc">
+                {lobbyStatus === 'in'
+                  ? 'Return to your lobby.'
+                  : 'Invite codes, bots fill empty seats.'}
+              </div>
             </div>
-          </div>
+          </button>
         </div>
       </div>
+
+      {lobbyStatus === 'in' && lobbySnap && (
+        <button
+          type="button"
+          className="party-dock"
+          title="Return to lobby"
+          onClick={() => {
+            uiSound('ui_click');
+            goto('lobby');
+          }}
+        >
+          <span className="pd-code">{lobbySnap.code}</span>
+          {lobbySnap.seats
+            .filter((s) => s.occupant?.kind === 'human')
+            .map((s) =>
+              s.occupant?.kind === 'human' ? (
+                <span key={s.occupant.key} className="pd-chip">
+                  {s.occupant.name.slice(0, 1).toUpperCase()}
+                </span>
+              ) : null,
+            )}
+          <span className="pd-label">IN LOBBY — return</span>
+        </button>
+      )}
 
       <div className="hintbar on-light">Mini Clash v0.2 — Shatterbridge</div>
       <div className="keyhint on-light">
@@ -217,6 +267,103 @@ export function HubScreen(): React.ReactElement {
       </div>
 
       {settingsOpen && <SettingsModal onClose={() => setSettingsOpen(false)} />}
+      {friendsOpen && <FriendsModal onClose={() => setFriendsOpen(false)} />}
+    </div>
+  );
+}
+
+/** Create-or-join sheet for custom lobbies (UI_UX §5). */
+function FriendsModal({ onClose }: { onClose: () => void }): React.ReactElement {
+  const profile = useSession((s) => s.profile);
+  const goto = useSession((s) => s.goto);
+  const createLobby = useLobby((s) => s.create);
+  const joinLobby = useLobby((s) => s.join);
+  const lobbyError = useLobby((s) => s.error);
+  const clearError = useLobby((s) => s.clearError);
+  const pendingCode = useLobby((s) => s.pendingCode);
+  const setPendingCode = useLobby((s) => s.setPendingCode);
+  const [code, setCode] = useState(pendingCode ?? '');
+  const [busy, setBusy] = useState(false);
+  const name = profile?.name ?? 'Player';
+
+  const doCreate = async (): Promise<void> => {
+    if (busy) return;
+    uiSound('ui_click');
+    setBusy(true);
+    const ok = await createLobby(name);
+    setBusy(false);
+    if (ok) {
+      setPendingCode(null);
+      onClose();
+      goto('lobby');
+    }
+  };
+
+  const doJoin = async (): Promise<void> => {
+    if (busy || code.trim().length < 6) return;
+    uiSound('ui_click');
+    setBusy(true);
+    const ok = await joinLobby(code, name);
+    setBusy(false);
+    if (ok) {
+      setPendingCode(null);
+      onClose();
+      goto('lobby');
+    }
+  };
+
+  return (
+    <div className="modal-veil" onPointerDown={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="panel friends-modal col">
+        <h2>Play with friends</h2>
+        <p className="fm-sub">
+          One lobby, one code. Create one and share it, or punch in a friend’s code.
+        </p>
+        <button type="button" className="btn primary" disabled={busy} onClick={doCreate}>
+          {busy ? '…' : 'CREATE LOBBY'}
+        </button>
+        <div className="fm-or">— or join with a code —</div>
+        <div className="row" style={{ gap: 8 }}>
+          <input
+            className="fm-code"
+            value={code}
+            maxLength={6}
+            placeholder="ABC123"
+            onChange={(e) => {
+              clearError();
+              setCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''));
+            }}
+            onKeyDown={(e) => {
+              if (e.code === 'Enter') void doJoin();
+              e.stopPropagation();
+            }}
+          />
+          <button
+            type="button"
+            className="btn"
+            disabled={busy || code.trim().length < 6}
+            onClick={doJoin}
+          >
+            JOIN
+          </button>
+        </div>
+        {lobbyError && (
+          <div className="fm-error">
+            {lobbyError} — <b>make your own lobby</b> with the button above.
+          </div>
+        )}
+        <button
+          type="button"
+          className="btn ghost"
+          onClick={() => {
+            uiSound('ui_back');
+            setPendingCode(null);
+            onClose();
+          }}
+        >
+          {STRINGS.back}
+        </button>
+      </div>
     </div>
   );
 }

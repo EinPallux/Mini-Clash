@@ -44,14 +44,36 @@ export class BridgeRoom extends Room {
   private seats = new Map<string, number>();
   /** sessionId → last intent seq applied (echoed for client reconciliation). */
   private acked = new Map<string, number>();
-  /** Reserved seats for reconnect (playerId → reservation deadline). */
   private intentBudget = new Map<string, { windowStart: number; count: number }>();
+  /** Lobby handoff: one-time token → seat (lobby-created rooms only). */
+  private reservations = new Map<string, { player: number; name: string }>();
+  /** Lobby-created rooms never seat tokenless walk-ins. */
+  private invitational = false;
+  /** Reserved humans that haven't arrived yet (bot-covered if the match starts). */
+  private awaited = new Set<number>();
+  /** Clients that finished loading. */
+  private loaded = new Set<string>();
+  private startCap: ReturnType<typeof setTimeout> | null = null;
 
   override onCreate(options: JoinOptions): void {
     this.maxClients = 8;
     const roster = validateRoster(options);
     this.match = createMatchState(roster, options);
     this.setMetadata({ mode: 'bridge', code: this.match.code });
+    const reserved = (options as { reservations?: unknown }).reservations;
+    if (reserved && typeof reserved === 'object') {
+      for (const [token, entry] of Object.entries(reserved as Record<string, unknown>)) {
+        const e = entry as { player?: unknown; name?: unknown };
+        if (typeof e?.player === 'number') {
+          this.reservations.set(token, {
+            player: e.player,
+            name: typeof e.name === 'string' ? e.name.slice(0, 24) : '',
+          });
+          this.awaited.add(e.player);
+          this.invitational = true;
+        }
+      }
+    }
 
     this.onMessage('intents', (client, msgs: unknown) => {
       delayed(() => this.applyIntentBatch(client, msgs));
@@ -62,10 +84,22 @@ export class BridgeRoom extends Room {
     });
 
     this.onMessage('ready', (client) => {
-      // Client finished loading — start ticking once the first human is in.
-      void client;
-      this.startIfReady();
+      this.loaded.add(client.sessionId);
+      // Start once every connected human loaded and every reserved seat arrived;
+      // slow loaders get a 20 s cap (UI_UX §7) — a bot stands in until arrival.
+      if (this.startCap === null) {
+        this.startCap = setTimeout(() => this.startIfReady(), 20_000);
+      }
+      if (this.everyoneReady()) this.startIfReady();
     });
+  }
+
+  private everyoneReady(): boolean {
+    if (this.awaited.size > 0) return false;
+    for (const client of this.clients) {
+      if (!this.loaded.has(client.sessionId)) return false;
+    }
+    return true;
   }
 
   private applyIntentBatch(client: Client, msgs: unknown): void {
@@ -90,9 +124,32 @@ export class BridgeRoom extends Room {
     this.intentBudget.set(client.sessionId, budget);
   }
 
-  override onJoin(client: Client, options: JoinOptions): void {
-    // v0.3 slice: the creating human takes seat 1; later humans claim bot seats
-    // (lobby room hands out explicit seat assignments).
+  override onJoin(client: Client, options: JoinOptions & { token?: string }): void {
+    // Lobby handoff: a one-time token maps to the exact seat the lobby assigned.
+    const token = typeof options?.token === 'string' ? options.token : null;
+    if (token !== null) {
+      const entry = this.reservations.get(token);
+      if (!entry) throw new Error('invalid seat token');
+      this.reservations.delete(token);
+      this.awaited.delete(entry.player);
+      this.seats.set(client.sessionId, entry.player);
+      // Late arrival after the 20 s cap: reclaim the seat from its cover bot.
+      if (this.sim && this.match.covered.has(entry.player)) {
+        this.match.reclaimSeat(this.sim, entry.player);
+      }
+      client.send('seat', {
+        player: entry.player,
+        roster: this.match.roster,
+        seed: this.match.seed,
+      });
+      if (this.everyoneReady()) this.startIfReady();
+      return;
+    }
+    // Lobby-created rooms are invitation-only — no tokenless walk-ins.
+    if (this.invitational) {
+      throw new Error('this match is private');
+    }
+    // Solo flow: the creating human takes the first unclaimed human seat.
     const seat = this.match.claimSeat(options?.name);
     if (seat === null) {
       throw new Error('room is full');
@@ -103,7 +160,15 @@ export class BridgeRoom extends Room {
 
   private startIfReady(): void {
     if (this.sim) return;
+    if (this.startCap !== null) {
+      clearTimeout(this.startCap);
+      this.startCap = null;
+    }
     this.sim = new Sim(this.match.config());
+    // Reserved humans that never arrived: a bot stands in until they do.
+    for (const player of this.awaited) {
+      this.match.coverSeat(this.sim, player);
+    }
     let tickIndex = 0;
     this.setSimulationInterval(() => {
       const sim = this.sim;
@@ -152,12 +217,16 @@ export class BridgeRoom extends Room {
   override async onLeave(client: Client, consented: boolean): Promise<void> {
     const player = this.seats.get(client.sessionId);
     if (player === undefined) return;
-    if (!consented && this.sim && !this.sim.world.match?.over) {
+    const matchOver = this.sim?.world.match?.over ?? false;
+    if (!consented && !matchOver) {
       // Hold the seat 90 s (GAME_DESIGN §17); the sim's bot brain covers it.
-      this.match.coverSeat(this.sim, player);
+      // Dropping during loading counts too — the sim covers the seat at start.
+      if (this.sim) this.match.coverSeat(this.sim, player);
+      else this.awaited.add(player);
       try {
         await this.allowReconnection(client, 90);
-        this.match.reclaimSeat(this.sim, player);
+        this.awaited.delete(player);
+        if (this.sim && this.match.covered.has(player)) this.match.reclaimSeat(this.sim, player);
         this.seats.set(client.sessionId, player);
         client.send('seat', { player, roster: this.match.roster, seed: this.match.seed });
         return;
@@ -167,9 +236,13 @@ export class BridgeRoom extends Room {
     }
     this.seats.delete(client.sessionId);
     this.intentBudget.delete(client.sessionId);
+    this.loaded.delete(client.sessionId);
+    // A leaver may have been the last thing loading was waiting on.
+    if (!this.sim && this.startCap !== null && this.everyoneReady()) this.startIfReady();
   }
 
   override onDispose(): void {
+    if (this.startCap !== null) clearTimeout(this.startCap);
     this.sim = null;
   }
 }

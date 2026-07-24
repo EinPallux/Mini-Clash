@@ -33,20 +33,33 @@ export function MatchView(): React.ReactElement {
     runtime.onEscape = () => setMenuOpen((v) => !v);
     let alive = true;
     const myChampion = mode === 'bridge' ? (lineup?.[0]?.championId ?? championId) : championId;
-    // ?online=1 routes the bridge match through the Colyseus server (the lobby
-    // flow will pass this explicitly once multi-human seating lands).
+    // Lobby matches always ride the socket (seat reservation from the lobby);
+    // ?online=1 additionally routes solo bridge matches through the server.
+    const join = useSession.getState().matchJoin;
     const net =
-      mode === 'bridge' && new URLSearchParams(window.location.search).get('online') === '1'
+      mode === 'bridge' &&
+      (join !== null || new URLSearchParams(window.location.search).get('online') === '1')
         ? ('socket' as const)
         : ('worker' as const);
+    const name = useSession.getState().profile?.name;
     runtime
-      .start(canvas, myChampion, (p) => alive && setProgress(p), mode, lineup ?? undefined, net)
+      .start(
+        canvas,
+        myChampion,
+        (p) => alive && setProgress(p),
+        mode,
+        lineup ?? undefined,
+        net,
+        join ? { ...join, name } : undefined,
+      )
       .then(() => alive && setReady(true))
       .catch((err: unknown) => alive && setError(err instanceof Error ? err.message : String(err)));
     return () => {
       alive = false;
       runtime.dispose();
       runtimeRef.current = null;
+      // A lobby handoff is one match only — the next round mints a new token.
+      useSession.getState().setMatchJoin(null);
     };
   }, []);
 

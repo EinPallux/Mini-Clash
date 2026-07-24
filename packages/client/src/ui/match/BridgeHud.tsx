@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { uiSound } from '../../game/audio';
 import { type FeedEntry, type HudSeat, useHud } from '../../game/hudStore';
 import type { MatchRuntime } from '../../game/match';
+import { useLobby } from '../../state/lobby';
 import { useSession } from '../../state/session';
 import { paletteColors, useSettings } from '../../state/settings';
 import { ChampionCluster, DenyFlash } from './HudShared';
@@ -158,13 +159,21 @@ export function BridgeHud({ runtime }: { runtime: () => MatchRuntime | null }): 
 
 /* ------------------------------ Team frames ------------------------------- */
 
-function SeatChip({ seat, self }: { seat: HudSeat; self: boolean }): React.ReactElement {
+function SeatChip({
+  seat,
+  self,
+  ally,
+}: {
+  seat: HudSeat;
+  self: boolean;
+  ally: boolean;
+}): React.ReactElement {
   return (
     <div
       className={`seat ${seat.dead ? 'dead' : ''} ${seat.visible ? '' : 'hidden-seat'} ${self ? 'self' : ''}`}
     >
       <div className="chip" style={{ background: CHAMP_TONE[seat.championId] ?? '#555' }}>
-        {seat.visible || seat.team === 0 ? champLetter(seat.championId) : '?'}
+        {seat.visible || ally ? champLetter(seat.championId) : '?'}
         <span className="lv">{seat.level}</span>
         {seat.dead && <span className="skull">☠ {seat.respawnIn}</span>}
       </div>
@@ -177,18 +186,20 @@ function SeatChip({ seat, self }: { seat: HudSeat; self: boolean }): React.React
 
 function TeamFrames(): React.ReactElement {
   const seats = useHud((s) => s.seats);
-  const allies = seats.filter((s) => s.team === 0);
-  const enemies = seats.filter((s) => s.team === 1);
+  const selfPlayer = useHud((s) => s.selfPlayer);
+  const selfTeam = useHud((s) => s.selfTeam);
+  const allies = seats.filter((s) => s.team === selfTeam);
+  const enemies = seats.filter((s) => s.team !== selfTeam);
   return (
     <>
       <div className="team-frames left">
         {allies.map((s) => (
-          <SeatChip key={s.player} seat={s} self={s.player === 1} />
+          <SeatChip key={s.player} seat={s} self={s.player === selfPlayer} ally />
         ))}
       </div>
       <div className="team-frames right">
         {enemies.map((s) => (
-          <SeatChip key={s.player} seat={s} self={false} />
+          <SeatChip key={s.player} seat={s} self={false} ally={false} />
         ))}
       </div>
     </>
@@ -198,9 +209,10 @@ function TeamFrames(): React.ReactElement {
 /* -------------------------------- Killfeed -------------------------------- */
 
 function FeedRow({ e }: { e: FeedEntry }): React.ReactElement {
+  const selfTeam = useHud((s) => s.selfTeam);
   if (e.kind === 'kill') {
     return (
-      <div className={`feed-row ${e.team === 0 ? 'ally' : 'enemy'}`}>
+      <div className={`feed-row ${e.team === selfTeam ? 'ally' : 'enemy'}`}>
         {e.killerChamp && (
           <span className="fchip" style={{ background: CHAMP_TONE[e.killerChamp] ?? '#555' }}>
             {champLetter(e.killerChamp)}
@@ -218,7 +230,7 @@ function FeedRow({ e }: { e: FeedEntry }): React.ReactElement {
     );
   }
   return (
-    <div className={`feed-row ${e.team === 0 ? 'ally' : 'enemy'}`}>
+    <div className={`feed-row ${e.team === selfTeam ? 'ally' : 'enemy'}`}>
       <span className="x">{e.kind === 'tower' ? '🏰' : '🏳'}</span>
       <b>{e.text}</b>
     </div>
@@ -254,7 +266,7 @@ function Minimap({ runtime }: { runtime: () => MatchRuntime | null }): React.Rea
       if (!cv || !rt) return;
       const g = cv.getContext('2d');
       if (!g) return;
-      const { width, deckHalf, marks } = rt.minimap();
+      const { width, deckHalf, marks, selfTeam } = rt.minimap();
       const W = cv.width;
       const H = cv.height;
       const colors = paletteColors(useSettings.getState().palette);
@@ -265,10 +277,15 @@ function Minimap({ runtime }: { runtime: () => MatchRuntime | null }): React.Rea
       const deckY = H * 0.2;
       const deckH = H * 0.6;
       g.fillRect(2, deckY, W - 4, deckH);
-      const px = (x: number): number => 2 + ((x + width / 2) / width) * (W - 4);
+      // Team 1 sees the strip mirrored — your base is always on the left.
+      const flip = selfTeam === 1;
+      const px = (x: number): number => {
+        const v = 2 + ((x + width / 2) / width) * (W - 4);
+        return flip ? W - v : v;
+      };
       const pz = (z: number): number => deckY + ((z + deckHalf) / (deckHalf * 2)) * deckH;
       for (const m of marks) {
-        const teamColor = m.team === 0 ? colors.ally : colors.enemy;
+        const teamColor = m.team === selfTeam ? colors.ally : colors.enemy;
         if (m.kind === 'tower') {
           g.fillStyle = m.dead ? 'rgba(255,255,255,0.18)' : hex(teamColor);
           g.fillRect(px(m.x) - 3, pz(m.z) - 4, 6, 8);
@@ -545,6 +562,8 @@ function Scoreboard(): React.ReactElement | null {
   const [open, setOpen] = useState(false);
   const seats = useHud((s) => s.seats);
   const match = useHud((s) => s.match);
+  const selfPlayer = useHud((s) => s.selfPlayer);
+  const selfTeam = useHud((s) => s.selfTeam);
   useEffect(() => {
     const down = (e: KeyboardEvent): void => {
       if (e.code === 'Tab') {
@@ -565,10 +584,10 @@ function Scoreboard(): React.ReactElement | null {
   if (!open || !match) return null;
   return (
     <div className="scoreboard">
-      {[0, 1].map((team) => (
-        <div key={team} className={`sb-team ${team === 0 ? 'ally' : 'enemy'}`}>
+      {[selfTeam, 1 - selfTeam].map((team) => (
+        <div key={team} className={`sb-team ${team === selfTeam ? 'ally' : 'enemy'}`}>
           <div className="sb-head">
-            <span>{team === 0 ? STRINGS.selectYourTeam : STRINGS.selectEnemyTeam}</span>
+            <span>{team === selfTeam ? STRINGS.selectYourTeam : STRINGS.selectEnemyTeam}</span>
             <span className="sb-score">
               {match.teamKills[team]} ⚔ · {match.towersDown[1 - team]} 🏰
             </span>
@@ -576,12 +595,12 @@ function Scoreboard(): React.ReactElement | null {
           {seats
             .filter((s) => s.team === team)
             .map((s) => (
-              <div key={s.player} className={`sb-row ${s.player === 1 ? 'self' : ''}`}>
+              <div key={s.player} className={`sb-row ${s.player === selfPlayer ? 'self' : ''}`}>
                 <span className="fchip" style={{ background: CHAMP_TONE[s.championId] ?? '#555' }}>
-                  {s.visible || team === 0 ? champLetter(s.championId) : '?'}
+                  {s.visible || team === selfTeam ? champLetter(s.championId) : '?'}
                 </span>
                 <span className="sb-name">
-                  {s.player === 1 ? 'You' : s.name}
+                  {s.player === selfPlayer ? 'You' : s.name}
                   {!s.visible && <i className="sb-hidden"> hidden</i>}
                 </span>
                 <span className="sb-lv">{s.level}</span>
@@ -770,10 +789,12 @@ function EndSequence(): React.ReactElement | null {
   const match = useHud((s) => s.match);
   const seats = useHud((s) => s.seats);
   const champ = useHud((s) => s.champion);
+  const selfPlayer = useHud((s) => s.selfPlayer);
+  const selfTeam = useHud((s) => s.selfTeam);
   const [phase, setPhase] = useState<'slab' | 'podium' | 'summary'>('slab');
   const wrote = useRef(false);
 
-  const won = match?.winner === 0;
+  const won = match?.winner === selfTeam;
 
   useEffect(() => {
     const t = setTimeout(() => setPhase('podium'), 2400);
@@ -791,14 +812,14 @@ function EndSequence(): React.ReactElement | null {
       myChampion: champ.championId,
       seats: seats.map((s) => ({
         championId: s.championId,
-        name: s.player === 1 ? 'You' : s.name,
+        name: s.player === selfPlayer ? 'You' : s.name,
         team: s.team,
         k: s.kills,
         d: s.deaths,
         a: s.assists,
       })),
     });
-  }, [match, champ, seats, won]);
+  }, [match, champ, seats, won, selfPlayer]);
 
   // MVP score: kills weigh triple, assists ×1.5, deaths subtract; level breaks ties.
   const podium = useMemo(() => {
@@ -833,7 +854,7 @@ function EndSequence(): React.ReactElement | null {
             >
               {i === 0 && <span className="crown">{STRINGS.mvp}</span>}
               <span className="big">{champLetter(s.championId)}</span>
-              <span className="who">{s.player === 1 ? 'You' : s.name}</span>
+              <span className="who">{s.player === selfPlayer ? 'You' : s.name}</span>
               <span className="kda">
                 {s.kills} / {s.deaths} / {s.assists}
               </span>
@@ -863,22 +884,22 @@ function EndSequence(): React.ReactElement | null {
         {match.teamKills[0]} — {match.teamKills[1]} · {fmtClock(match.time)}
       </p>
       <div className="summary-table">
-        {[0, 1].map((team) => (
-          <div key={team} className={`sb-team ${team === 0 ? 'ally' : 'enemy'}`}>
+        {[selfTeam, 1 - selfTeam].map((team) => (
+          <div key={team} className={`sb-team ${team === selfTeam ? 'ally' : 'enemy'}`}>
             <div className="sb-head">
-              <span>{team === 0 ? STRINGS.selectYourTeam : STRINGS.selectEnemyTeam}</span>
+              <span>{team === selfTeam ? STRINGS.selectYourTeam : STRINGS.selectEnemyTeam}</span>
             </div>
             {seats
               .filter((s) => s.team === team)
               .map((s) => (
-                <div key={s.player} className={`sb-row ${s.player === 1 ? 'self' : ''}`}>
+                <div key={s.player} className={`sb-row ${s.player === selfPlayer ? 'self' : ''}`}>
                   <span
                     className="fchip"
                     style={{ background: CHAMP_TONE[s.championId] ?? '#555' }}
                   >
                     {champLetter(s.championId)}
                   </span>
-                  <span className="sb-name">{s.player === 1 ? 'You' : s.name}</span>
+                  <span className="sb-name">{s.player === selfPlayer ? 'You' : s.name}</span>
                   <span className="sb-lv">{s.level}</span>
                   <span className="sb-kda">
                     {s.kills}/{s.deaths}/{s.assists}
@@ -894,7 +915,13 @@ function EndSequence(): React.ReactElement | null {
           className="btn primary"
           onClick={() => {
             uiSound('ui_click');
-            goto('select');
+            // Lobby matches re-queue through the lobby (same party, new deal).
+            if (useLobby.getState().status === 'in') {
+              useSession.getState().setMatchJoin(null);
+              goto('lobby');
+            } else {
+              goto('select');
+            }
           }}
         >
           {STRINGS.playAgain}
@@ -904,6 +931,7 @@ function EndSequence(): React.ReactElement | null {
           className="btn"
           onClick={() => {
             uiSound('ui_back');
+            useSession.getState().setMatchJoin(null);
             goto('hub');
           }}
         >

@@ -19,7 +19,7 @@ import { FxRunner } from './fx/runner';
 import { useHud } from './hudStore';
 import { InputManager } from './input';
 import { SnapshotBuffer } from './interp';
-import { type NetLink, SocketLink, WorkerLink } from './link';
+import { type NetLink, type SocketJoin, SocketLink, WorkerLink } from './link';
 import { PredictedSelf } from './predict';
 import { GameRenderer } from './renderer';
 import { AimIndicator, DamageNumbers, DecalPool, RingPool, SweepPool } from './ui3d';
@@ -71,6 +71,7 @@ export class MatchRuntime {
   private buffer = new SnapshotBuffer();
   private predicted: PredictedSelf | null = null;
   private bridge: BridgeSet | null = null;
+  private selfTeam: 0 | 1 = 0;
   private raf = 0;
   private lastT = 0;
   private lastRender = 0;
@@ -87,6 +88,7 @@ export class MatchRuntime {
     mode: MatchMode = 'training',
     roster?: MatchPlayerConfig[],
     net: NetMode = 'worker',
+    join?: SocketJoin & { name?: string },
   ): Promise<void> {
     const map = mode === 'bridge' ? SHATTERBRIDGE_MAP : TRAINING_MAP;
     const manifest = await loadManifest();
@@ -122,7 +124,13 @@ export class MatchRuntime {
       () => this.selfPos().x,
     );
 
-    this.link = net === 'socket' ? new SocketLink() : new WorkerLink(SELF_PLAYER);
+    this.link =
+      net === 'socket'
+        ? new SocketLink({
+            name: join?.name,
+            join: join ? { roomId: join.roomId, token: join.token } : undefined,
+          })
+        : new WorkerLink(SELF_PLAYER);
     if (net === 'socket') {
       // Online: 100 ms interpolation delay for remotes; the local champion runs
       // on client-side prediction instead (TECH §6).
@@ -162,11 +170,12 @@ export class MatchRuntime {
           : [{ id: SELF_PLAYER, championId, team: 0 }],
     });
     onProgress(0.95);
-    // Seat identity is authoritative now (server-assigned online).
-    const selfTeam = (mode === 'bridge' ? (roster ?? []) : []).find(
-      (p) => p.id === this.link.playerId,
-    )?.team;
-    this.actors.setSelf(this.link.playerId, selfTeam ?? 0);
+    // Seat identity is authoritative now (server-assigned online) — and so is
+    // the roster (lobby matches never had a local one).
+    const authoritative = this.link.roster ?? (mode === 'bridge' ? (roster ?? []) : []);
+    this.selfTeam = authoritative.find((p) => p.id === this.link.playerId)?.team ?? 0;
+    this.actors.setSelf(this.link.playerId, this.selfTeam);
+    this.bridge?.setSelfTeam(this.selfTeam);
 
     this.input = new InputManager(canvas, this.camera, {
       send: (intent) => {
@@ -189,7 +198,7 @@ export class MatchRuntime {
       },
     });
 
-    const spawn = map.spawns.find((s) => s.team === 0) ?? map.spawns[0];
+    const spawn = map.spawns.find((s) => s.team === this.selfTeam) ?? map.spawns[0];
     this.camera.setTarget(spawn.x, spawn.z);
     this.camera.snap();
     onProgress(1);
@@ -267,6 +276,7 @@ export class MatchRuntime {
   minimap(): {
     width: number;
     deckHalf: number;
+    selfTeam: 0 | 1;
     marks: { x: number; z: number; kind: string; team: number; self: boolean; dead?: boolean }[];
   } {
     const snap = this.buffer.current;
@@ -298,7 +308,7 @@ export class MatchRuntime {
         }
       }
     }
-    return { width: SHATTERBRIDGE_MAP.width, deckHalf: 11, marks };
+    return { width: SHATTERBRIDGE_MAP.width, deckHalf: 11, selfTeam: this.selfTeam, marks };
   }
 
   trainer(cmd: TrainerCmd): void {

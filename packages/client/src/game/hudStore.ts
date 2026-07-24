@@ -82,6 +82,10 @@ interface HudState {
   champion: HudChampion | null;
   dummies: HudDummy[];
   match: HudMatch | null;
+  /** Our seat id — 1 offline, server-assigned online (lobby matches vary). */
+  selfPlayer: number;
+  /** Our team — display code renders ally/enemy relative to this. */
+  selfTeam: number;
   seats: HudSeat[];
   feed: FeedEntry[];
   shopMsg: { at: number; ok: boolean; reason?: string } | null;
@@ -108,6 +112,8 @@ export const useHud = create<HudState>()((set, get) => ({
   champion: null,
   dummies: [],
   match: null,
+  selfPlayer: 1,
+  selfTeam: 0,
   seats: [],
   feed: [],
   shopMsg: null,
@@ -129,6 +135,8 @@ export const useHud = create<HudState>()((set, get) => ({
       champion: null,
       dummies: [],
       match: null,
+      selfPlayer: 1,
+      selfTeam: 0,
       seats: [],
       feed: [],
       shopMsg: null,
@@ -150,12 +158,14 @@ export const useHud = create<HudState>()((set, get) => ({
       suddenDeath: snap.match.suddenDeath,
     };
     let champion: HudChampion | null = null;
+    let selfTeam = get().selfTeam;
     const dummies: HudDummy[] = [];
     const present = new Map<number, ChampionSnap>();
     for (const e of snap.entities) {
       if (e.kind === 'champion') {
         present.set(e.player, e);
         if (e.player === selfPlayer) {
+          selfTeam = e.team;
           champion = {
             championId: e.championId,
             hp: Math.ceil(e.hp),
@@ -235,7 +245,7 @@ export const useHud = create<HudState>()((set, get) => ({
       ) {
         return s;
       }
-      return { champion, dummies, match, seats };
+      return { champion, dummies, match, seats, selfPlayer, selfTeam };
     });
   },
 }));
