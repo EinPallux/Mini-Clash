@@ -54,7 +54,7 @@ export const UNITS: Record<string, UnitDef> = {
       vsStructures: 1,
       fromStructures: 1,
       vsMinis: 2.5,
-      scalePerMin: 0.03,
+      scalePerMin: 0.045,
     },
     visual: {
       model: 'chars-blocky/character-d',
@@ -89,7 +89,7 @@ export const UNITS: Record<string, UnitDef> = {
       vsStructures: 1,
       fromStructures: 1,
       vsMinis: 2.5,
-      scalePerMin: 0.03,
+      scalePerMin: 0.045,
     },
     visual: {
       model: 'chars-blocky/character-p',
@@ -122,7 +122,7 @@ export const UNITS: Record<string, UnitDef> = {
       vsStructures: 3,
       fromStructures: 0.3,
       vsMinis: 1,
-      scalePerMin: 0.03,
+      scalePerMin: 0.045,
     },
     // Castle siege engine — no clips; the actor rolls wheels/bobs procedurally.
     visual: { model: 'castle/siege-ram', scale: 1 },

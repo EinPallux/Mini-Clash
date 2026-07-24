@@ -206,7 +206,7 @@ describe('Fathom kit', () => {
   it('Powder Keg detonates on fuse and damages + slows nearby dummies', () => {
     const sim = new Sim(fathomCfg());
     sim.applyIntents([msg({ t: 'move', x: 4, z: 0 })]);
-    run(sim, 4);
+    run(sim, 5.5); // generous walk window — the assertion is about the keg, not move speed
     sim.applyIntents([msg({ t: 'cast', slot: 'w', x: 7.5, z: 0 })]);
     let snap = run(sim, 0.5);
     expect(snap.entities.some((e) => e.kind === 'keg')).toBe(true);

@@ -82,7 +82,7 @@ describe('bridge boot & barrier', () => {
 });
 
 describe('mini waves', () => {
-  it('first waves spawn at 0:35 from both gates; every 3rd wave adds Rams', () => {
+  it('first waves spawn at 0:35 from both gates; every 2nd wave adds Rams', () => {
     const sim = new Sim(humanCfg());
     let snap = run(sim, 34);
     expect(snap.entities.filter((e) => e.kind === 'mini').length).toBe(0);
@@ -90,8 +90,9 @@ describe('mini waves', () => {
     const minis = snap.entities.filter((e) => e.kind === 'mini');
     expect(minis.length).toBe(10); // 5 per gate
     expect(minis.filter((m) => m.kind === 'mini' && m.miniKind === 'ram').length).toBe(0);
-    // Waves 2 (60s) and 3 (85s): the 3rd carries a Ram per gate.
-    snap = run(sim, 55);
+    // Wave 2 (60s) carries a Ram per gate — check right after spawn, before the
+    // waves have met (survival depends on balance numbers, spawn timing doesn't).
+    snap = run(sim, 26);
     const rams = snap.entities.filter((e) => e.kind === 'mini' && e.miniKind === 'ram');
     expect(rams.length).toBe(2);
   });

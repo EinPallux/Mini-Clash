@@ -65,8 +65,9 @@ try {
   // Hub.
   await page.waitForSelector('.mode-card', { timeout: 10000 });
   await page.screenshot({ path: `${OUT}/02-hub.png` });
-  // Start training (Rook is default selection).
-  await page.click('.mode-card');
+  // Start training (Rook is default selection). The Bridge card sits first now —
+  // pick the Training card by its title.
+  await page.click('.mode-card:has-text("Training Grounds")');
   await page.waitForSelector('.hud-bottom', { timeout: 40000 });
   await page.waitForTimeout(1800); // spawn fx settle
   await page.screenshot({ path: `${OUT}/03-arena-spawn.png` });

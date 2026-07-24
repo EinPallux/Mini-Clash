@@ -90,7 +90,7 @@ describe('Mortis', () => {
     run(sim, 0.6);
     const root = dummy.buffs.find((b) => b.id === 'cc_root');
     expect(root).toBeDefined();
-    expect(root && root.def.duration).toBeCloseTo(1.6, 1); // 1.2 + 0.4 inscribed
+    expect(root && root.def.duration).toBeCloseTo(1.8, 1); // 1.4 + 0.4 inscribed
 
     // R: stand near the dummy and channel — expect several ticks.
     sim.applyIntents([msg({ t: 'move', x: dummy.x - 2.5, z: dummy.z })]);

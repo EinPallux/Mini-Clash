@@ -75,6 +75,7 @@ function rosterFor(seed) {
 const capTicks = CAP_MIN * 60 * 30;
 const results = [];
 const champStats = new Map();
+const allP95 = [];
 
 for (let m = 0; m < MATCHES; m++) {
   const cfg = rosterFor(BASE_SEED + m * 7919);
@@ -83,8 +84,11 @@ for (let m = 0; m < MATCHES; m++) {
   let over = null;
   let ticks = 0;
   let events = 0;
+  const tickMs = [];
   while (ticks < capTicks) {
+    const tt = performance.now();
     const snap = sim.tick();
+    tickMs.push(performance.now() - tt);
     ticks++;
     events += snap.events.length;
     if (snap.match.over) {
@@ -93,6 +97,9 @@ for (let m = 0; m < MATCHES; m++) {
     }
   }
   const wallMs = performance.now() - t0;
+  tickMs.sort((a, b) => a - b);
+  const p95 = tickMs[Math.floor(tickMs.length * 0.95)] ?? 0;
+  allP95.push(p95);
   const mins = ticks / 30 / 60;
   const w = sim.world;
   for (const e of w.entities) {

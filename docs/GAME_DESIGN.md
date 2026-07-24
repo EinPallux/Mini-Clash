@@ -73,8 +73,8 @@ The **vs Bots** and **Training** modes run the full simulation in a Web Worker w
 | 8:00 | Surrender voting unlocked (3 of 4 required) |
 | ~9:30 | Typical level 9 → **Augment draft 3** |
 | 10:30 | **Clash Golem** #2 (Elder: larger, stronger siege) |
-| 16:00 | **Overtime — Bridge Collapse** (see §8.4) |
-| 20:00 | **Sudden Death** — both Cores decay 1%/s; higher-HP core survives |
+| 15:00 | **Overtime — Bridge Collapse** (see §8.4) |
+| 17:30 | **Sudden Death** — both Cores decay 1.5%/s; higher-HP core survives |
 
 Victory: enemy Clash Core destroyed → 3 s slow-motion core explosion → podium sequence (see UI_UX §End of Match).
 
@@ -142,8 +142,8 @@ The map runs a seeded event schedule (all clients/server share the seed; bots pl
 | **Coin Rain** | pool (4:00 / 12:30 windows) | A marked 8 u zone showers ~30 coins over 20 s (2–6 g each, pickup on touch). Risk/reward scramble magnet. |
 | **Storm Front** | pool (4:00 / 8:30 windows) | A crackling storm wall (4 u deep, full width) sweeps the bridge end-to-end over 25 s; standing in it deals 2.5%/s max-HP arcane and slows 15%. Forces the whole map to rotate. |
 | **Clash Golem** | 6:00 and 10:30 | Neutral golem (600→ scaled HP, heavy slam attacks) wakes at the center altar. The team that **lands the killing blow** converts it: it walks their lane as a siege engine (taunts towers, 40% tower-damage resist, buffs nearby Minis). #2 is the Elder Golem: +60% stats, its siege aura also shields allied champions. |
-| **Bridge Collapse (Overtime)** | 16:00 | Every 60 s the outer 3 u of BOTH long edges crumble into the void (animated chunk-fall), narrowing the deck 18→12→8 u. Brush and cover fall away first; escape space vanishes; fights become unavoidable. Simultaneously **Corebreaker**: Cores take +100% damage and every Mini wave is all-Rams. |
-| **Sudden Death** | 20:00 | Both Cores decay 1%/s. Higher-HP Core wins; exact tie → team with more structure damage dealt. |
+| **Bridge Collapse (Overtime)** | 15:00 | Every 60 s the outer 3 u of BOTH long edges crumble into the void (animated chunk-fall), narrowing the deck 18→12→8 u. Brush and cover fall away first; escape space vanishes; fights become unavoidable. Simultaneously **Corebreaker**: Cores take +200% damage and every wave carries 5 Rams. |
+| **Sudden Death** | 17:30 | Both Cores decay 1.5%/s. Higher-HP Core wins; exact tie → team with more structure damage dealt. |
 
 Design intent: the schedule gives ARAM the *objective heartbeat* of a full MOBA (dragon/baron tempo) without a jungle, and the seeded pools mean match rhythm varies run-to-run.
 
@@ -239,13 +239,13 @@ The fountain plate itself heals **9% max HP + 15 Energy per second** while you s
 ## 13. Units & structures
 
 ### 13.1 Minis
-Waves every 25 s from each gate (first 0:35): 3 **Bruisers** (melee, 480 HP, 14 dmg) + 2 **Zappers** (ranged 5 u, 300 HP, 21 dmg); every 2nd wave adds a **Ram** (900 HP, 3× damage vs towers, takes −70% from towers). Bruisers and Zappers deal **2.5× damage to enemy Minis** (waves grind through each other instead of stockpiling; Rams ignore the wave and go for structures), and **champions deal 2× damage to Minis** — waves are speed bumps for heroes, walls for each other. All Mini stats scale +3%/min. Models: Kenney Blocky Characters in team palettes (Bruiser sword, Zapper wand-bolt, Ram carries a log ram); they're characters, not blobs — full walk/attack/death animations.
+Waves every 25 s from each gate (first 0:35): 3 **Bruisers** (melee, 480 HP, 14 dmg) + 2 **Zappers** (ranged 5 u, 300 HP, 21 dmg); every 2nd wave adds a **Ram** (900 HP, 3× damage vs towers, takes −70% from towers). Bruisers and Zappers deal **2.5× damage to enemy Minis** (waves grind through each other instead of stockpiling; Rams ignore the wave and go for structures), and **champions deal 2× damage to Minis** — waves are speed bumps for heroes, walls for each other. All Mini stats scale +4.5%/min (v0.2 balance: waves must eventually out-muscle a settled defense). Models: Kenney Blocky Characters in team palettes (Bruiser sword, Zapper wand-bolt, Ram carries a log ram); they're characters, not blobs — full walk/attack/death animations.
 
 ### 13.2 Watchtowers
-2400 HP, 40 Armor/Ward, backdoor protection (−50% damage taken when no enemy Minis within 11 u). Attack: 180 dmg shots every 1.2 s, range 8.5 u, +40% ramp per consecutive shot on the same champion. Priority: Minis > champion attacking an allied champion (instant aggro-switch) > nearest champion. Aggro is visualized (red tether + tower eye glow — honesty rule).
+2400 HP, 40 Armor/Ward, backdoor protection (−35% damage taken when no enemy Minis within 11 u). Attack: 180 dmg shots every 1.2 s, range 8.5 u, +40% ramp per consecutive shot on the same champion. Priority: Minis > champion attacking an allied champion (instant aggro-switch) > nearest champion. Aggro is visualized (red tether + tower eye glow — honesty rule).
 
 ### 13.3 Clash Core
-3600 HP, 30 resists, exposed only after both Watchtowers fall. Self-defense: slow AoE pulse (120 dmg, 8 u) every 2 s when enemies are in range. Destruction = victory. The Core is a huge crystal-heart machine (Castle + Factory kit build) with damage states (cracks, leaking light, alarm klaxon under 25%).
+3600 HP, 30 resists, exposed only after both Watchtowers fall. Self-defense: slow AoE pulse (95 dmg, 8 u) every 2 s when enemies are in range. Destruction = victory. The Core is a huge crystal-heart machine (Castle + Factory kit build) with damage states (cracks, leaking light, alarm klaxon under 25%).
 
 ### 13.4 Health orbs
 Pads at the 30 u / 90 u marks spawn an orb every 45 s (first 1:30). Touch: heal 18% max HP + 40 Energy + 20 XP to toucher, small splash heal (6%) to nearby allies. Contested by design (pads sit in the poke zone).

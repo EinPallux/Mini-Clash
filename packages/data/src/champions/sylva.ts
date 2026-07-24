@@ -8,7 +8,7 @@ export const SYLVA: ChampionDef = {
   role: 'support',
   difficulty: 2,
   stats: {
-    hp: 620,
+    hp: 680,
     hpPerLevel: 71.1,
     regenPctPerSec: 0.0035,
     ad: 52,
@@ -70,7 +70,7 @@ export const SYLVA: ChampionDef = {
           t: 'zone',
           radius: 2.2,
           duration: 3,
-          healPerSec: { base: 30, perLevel: 2.5, apRatio: 0.25 },
+          healPerSec: { base: 40, perLevel: 3.2, apRatio: 0.25 },
           cleanseSlows: true,
           enemyDamageAmp: -0.1,
         },
@@ -93,7 +93,7 @@ export const SYLVA: ChampionDef = {
         {
           t: 'vineGrasp',
           shape: { kind: 'cone', radius: 6, angleDeg: 60 },
-          amount: { base: 120, perLevel: 10, apRatio: 0.7 },
+          amount: { base: 150, perLevel: 12, apRatio: 0.7 },
           type: 'arcane',
           baseRoot: 1.4,
           rootPerFlower: 0.3,

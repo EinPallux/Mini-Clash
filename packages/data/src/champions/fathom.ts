@@ -8,15 +8,15 @@ export const FATHOM: ChampionDef = {
   role: 'gunner',
   difficulty: 2,
   stats: {
-    hp: 640,
+    hp: 615,
     hpPerLevel: 74,
     regenPctPerSec: 0.0035,
-    ad: 62,
+    ad: 58,
     adPerLevel: 7.3,
-    attackSpeed: 0.88,
+    attackSpeed: 0.8,
     attackSpeedPerLevel: 0.018,
-    moveSpeed: 3.6,
-    range: 6.5,
+    moveSpeed: 3.45,
+    range: 6.0,
     armor: 22,
     armorPerLevel: 2.4,
     ward: 20,
@@ -33,7 +33,7 @@ export const FATHOM: ChampionDef = {
     name: 'Powder Rounds',
     description:
       'Every 4th basic attack is a powder blast: +{bonusBase} (+20% AD) splash damage in 1.2u that pushes the target back.',
-    params: { every: 4, bonusBase: 30, bonusAdRatio: 0.2, splashRadius: 1.2, push: 0.5 },
+    params: { every: 4, bonusBase: 20, bonusAdRatio: 0.2, splashRadius: 1.2, push: 0.5 },
   },
   abilities: {
     q: {
@@ -85,7 +85,7 @@ export const FATHOM: ChampionDef = {
           interval: 0.35,
           startDelay: 1.2,
           pulseRadius: 1.8,
-          amount: { base: 90, perLevel: 8, adRatio: 0.45 },
+          amount: { base: 70, perLevel: 6.5, adRatio: 0.45 },
           type: 'physical',
           maxHitsPerTarget: 2,
         },
