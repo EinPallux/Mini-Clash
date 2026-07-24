@@ -61,6 +61,11 @@ export function applyCc(target: Entity, cc: CcSpec): void {
       onHardCc(target);
       break;
     }
+    case 'fear': {
+      // Minis scatter (their AI reads this); champions are fear-immune for now.
+      applyBuff(target, { id: 'cc_fear', name: 'Feared', duration: cc.duration });
+      break;
+    }
   }
 }
 

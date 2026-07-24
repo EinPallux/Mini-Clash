@@ -1,4 +1,5 @@
 import { powderBlast } from './abilities';
+import { applyCc } from './buffs';
 import { dealDamage, displace } from './combat';
 import { dist, norm } from './vec';
 import type { Entity, World } from './world';
@@ -41,14 +42,16 @@ export function updateProjectile(w: World, e: Entity, dt: number): void {
       }
     }
   } else {
-    // Direct-hit skillshot: first enemy touched.
+    // Direct-hit skillshot: first enemy touched (overkill can carry through).
     const owner = w.get(p.owner);
-    for (const u of w.enemiesOf(e.team)) {
+    for (const u of [...w.enemiesOf(e.team)]) {
       if (u.kind === 'keg' || p.hitIds.has(u.id)) continue;
       if (dist(e.x, e.z, u.x, u.z) <= e.radius + u.radius) {
         p.hitIds.add(u.id);
         dealDamage(w, { source: owner ?? e }, u, p.damage, p.dtype);
-        if (p.def?.pierces !== 'all') {
+        if (p.def?.cc && !u.dead) applyCc(u, p.def.cc);
+        const carriedThrough = p.def?.pierceOnKill && u.dead;
+        if (p.def?.pierces !== 'all' && !carriedThrough) {
           e.dead = true;
           w.remove(e.id);
           return;

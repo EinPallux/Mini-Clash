@@ -13,6 +13,8 @@ export interface StatTotals {
   haste: number;
   range: number;
   damageReduction: number;
+  /** Additive damage-dealt modifier (+0.12 = +12%; floor −0.9). */
+  damageAmp: number;
 }
 
 const ATTACK_SPEED_CAP = 2.5;
@@ -57,6 +59,7 @@ export function championStats(e: Entity): StatTotals {
     haste: 0,
     range: s.range,
     damageReduction: 0,
+    damageAmp: 0,
   };
   if (c.items.length > 0) {
     const adds = itemAdds(c.items);
@@ -80,6 +83,7 @@ export function unitStats(e: Entity, base: { armor: number; ward: number }): Sta
     haste: 0,
     range: 0,
     damageReduction: 0,
+    damageAmp: 0,
   };
   applyBuffs(e, t);
   return t;
@@ -102,6 +106,9 @@ function applyBuffs(e: Entity, t: StatTotals): void {
     }
     if (b.def.damageReduction) {
       t.damageReduction = 1 - (1 - t.damageReduction) * (1 - b.def.damageReduction);
+    }
+    if (b.def.damageAmp) {
+      t.damageAmp = Math.max(-0.9, t.damageAmp + b.def.damageAmp * b.stacks);
     }
     if (b.def.decayingMsBonus) {
       const frac = b.tLeft / b.def.duration;

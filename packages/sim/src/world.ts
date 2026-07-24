@@ -81,7 +81,7 @@ export interface ChampState {
   cds: Record<Slot, number>;
   aaCd: number;
   cast: CastState | null;
-  recast: { slot: Slot; tLeft: number; ability: AbilityDef } | null;
+  recast: { slot: Slot; tLeft: number; ability: AbilityDef; left: number } | null;
   leap: LeapState | null;
   /** Move / attack-move orders */
   order:
@@ -189,6 +189,25 @@ export interface CoreState {
   pulseCd: number;
 }
 
+/** Sylva's pollen flowers: bloomed by her abilities for area heals. */
+export interface FlowerState {
+  owner: EntityId;
+  tLeft: number;
+}
+
+/** Ground aura zone (Sylva's Blooming Ward). */
+export interface ZoneState {
+  owner: EntityId;
+  tLeft: number;
+  duration: number;
+  radius: number;
+  /** Resolved at cast. */
+  healPerSec: number;
+  enemyDamageAmp: number;
+  cleanseSlows: boolean;
+  cleansed: Set<EntityId>;
+}
+
 /** Bridge-mode match orchestration state (absent on training maps). */
 export interface MatchState {
   mode: 'training' | 'bridge';
@@ -214,7 +233,18 @@ export interface MatchState {
 
 export interface Entity {
   id: EntityId;
-  kind: 'champion' | 'dummy' | 'keg' | 'wall' | 'projectile' | 'mini' | 'tower' | 'core' | 'orb';
+  kind:
+    | 'champion'
+    | 'dummy'
+    | 'keg'
+    | 'wall'
+    | 'projectile'
+    | 'mini'
+    | 'tower'
+    | 'core'
+    | 'orb'
+    | 'flower'
+    | 'zone';
   team: Team;
   x: number;
   z: number;
@@ -236,6 +266,8 @@ export interface Entity {
   mini?: MiniState;
   tower?: TowerState;
   core?: CoreState;
+  flower?: FlowerState;
+  zone?: ZoneState;
 }
 
 export interface ScheduledTask {

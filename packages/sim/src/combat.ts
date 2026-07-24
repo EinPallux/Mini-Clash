@@ -1,5 +1,5 @@
 import { BRIDGE, CORE_DEF, type DamageType, TOWER_DEF } from '@mini-clash/data';
-import { absorbShields, applyCc, consumeBlock } from './buffs';
+import { absorbShields, applyBuff, applyCc, consumeBlock } from './buffs';
 import { creditKill, onMiniKilled } from './economy';
 import { championStats, hasItemPassive, mitigate, unitStats } from './stats';
 import { dist } from './vec';
@@ -54,10 +54,12 @@ export function dealDamage(
 
   let amount = raw;
 
-  // Executioner's Edge: bonus damage vs low targets.
+  // Executioner's Edge + damage-amp buffs (Grukk's Toll, Sylva's dampen zone).
   if (srcChamp && (tag === 'aa' || tag === 'ability')) {
     const ex = hasItemPassive(ctx.source, 'executioner');
     if (ex && target.hp / target.hpMax < ex.threshold) amount *= 1 + ex.bonus;
+    const amp = championStats(ctx.source).damageAmp;
+    if (amp !== 0) amount *= 1 + amp;
   }
   // Ram Minis siege: bonus vs structures, resilience vs tower fire (both from data).
   if (ctx.source.mini && (target.kind === 'tower' || target.kind === 'core')) {
@@ -139,6 +141,60 @@ export function dealDamage(
     x: target.x,
     z: target.z,
   });
+
+  // Champion passive hooks (never re-entered from item/burn damage).
+  if (srcChamp && tag === 'aa' && target.kind !== 'tower' && target.kind !== 'core') {
+    // Mortis — Soul Ledger: attacks vs inscribed targets burn extra and refund Energy.
+    if (srcChamp.def.passive.id === 'soul_ledger') {
+      const p = srcChamp.def.passive.params;
+      if (target.buffs.some((b) => b.id === 'mortis_inscribed')) {
+        const stats = championStats(ctx.source);
+        const bonus = p.bonusBase + p.bonusApRatio * stats.ap;
+        srcChamp.energy = Math.min(100, srcChamp.energy + p.energyRefund);
+        w.fx('mortis.passive.brand', target.x, target.z, {
+          source: ctx.source.id,
+          target: target.id,
+        });
+        dealDamage(w, { source: ctx.source, tag: 'item' }, target, bonus, 'arcane');
+      }
+    }
+    // Rattle — Loose Bones: the next attack consumes shard stacks for bonus damage.
+    if (srcChamp.def.passive.id === 'loose_bones') {
+      const bones = ctx.source.buffs.find((b) => b.id === 'rattle_bones');
+      if (bones) {
+        const p = srcChamp.def.passive.params;
+        const stats = championStats(ctx.source);
+        const bonus = bones.stacks * (p.perShard + p.perShardAdRatio * stats.ad);
+        ctx.source.buffs.splice(ctx.source.buffs.indexOf(bones), 1);
+        w.fx('rattle.passive.consume', target.x, target.z, {
+          source: ctx.source.id,
+          target: target.id,
+        });
+        dealDamage(w, { source: ctx.source, tag: 'item' }, target, bonus, 'physical');
+      }
+    }
+  }
+  if (srcChamp && tag === 'ability') {
+    // Mortis inscribes; Grukk collects his toll.
+    if (
+      srcChamp.def.passive.id === 'soul_ledger' &&
+      target.kind !== 'tower' &&
+      target.kind !== 'core'
+    ) {
+      const p = srcChamp.def.passive.params;
+      applyBuff(target, { id: 'mortis_inscribed', name: 'Inscribed', duration: p.duration });
+    }
+    if (srcChamp.def.passive.id === 'toll_paid' && target.kind === 'champion') {
+      const p = srcChamp.def.passive.params;
+      applyBuff(ctx.source, {
+        id: 'grukk_toll',
+        name: 'Toll Paid',
+        duration: p.duration,
+        maxStacks: p.maxStacks,
+        damageAmp: (p.pctBase + p.pctPerLevel * srcChamp.level) / 100,
+      });
+    }
+  }
 
   // Attacker item hooks (never re-entered from item/burn damage).
   if (srcChamp && tag === 'aa') {
@@ -223,6 +279,23 @@ export function kill(w: World, target: Entity, by?: Entity): void {
   target.dead = true;
   target.buffs.length = 0;
   w.emit({ t: 'death', id: target.id, x: target.x, z: target.z });
+
+  // Kill-watch refunds (Rattle's Marrow Harvest): any watcher of this death cashes in.
+  for (const u of w.champions()) {
+    const uc = u.champ;
+    if (!uc || uc.passive.harvestId !== target.id) continue;
+    if (w.time <= (uc.passive.harvestUntil ?? 0)) {
+      uc.cds.r *= 1 - (uc.passive.harvestRefund ?? 0);
+      applyBuff(u, {
+        id: 'rattle_harvest_ms',
+        name: 'Marrow Rush',
+        duration: uc.passive.harvestMsDur ?? 2,
+        mul: { moveSpeed: 1 + (uc.passive.harvestMs ?? 0) },
+      });
+      w.fx('rattle.r.confirm', u.x, u.z, { source: u.id });
+    }
+    uc.passive.harvestId = -1;
+  }
 
   if (target.kind === 'keg') {
     // Keg death = detonation (handled by keg system to avoid double explosions).

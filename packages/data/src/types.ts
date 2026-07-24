@@ -20,7 +20,7 @@ export interface ScalingValue {
   apRatio?: number;
 }
 
-export type CcKind = 'slow' | 'root' | 'stun' | 'knockup' | 'knockback';
+export type CcKind = 'slow' | 'root' | 'stun' | 'knockup' | 'knockback' | 'fear';
 
 export interface CcSpec {
   kind: CcKind;
@@ -50,6 +50,8 @@ export interface BuffDef {
   decayingMsBonus?: number;
   /** Absorb pool granted on application (Horn of Rally, Nullwave). */
   shield?: number;
+  /** Additive damage-dealt fraction per stack (+0.04 = +4%; negative = dampen). */
+  damageAmp?: number;
   maxStacks?: number;
 }
 
@@ -71,6 +73,8 @@ export interface ProjectileDef {
   maxRange: number;
   /** What stops it. Units always block unless listed; walls always block. */
   pierces?: 'none' | 'all';
+  /** Carries through targets it kills (Mortis Q overkill rewards wave-timing). */
+  pierceOnKill?: boolean;
   /** Pulse damage at fixed travel distances (skipshot); each unit hit once per projectile. */
   pulses?: { atDistance: number; radius: number; damageMul: number }[];
   /** FX timeline fired at each pulse position. */
@@ -101,9 +105,17 @@ export type Action =
       amount: ScalingValue;
       type: DamageType;
       cc?: CcSpec;
+      /** Applied to Minis instead of `cc` (Grukk's Bellow fears Minis, slows champions). */
+      ccMinis?: CcSpec;
+      /** Extra cc duration when the target carries this buff (Mortis vs inscribed). */
+      ccBonusBuff?: { buff: string; extra: number };
+      /** Resolve after this many seconds (telegraphed eruptions). Position locks at cast. */
+      delay?: number;
+      /** FX timeline fired at the aim point when the delay starts. */
+      telegraphFx?: string;
       alsoStructures?: boolean;
     }
-  | { t: 'projectile'; proj: string }
+  | { t: 'projectile'; proj: string; angleOffsetDeg?: number }
   | {
       t: 'buff';
       buff: string;
@@ -126,7 +138,68 @@ export type Action =
       type: DamageType;
       maxHitsPerTarget: number;
     }
-  | { t: 'heal'; who: 'self'; amount: ScalingValue };
+  | { t: 'heal'; who: 'self'; amount: ScalingValue }
+  /** Caster-centred channel: damage ticks follow the caster (Mortis R). */
+  | {
+      t: 'channel';
+      duration: number;
+      tickEvery: number;
+      radius: number;
+      amount: ScalingValue;
+      type: DamageType;
+      /** Move-speed multiplier while channelling. */
+      moveSpeedMul: number;
+      /** Applied to each tick's victims (approximates the leave-slow). */
+      ccPerTick?: CcSpec;
+      tickFx?: string;
+    }
+  /** Line dash toward aim with a sweep hit; champions in the far `zone` are pulled back. */
+  | {
+      t: 'dash';
+      distance: number;
+      duration: number;
+      width: number;
+      amount?: ScalingValue;
+      type?: DamageType;
+      tipPull?: { zone: number; pull: number };
+    }
+  /** Spawn a destructible marker (Rattle's skull) and remember it in passive scratch. */
+  | { t: 'placeMarker'; marker: string; unit: string; duration: number }
+  /** Blink to the remembered marker if it still stands, consuming it. */
+  | { t: 'blinkToMarker'; marker: string }
+  /** Blink behind the nearest enemy champion at the aim point and strike (Rattle R). */
+  | {
+      t: 'blinkStrike';
+      amount: ScalingValue;
+      type: DamageType;
+      behind: number;
+      /** Kill within this window refunds the slot's cooldown fraction + grants MS. */
+      harvest?: { window: number; refund: number; msBonus: number; msDuration: number };
+    }
+  /** Self shield (absorb pool) — Grukk's Bellow. */
+  | { t: 'shieldSelf'; buffId: string; amount: ScalingValue; duration: number }
+  /** Bloom the caster's flowers inside a shape (Sylva). */
+  | { t: 'bloom'; at: TargetPoint; shape: AreaShape }
+  /** Garden zone at aim: ally heal-over-time, slow-cleanse, enemy damage dampen (Sylva W). */
+  | {
+      t: 'zone';
+      radius: number;
+      duration: number;
+      healPerSec: ScalingValue;
+      cleanseSlows: boolean;
+      enemyDamageAmp: number;
+    }
+  /** Vine cone: damage + root extended per bloomed flower in the cone (Sylva R). */
+  | {
+      t: 'vineGrasp';
+      shape: AreaShape;
+      amount: ScalingValue;
+      type: DamageType;
+      baseRoot: number;
+      rootPerFlower: number;
+      rootMax: number;
+      flowerHealRadius: number;
+    };
 
 export type TargetPoint = 'aim' | 'self';
 
@@ -147,8 +220,16 @@ export interface AbilityDef {
     | { kind: 'line'; length: number; width: number }
     | { kind: 'point'; radius: number };
   actions: Action[];
-  /** Optional recast stage (Rook Q backswing). */
-  recast?: { window: number; actions: Action[]; name: string };
+  /** Optional recast stage (Rook Q backswing; Grukk R chains slams via `charges`). */
+  recast?: {
+    window: number;
+    actions: Action[];
+    name: string;
+    /** How many recasts fit in the window (default 1). */
+    charges?: number;
+    /** Actions for the final recast, if different (Grukk's knock-up slam). */
+    finalActions?: Action[];
+  };
   /** Recovery fraction of castTime tail that can be move-cancelled (feel rule; client-side). */
   unlocksAt?: number;
 }

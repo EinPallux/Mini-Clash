@@ -25,4 +25,51 @@ export const PROJECTILES: Record<string, ProjectileDef> = {
       arcHeight: 0.55,
     },
   },
+
+  mortis_q_bolt: {
+    id: 'mortis_q_bolt',
+    speed: 13,
+    radius: 0.32,
+    maxRange: 7,
+    // Overkill carries the wisp-skull through slain Minis (wave-timing reward).
+    pierceOnKill: true,
+    damage: { amount: { base: 85, perLevel: 7, apRatio: 0.6 }, type: 'arcane' },
+    visual: {
+      kind: 'orb',
+      size: 0.34,
+      color: 0x8ff0d8,
+      trail: { color: 0x59c9ad, width: 0.2, life: 0.4 },
+    },
+  },
+
+  rattle_q_dagger: {
+    id: 'rattle_q_dagger',
+    speed: 16,
+    radius: 0.22,
+    maxRange: 5,
+    damage: { amount: { base: 55, perLevel: 5, adRatio: 0.45 }, type: 'physical' },
+    visual: {
+      kind: 'orb',
+      size: 0.2,
+      color: 0xd8e6f2,
+      trail: { color: 0xa8b8c8, width: 0.12, life: 0.22 },
+      spin: 12,
+    },
+  },
+
+  sylva_q_dart: {
+    id: 'sylva_q_dart',
+    speed: 14,
+    radius: 0.26,
+    maxRange: 6.5,
+    damage: { amount: { base: 70, perLevel: 6, apRatio: 0.55 }, type: 'arcane' },
+    cc: { kind: 'slow', duration: 1, strength: 0.2 },
+    visual: {
+      kind: 'orb',
+      size: 0.26,
+      color: 0x8ade6a,
+      trail: { color: 0xf2a5c8, width: 0.16, life: 0.35 },
+      spin: 9,
+    },
+  },
 };

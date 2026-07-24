@@ -1,0 +1,177 @@
+import type { ChampionDef } from '../types';
+
+/** GRUKK — the Toll Collector. Bruiser. Numbers per docs/CHAMPIONS.md §4. */
+export const GRUKK: ChampionDef = {
+  id: 'grukk',
+  name: 'Grukk',
+  title: 'the Toll Collector',
+  role: 'bruiser',
+  difficulty: 1,
+  stats: {
+    hp: 940,
+    hpPerLevel: 112.2,
+    regenPctPerSec: 0.005,
+    ad: 63,
+    adPerLevel: 6.6,
+    attackSpeed: 0.78,
+    attackSpeedPerLevel: 0.013,
+    moveSpeed: 3.6,
+    range: 2.2,
+    armor: 30,
+    armorPerLevel: 3.1,
+    ward: 26,
+    wardPerLevel: 2.9,
+    radius: 0.55,
+  },
+  attack: { kind: 'melee', windupFrac: 0.36 },
+  passive: {
+    id: 'toll_paid',
+    name: 'Toll Paid',
+    description:
+      'Hitting a champion with an ability grants +{pctBase}% (+0.5%/level) damage dealt for {duration}s, stacking {maxStacks} times.',
+    params: { pctBase: 4, pctPerLevel: 0.5, maxStacks: 3, duration: 4 },
+  },
+  abilities: {
+    q: {
+      id: 'grukk_q',
+      slot: 'q',
+      name: 'Skewer',
+      description:
+        'Lunge 2.5u with the spear: {dmg} physical damage. Champions caught by the tip are yanked 1.5u toward you.',
+      cost: 30,
+      cooldown: 7,
+      castTime: 0.1,
+      range: 4.5,
+      aim: 'direction',
+      indicator: { kind: 'line', length: 4.5, width: 1.2 },
+      actions: [
+        {
+          t: 'dash',
+          distance: 2.5,
+          duration: 0.18,
+          width: 1.2,
+          amount: { base: 80, perLevel: 7, adRatio: 0.7 },
+          type: 'physical',
+          tipPull: { zone: 1, pull: 1.5 },
+        },
+      ],
+    },
+    w: {
+      id: 'grukk_w',
+      slot: 'w',
+      name: 'War Bellow',
+      description:
+        'Roar in a cone: {dmg} physical damage. Minis flee 1.5s, champions are slowed 20%, and you shield yourself for {shield}.',
+      cost: 25,
+      cooldown: 12,
+      castTime: 0.2,
+      range: 4,
+      aim: 'direction',
+      indicator: { kind: 'cone', radius: 4, angleDeg: 70 },
+      actions: [
+        {
+          t: 'areaDamage',
+          at: 'self',
+          shape: { kind: 'cone', radius: 4, angleDeg: 70 },
+          amount: { base: 50, perLevel: 4, adRatio: 0.4 },
+          type: 'physical',
+          cc: { kind: 'slow', duration: 1.5, strength: 0.2 },
+          ccMinis: { kind: 'fear', duration: 1.5 },
+        },
+        // ≈ 70 + 10% max HP across the level curve (ScalingValue has no HP ratio).
+        {
+          t: 'shieldSelf',
+          buffId: 'grukk_bellow_shield',
+          amount: { base: 164, perLevel: 11.2 },
+          duration: 2.5,
+        },
+      ],
+    },
+    r: {
+      id: 'grukk_r',
+      slot: 'r',
+      name: 'Seismic Tantrum',
+      description:
+        'Slam the deck three times within 6s (recast to aim each): {dmg} physical damage and a 20% slow. The third slam knocks up for 0.8s.',
+      cost: 0,
+      cooldown: 75,
+      castTime: 0.15,
+      range: 3,
+      aim: 'point',
+      indicator: { kind: 'circle', radius: 1.5 },
+      actions: [
+        {
+          t: 'areaDamage',
+          at: 'aim',
+          shape: { kind: 'circle', radius: 1.5 },
+          amount: { base: 90, perLevel: 8, adRatio: 0.55 },
+          type: 'physical',
+          cc: { kind: 'slow', duration: 1.5, strength: 0.2 },
+        },
+      ],
+      recast: {
+        window: 6,
+        name: 'Tantrum',
+        charges: 2,
+        actions: [
+          {
+            t: 'areaDamage',
+            at: 'aim',
+            shape: { kind: 'circle', radius: 1.5 },
+            amount: { base: 90, perLevel: 8, adRatio: 0.55 },
+            type: 'physical',
+            cc: { kind: 'slow', duration: 1.5, strength: 0.2 },
+          },
+        ],
+        finalActions: [
+          {
+            t: 'areaDamage',
+            at: 'aim',
+            shape: { kind: 'circle', radius: 1.5 },
+            amount: { base: 90, perLevel: 8, adRatio: 0.55 },
+            type: 'physical',
+            cc: { kind: 'knockup', duration: 0.8 },
+          },
+        ],
+      },
+    },
+  },
+  entrance: {
+    id: 'booth_rules',
+    name: 'Booth Rules',
+    description: 'On arrival, enemies within {radius}u are slowed {slow}% for {duration}s.',
+    params: { radius: 2.5, duration: 1, slow: 0.2 },
+  },
+  botBuild: {
+    relic: 'horn_of_rally',
+    items: [
+      'iron_plate',
+      'juggernaut_mail',
+      'titans_bastion',
+      'bulwark_scrap',
+      'sharpened_fang',
+      'executioners_edge',
+    ],
+  },
+  visual: {
+    model: 'dungeon/character-orc',
+    scale: 1,
+    props: [
+      { model: 'dungeon/weapon-spear', socket: 'handRight', scale: 1.2 },
+      { model: 'dungeon/shield-round', socket: 'back', scale: 1.1 },
+    ],
+    anim: {
+      idle: { clip: 'idle', loop: true },
+      run: { clip: 'sprint', loop: true },
+      attack: { clip: 'attack-melee-right' },
+      cast_q: { clip: 'attack-melee-right', speed: 1.3 },
+      cast_w: { clip: 'emote-no', speed: 1.5 },
+      cast_r: { clip: 'attack-kick-right', speed: 1.2 },
+      death: { clip: 'die' },
+      dance: { clip: 'emote-yes', loop: true },
+      fidget: { clip: 'emote-no' },
+      spawn: { clip: 'jump', speed: 1.2 },
+    },
+    portraitColor: 0x7fae52,
+  },
+};

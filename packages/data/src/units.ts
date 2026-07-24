@@ -106,6 +106,16 @@ export const UNITS: Record<string, UnitDef> = {
     },
     visual: { model: 'chars-blocky/character-r', scale: 0.95 },
   },
+  rattle_skull: {
+    id: 'rattle_skull',
+    name: "Rattle's Skull",
+    hp: 150,
+    armor: 0,
+    ward: 0,
+    radius: 0.3,
+    behavior: 'destructible',
+    visual: { model: 'graveyard/skull', scale: 0.8 },
+  },
   powder_keg: {
     id: 'powder_keg',
     name: 'Powder Keg',

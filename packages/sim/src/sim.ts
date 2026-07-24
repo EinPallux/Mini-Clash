@@ -18,9 +18,10 @@ import type {
   TrainerCmd,
 } from '@mini-clash/protocol';
 import { applySpawnEffects, canAttack, tryCast, updateAutoAttack, updateCasts } from './abilities';
+import { healEntity, plantFlower } from './actions';
 import { type BotBrain, makeBrain, thinkBots } from './bots';
 import { isHiddenFrom, updateBrushState } from './brush';
-import { applyBuffById, applyCc, shieldTotal, tickBuffs } from './buffs';
+import { applyBuff, applyBuffById, applyCc, shieldTotal, tickBuffs } from './buffs';
 import { dealDamage } from './combat';
 import { levelUpChamp, updateIncome, updateOrbs } from './economy';
 import { tryBuy, tryBuyRelic, trySell, tryUseRelic, updateItemPassives } from './items';
@@ -425,7 +426,7 @@ export class Sim {
     }
     applySeparation(w, dt);
 
-    // 5. Minis, structures, walls, kegs, dummies.
+    // 5. Minis, structures, walls, kegs, dummies, flowers, zones.
     const battle = this.map.battle;
     for (const e of [...w.entities]) {
       if (e.mini && battle) updateMini(w, e, battle, dt);
@@ -434,6 +435,8 @@ export class Sim {
       else if (e.wall) this.updateWall(e, dt);
       else if (e.keg) this.updateKeg(e, dt);
       else if (e.dummy) this.updateDummy(e, dt);
+      else if (e.flower) this.updateFlower(e, dt);
+      else if (e.zone) this.updateZone(e, dt);
     }
 
     // 6. Buffs, item passives, regen, income, respawns, brush.
@@ -441,6 +444,7 @@ export class Sim {
       tickBuffs(e, dt);
       if (e.champ && !e.dead) {
         updateItemPassives(w, e);
+        this.updatePollenTrail(e);
         const stats = championStats(e);
         e.hpMax = stats.hpMax;
         e.hp = Math.min(e.hpMax, e.hp + e.hpMax * e.champ.def.stats.regenPctPerSec * dt);
@@ -660,6 +664,67 @@ export class Sim {
     }
   }
 
+  private updateFlower(e: Entity, dt: number): void {
+    const f = e.flower;
+    if (!f) return;
+    f.tLeft -= dt;
+    if (f.tLeft <= 0) this.world.remove(e.id);
+  }
+
+  private updateZone(e: Entity, dt: number): void {
+    const z = e.zone;
+    if (!z) return;
+    const w = this.world;
+    z.tLeft -= dt;
+    if (z.tLeft <= 0) {
+      w.remove(e.id);
+      return;
+    }
+    const owner = w.get(z.owner);
+    for (const u of w.champions()) {
+      const inside = dist(e.x, e.z, u.x, u.z) <= z.radius + u.radius;
+      if (!inside) continue;
+      if (u.team === e.team) {
+        healEntity(owner ?? u, u, z.healPerSec * dt);
+        if (z.cleanseSlows && !z.cleansed.has(u.id)) {
+          z.cleansed.add(u.id);
+          u.buffs = u.buffs.filter((b) => !b.id.startsWith('cc_slow'));
+        }
+      } else {
+        applyBuff(u, {
+          id: 'zone_dampen',
+          name: 'Dampened',
+          duration: 0.25,
+          damageAmp: z.enemyDamageAmp,
+        });
+      }
+    }
+  }
+
+  /** Sylva's Pollen Trail: plant a flower every N units walked. */
+  private updatePollenTrail(e: Entity): void {
+    const c = e.champ;
+    if (!c || c.def.passive.id !== 'pollen_trail') return;
+    const p = c.def.passive.params;
+    if (c.passive.pollenInit !== 1) {
+      c.passive.pollenInit = 1;
+      c.passive.pollenX = e.x;
+      c.passive.pollenZ = e.z;
+      c.passive.pollenAcc = 0;
+      return;
+    }
+    const step = dist(c.passive.pollenX, c.passive.pollenZ, e.x, e.z);
+    c.passive.pollenX = e.x;
+    c.passive.pollenZ = e.z;
+    // Blinks/knockbacks shouldn't dump a garden mid-teleport.
+    if (step > 2) return;
+    c.passive.pollenAcc += step;
+    if (c.passive.pollenAcc >= p.spacing) {
+      c.passive.pollenAcc = 0;
+      plantFlower(this.world, e, e.x, e.z, p.max, p.life);
+    }
+  }
+
   snapshot(): Snapshot {
     const w = this.world;
     const entities: EntitySnap[] = [];
@@ -817,9 +882,16 @@ export class Sim {
       return {
         ...base,
         kind: 'keg',
+        unitId: e.keg.def.id,
         fuseLeft: Math.max(0, e.keg.fuseLeft),
         tossPhase: e.keg.tossPhase < 1 ? e.keg.tossPhase : undefined,
       };
+    }
+    if (e.flower) {
+      return { ...base, kind: 'flower', tLeft: e.flower.tLeft };
+    }
+    if (e.zone) {
+      return { ...base, kind: 'zone', tLeft: e.zone.tLeft, duration: e.zone.duration };
     }
     if (e.wall) {
       return {

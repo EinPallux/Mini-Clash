@@ -137,6 +137,8 @@ export interface DummySnap extends EntityBase {
 
 export interface KegSnap extends EntityBase {
   kind: 'keg';
+  /** Unit def id — picks the model (powder keg, Rattle's skull…). */
+  unitId: string;
   fuseLeft: number;
   /** Toss arc phase 0..1 (client renders the lob). */
   tossPhase?: number;
@@ -187,6 +189,19 @@ export interface OrbSnap extends EntityBase {
   kind: 'orb';
 }
 
+/** Sylva's planted flower (client renders bud → bloom on removal fx). */
+export interface FlowerSnap extends EntityBase {
+  kind: 'flower';
+  tLeft: number;
+}
+
+/** Ground aura zone (Sylva's ward). */
+export interface ZoneSnap extends EntityBase {
+  kind: 'zone';
+  tLeft: number;
+  duration: number;
+}
+
 export type EntitySnap =
   | ChampionSnap
   | DummySnap
@@ -196,7 +211,9 @@ export type EntitySnap =
   | MiniSnap
   | TowerSnap
   | CoreSnap
-  | OrbSnap;
+  | OrbSnap
+  | FlowerSnap
+  | ZoneSnap;
 
 /* --------------------------------- Events --------------------------------- */
 

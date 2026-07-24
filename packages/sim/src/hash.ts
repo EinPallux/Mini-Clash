@@ -37,6 +37,8 @@ export function stateHash(sim: Sim): string {
     if (e.mini) parts.push(e.mini.waypoint, r(e.mini.atkCd), e.mini.targetId ?? -1);
     if (e.tower) parts.push(r(e.tower.shotCd), e.tower.ramp, e.tower.aggro ?? -1);
     if (e.core) parts.push(r(e.core.pulseCd), e.core.invulnerable ? 1 : 0);
+    if (e.flower) parts.push(e.flower.owner, r(e.flower.tLeft));
+    if (e.zone) parts.push(e.zone.owner, r(e.zone.tLeft), r(e.zone.healPerSec));
   }
   const s = parts.join('|');
   let h = 5381;

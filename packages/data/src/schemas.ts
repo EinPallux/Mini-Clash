@@ -10,7 +10,7 @@ const scaling = z.object({
 });
 
 const cc = z.object({
-  kind: z.enum(['slow', 'root', 'stun', 'knockup', 'knockback']),
+  kind: z.enum(['slow', 'root', 'stun', 'knockup', 'knockback', 'fear']),
   duration: z.number().positive(),
   strength: z.number().optional(),
 });
@@ -50,6 +50,7 @@ export const buffSchema = z.object({
   damageReduction: z.number().min(0).max(1).optional(),
   decayingMsBonus: z.number().optional(),
   shield: z.number().positive().optional(),
+  damageAmp: z.number().min(-0.9).optional(),
   maxStacks: z.number().int().positive().optional(),
 });
 
@@ -64,9 +65,17 @@ const action: z.ZodType<unknown> = z.lazy(() =>
       amount: scaling,
       type: z.enum(['physical', 'arcane']),
       cc: cc.optional(),
+      ccMinis: cc.optional(),
+      ccBonusBuff: z.object({ buff: z.string(), extra: z.number().positive() }).optional(),
+      delay: z.number().positive().optional(),
+      telegraphFx: z.string().optional(),
       alsoStructures: z.boolean().optional(),
     }),
-    z.object({ t: z.literal('projectile'), proj: z.string() }),
+    z.object({
+      t: z.literal('projectile'),
+      proj: z.string(),
+      angleOffsetDeg: z.number().optional(),
+    }),
     z.object({
       t: z.literal('buff'),
       buff: z.string(),
@@ -106,6 +115,72 @@ const action: z.ZodType<unknown> = z.lazy(() =>
       maxHitsPerTarget: z.number().int().positive(),
     }),
     z.object({ t: z.literal('heal'), who: z.literal('self'), amount: scaling }),
+    z.object({
+      t: z.literal('channel'),
+      duration: z.number().positive(),
+      tickEvery: z.number().positive(),
+      radius: z.number().positive(),
+      amount: scaling,
+      type: z.enum(['physical', 'arcane']),
+      moveSpeedMul: z.number().positive().max(1),
+      ccPerTick: cc.optional(),
+      tickFx: z.string().optional(),
+    }),
+    z.object({
+      t: z.literal('dash'),
+      distance: z.number().positive(),
+      duration: z.number().positive(),
+      width: z.number().positive(),
+      amount: scaling.optional(),
+      type: z.enum(['physical', 'arcane']).optional(),
+      tipPull: z.object({ zone: z.number().positive(), pull: z.number().positive() }).optional(),
+    }),
+    z.object({
+      t: z.literal('placeMarker'),
+      marker: z.string().min(1),
+      unit: z.string().min(1),
+      duration: z.number().positive(),
+    }),
+    z.object({ t: z.literal('blinkToMarker'), marker: z.string().min(1) }),
+    z.object({
+      t: z.literal('blinkStrike'),
+      amount: scaling,
+      type: z.enum(['physical', 'arcane']),
+      behind: z.number().positive(),
+      harvest: z
+        .object({
+          window: z.number().positive(),
+          refund: z.number().positive().max(1),
+          msBonus: z.number().positive(),
+          msDuration: z.number().positive(),
+        })
+        .optional(),
+    }),
+    z.object({
+      t: z.literal('shieldSelf'),
+      buffId: z.string().min(1),
+      amount: scaling,
+      duration: z.number().positive(),
+    }),
+    z.object({ t: z.literal('bloom'), at: targetPoint, shape }),
+    z.object({
+      t: z.literal('zone'),
+      radius: z.number().positive(),
+      duration: z.number().positive(),
+      healPerSec: scaling,
+      cleanseSlows: z.boolean(),
+      enemyDamageAmp: z.number().min(-0.9).max(0),
+    }),
+    z.object({
+      t: z.literal('vineGrasp'),
+      shape,
+      amount: scaling,
+      type: z.enum(['physical', 'arcane']),
+      baseRoot: z.number().positive(),
+      rootPerFlower: z.number().positive(),
+      rootMax: z.number().positive(),
+      flowerHealRadius: z.number().positive(),
+    }),
   ]),
 );
 
@@ -115,6 +190,7 @@ export const projectileSchema = z.object({
   radius: z.number().positive(),
   maxRange: z.number().positive(),
   pierces: z.enum(['none', 'all']).optional(),
+  pierceOnKill: z.boolean().optional(),
   pulses: z
     .array(
       z.object({
@@ -162,7 +238,13 @@ export const abilitySchema = z.object({
   indicator,
   actions: z.array(action).min(1),
   recast: z
-    .object({ window: z.number().positive(), actions: z.array(action).min(1), name: z.string() })
+    .object({
+      window: z.number().positive(),
+      actions: z.array(action).min(1),
+      name: z.string(),
+      charges: z.number().int().positive().optional(),
+      finalActions: z.array(action).min(1).optional(),
+    })
     .optional(),
   unlocksAt: z.number().optional(),
 });

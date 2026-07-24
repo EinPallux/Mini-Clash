@@ -96,6 +96,27 @@ export function updateMini(w: World, e: Entity, battle: Battle, dt: number): voi
   const spec = m.def.mini;
   if (!spec) return;
 
+  // Feared (Grukk's Bellow): scatter away from the nearest enemy champion.
+  if (e.buffs.some((b) => b.id === 'cc_fear')) {
+    m.attacking = false;
+    m.targetId = null;
+    let scary: Entity | undefined;
+    let scaryD = Number.POSITIVE_INFINITY;
+    for (const u of w.champions()) {
+      if (u.team === e.team) continue;
+      const d = dist(e.x, e.z, u.x, u.z);
+      if (d < scaryD) {
+        scaryD = d;
+        scary = u;
+      }
+    }
+    if (scary) {
+      const [dx, dz] = norm(e.x - scary.x, e.z - scary.z);
+      moveToward(w, e, m, e.x + dx * 4, e.z + dz * 4, spec.moveSpeed * speedMul(e), dt);
+    }
+    return;
+  }
+
   // Re-acquire on a staggered cadence (or when the target is gone).
   const targetEnt = m.targetId !== null ? w.get(m.targetId) : undefined;
   const targetGone =
