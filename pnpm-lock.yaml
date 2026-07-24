@@ -38,6 +38,9 @@ importers:
       '@mini-clash/sim':
         specifier: workspace:*
         version: link:../sim
+      colyseus.js:
+        specifier: ^0.16.0
+        version: 0.16.22
       react:
         specifier: ^19.2.4
         version: 19.2.8

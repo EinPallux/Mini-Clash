@@ -108,3 +108,26 @@ describe('bridge room', () => {
     await room.leave(true);
   }, 20000);
 });
+
+describe('link plumbing', () => {
+  it('echoes rtt probes and reports the applied intent seq as ack', async () => {
+    const client = new JsClient(`ws://127.0.0.1:${port}`);
+    const room = await client.create('bridge', { name: 'Rtt', seed: 5 });
+    let echoed: unknown = null;
+    room.onMessage('rtt', (msg: unknown) => {
+      echoed = msg;
+    });
+    const acks: number[] = [];
+    room.onMessage('snap', (snap: Snapshot & { ack?: number }) => {
+      if (typeof snap.ack === 'number') acks.push(snap.ack);
+    });
+    room.onMessage('seat', () => {});
+    room.send('ready', {});
+    room.send('rtt', { t: 123.5 });
+    await waitFor(() => echoed !== null);
+    expect(echoed).toEqual({ t: 123.5 });
+    room.send('intents', [{ seq: 7, player: 1, intent: { t: 'move', x: -57, z: 4 } }]);
+    await waitFor(() => acks.includes(7));
+    await room.leave(true);
+  }, 20000);
+});

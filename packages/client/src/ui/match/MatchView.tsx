@@ -33,8 +33,14 @@ export function MatchView(): React.ReactElement {
     runtime.onEscape = () => setMenuOpen((v) => !v);
     let alive = true;
     const myChampion = mode === 'bridge' ? (lineup?.[0]?.championId ?? championId) : championId;
+    // ?online=1 routes the bridge match through the Colyseus server (the lobby
+    // flow will pass this explicitly once multi-human seating lands).
+    const net =
+      mode === 'bridge' && new URLSearchParams(window.location.search).get('online') === '1'
+        ? ('socket' as const)
+        : ('worker' as const);
     runtime
-      .start(canvas, myChampion, (p) => alive && setProgress(p), mode, lineup ?? undefined)
+      .start(canvas, myChampion, (p) => alive && setProgress(p), mode, lineup ?? undefined, net)
       .then(() => alive && setReady(true))
       .catch((err: unknown) => alive && setError(err instanceof Error ? err.message : String(err)));
     return () => {

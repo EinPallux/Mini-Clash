@@ -38,6 +38,40 @@ export function BridgeHud({ runtime }: { runtime: () => MatchRuntime | null }): 
   const champ = useHud((s) => s.champion);
   const match = useHud((s) => s.match);
   const fps = useHud((s) => s.fps);
+  const dropped = useHud((s) => s.droppedReason);
+  const goto = useSession((s) => s.goto);
+  const [rtt, setRtt] = useState(0);
+  useEffect(() => {
+    const iv = setInterval(() => setRtt(Math.round(runtime()?.rttMs ?? 0)), 1000);
+    return () => clearInterval(iv);
+  }, [runtime]);
+
+  if (dropped) {
+    // Clean failure contract: the room died — say so plainly and go home.
+    return (
+      <div className="hud">
+        <div className="loading-veil backdrop-dark" style={{ background: 'rgba(8, 8, 14, 0.92)' }}>
+          <div className="screen" style={{ position: 'static' }}>
+            <h1 className="wordmark" style={{ fontSize: '2.6rem' }}>
+              Match lost to the void
+            </h1>
+            <p style={{ opacity: 0.75, marginTop: 6 }}>{dropped}</p>
+            <button
+              type="button"
+              className="btn primary"
+              style={{ marginTop: 18 }}
+              onClick={() => {
+                uiSound('ui_back');
+                goto('hub');
+              }}
+            >
+              {STRINGS.back}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (!champ || !match) return <div className="hud" />;
 
@@ -89,6 +123,18 @@ export function BridgeHud({ runtime }: { runtime: () => MatchRuntime | null }): 
         <span className="hud-chip" style={{ opacity: 0.65 }}>
           {fps} fps
         </span>
+        {rtt > 0 && (
+          <span
+            className="hud-chip"
+            style={{
+              opacity: 0.8,
+              color: rtt > 120 ? '#ff8a5c' : rtt > 60 ? '#ffc72e' : '#8ade6a',
+            }}
+            title="Round-trip to the game server"
+          >
+            {rtt} ms
+          </span>
+        )}
         <span className="hud-chip" style={{ opacity: 0.8 }}>
           <b>TAB</b> Score · <b>G</b> Ping · <b>ESC</b> Menu
         </span>

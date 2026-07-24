@@ -20,6 +20,8 @@ export class BridgeRoom extends Room {
   private sim: Sim | null = null;
   /** sessionId → playerId. */
   private seats = new Map<string, number>();
+  /** sessionId → last intent seq applied (echoed for client reconciliation). */
+  private acked = new Map<string, number>();
   /** Reserved seats for reconnect (playerId → reservation deadline). */
   private intentBudget = new Map<string, { windowStart: number; count: number }>();
 
@@ -45,8 +47,14 @@ export class BridgeRoom extends Room {
         budget.count++;
         // The seat map is the identity authority — the wire player id is ignored.
         applyIntent(this.sim, player, raw);
+        const seq = (raw as { seq?: number }).seq;
+        if (typeof seq === 'number') this.acked.set(client.sessionId, seq);
       }
       this.intentBudget.set(client.sessionId, budget);
+    });
+
+    this.onMessage('rtt', (client, msg: unknown) => {
+      client.send('rtt', msg);
     });
 
     this.onMessage('ready', (client) => {
@@ -98,7 +106,8 @@ export class BridgeRoom extends Room {
       const player = this.seats.get(client.sessionId);
       if (player === undefined) continue;
       const team = this.match.teamOf(player);
-      client.send('snap', views[team]);
+      const ack = this.acked.get(client.sessionId);
+      client.send('snap', ack === undefined ? views[team] : { ...(views[team] as object), ack });
     }
   }
 

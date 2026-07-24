@@ -1132,6 +1132,12 @@ export class ActorManager {
     return this.actors.get(id);
   }
 
+  /** Online, the server assigns our seat after connect — update before first sync. */
+  setSelf(playerId: number, team: 0 | 1): void {
+    this.ctx.selfPlayerId = playerId;
+    this.ctx.selfTeam = team;
+  }
+
   /** Object roots for pointer picking (target attacks): attackable ENEMY units only —
    * friendly bodies must never swallow a move click. */
   pickables(): { object: THREE.Object3D; id: number }[] {

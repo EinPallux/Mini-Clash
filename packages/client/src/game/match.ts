@@ -18,7 +18,7 @@ import { FxRunner } from './fx/runner';
 import { useHud } from './hudStore';
 import { InputManager } from './input';
 import { SnapshotBuffer } from './interp';
-import { WorkerLink } from './link';
+import { type NetLink, SocketLink, WorkerLink } from './link';
 import { GameRenderer } from './renderer';
 import { AimIndicator, DamageNumbers, DecalPool, RingPool, SweepPool } from './ui3d';
 
@@ -26,6 +26,7 @@ import { AimIndicator, DamageNumbers, DecalPool, RingPool, SweepPool } from './u
 
 const SELF_PLAYER = 1;
 export type MatchMode = 'training' | 'bridge';
+export type NetMode = 'worker' | 'socket';
 
 const BOT_NAMES = ['Krag', 'Nyx', 'Piston', 'Moxie', 'Thorn', 'Ember', 'Gruff', 'Fizz'];
 
@@ -55,7 +56,7 @@ function bridgeRoster(selfChampionId: string): MatchPlayerConfig[] {
 export class MatchRuntime {
   private renderer!: GameRenderer;
   private camera!: FollowCamera;
-  private link!: WorkerLink;
+  private link!: NetLink;
   private input!: InputManager;
   private actors!: ActorManager;
   private particles!: ParticleSystem;
@@ -82,6 +83,7 @@ export class MatchRuntime {
     onProgress: (p: number) => void,
     mode: MatchMode = 'training',
     roster?: MatchPlayerConfig[],
+    net: NetMode = 'worker',
   ): Promise<void> {
     const map = mode === 'bridge' ? SHATTERBRIDGE_MAP : TRAINING_MAP;
     const manifest = await loadManifest();
@@ -100,6 +102,7 @@ export class MatchRuntime {
     this.sweeps = new SweepPool(this.renderer.scene);
     this.numbers = new DamageNumbers(this.renderer.scene);
     this.actors = new ActorManager(this.renderer.scene, SELF_PLAYER, 0, this.particles);
+    // Online, the server assigns the seat — actors learn it after connect.
     if (mode === 'bridge') this.bridge = new BridgeSet(this.renderer.scene, map);
     this.aim = new AimIndicator(
       this.renderer.scene,
@@ -116,8 +119,13 @@ export class MatchRuntime {
       () => this.selfPos().x,
     );
 
-    this.link = new WorkerLink();
+    this.link = net === 'socket' ? new SocketLink() : new WorkerLink(SELF_PLAYER);
     this.link.onSnapshot = (snap) => this.buffer.push(snap);
+    this.link.onDropped = (reason) => {
+      // Server/room died mid-match: clean failure, never a stuck client (v0.3
+      // contract) — the HUD shows the message and routes back to the hub.
+      useHud.getState().dropped(reason);
+    };
     // ?rig=win pre-damages enemy structures AND idles the enemy seats — offline
     // smoke hook so acceptance tests reach the win sequence in ~2 minutes
     // (harmless vs bots, and the v0.3 server ignores rig).
@@ -137,9 +145,14 @@ export class MatchRuntime {
           : [{ id: SELF_PLAYER, championId, team: 0 }],
     });
     onProgress(0.95);
+    // Seat identity is authoritative now (server-assigned online).
+    const selfTeam = (mode === 'bridge' ? (roster ?? []) : []).find(
+      (p) => p.id === this.link.playerId,
+    )?.team;
+    this.actors.setSelf(this.link.playerId, selfTeam ?? 0);
 
     this.input = new InputManager(canvas, this.camera, {
-      send: (intent) => this.link.send(SELF_PLAYER, intent),
+      send: (intent) => this.link.send(intent),
       quickPing: mode === 'bridge' ? () => this.ping('attack') : undefined,
       pickEntity: (nx, ny) => this.pick(nx, ny),
       onEscape: () => this.onEscape?.(),
@@ -161,7 +174,7 @@ export class MatchRuntime {
     const snap = this.buffer.current;
     if (!snap) return null;
     for (const e of snap.entities) {
-      if (e.kind === 'champion' && e.player === SELF_PLAYER) return e;
+      if (e.kind === 'champion' && e.player === this.selfPlayer) return e;
     }
     return null;
   }
@@ -186,30 +199,38 @@ export class MatchRuntime {
     return null;
   }
 
+  get selfPlayer(): number {
+    return this.link?.playerId ?? SELF_PLAYER;
+  }
+
+  get rttMs(): number {
+    return this.link?.rttMs ?? 0;
+  }
+
   switchChampion(championId: string): void {
-    this.link.send(SELF_PLAYER, { t: 'trainer', cmd: { k: 'switchChampion', championId } });
+    this.link.send({ t: 'trainer', cmd: { k: 'switchChampion', championId } });
   }
 
   /** Ping at the current cursor ground position (wheel/quick-ping UI). */
   ping(kind: PingKind): void {
     const g = this.input.cursorGround;
-    this.link.send(SELF_PLAYER, { t: 'ping', kind, x: g.x, z: g.z });
+    this.link.send({ t: 'ping', kind, x: g.x, z: g.z });
   }
 
   surrender(): void {
-    this.link.send(SELF_PLAYER, { t: 'surrender' });
+    this.link.send({ t: 'surrender' });
   }
 
   buy(itemId: string): void {
-    this.link.send(SELF_PLAYER, { t: 'buy', itemId });
+    this.link.send({ t: 'buy', itemId });
   }
 
   buyRelic(relicId: string): void {
-    this.link.send(SELF_PLAYER, { t: 'buyRelic', relicId });
+    this.link.send({ t: 'buyRelic', relicId });
   }
 
   sell(itemId: string): void {
-    this.link.send(SELF_PLAYER, { t: 'sell', itemId });
+    this.link.send({ t: 'sell', itemId });
   }
 
   /** Lane-strip minimap payload (drawn by the HUD at ~10 Hz). */
@@ -241,7 +262,7 @@ export class MatchRuntime {
             z: e.z,
             kind: e.kind,
             team: e.team,
-            self: e.kind === 'champion' && e.player === SELF_PLAYER,
+            self: e.kind === 'champion' && e.player === this.selfPlayer,
             dead: (e.kind === 'champion' || e.kind === 'tower') && e.dead ? true : undefined,
           });
         }
@@ -251,7 +272,7 @@ export class MatchRuntime {
   }
 
   trainer(cmd: TrainerCmd): void {
-    this.link.send(SELF_PLAYER, { t: 'trainer', cmd });
+    this.link.send({ t: 'trainer', cmd });
   }
 
   private seatName(player: number): { name: string; championId: string; team: number } {
@@ -259,7 +280,7 @@ export class MatchRuntime {
     for (const e of snap?.entities ?? []) {
       if (e.kind === 'champion' && e.player === player) {
         return {
-          name: e.player === SELF_PLAYER ? 'You' : e.name,
+          name: e.player === this.selfPlayer ? 'You' : e.name,
           championId: e.championId,
           team: e.team,
         };
@@ -268,7 +289,7 @@ export class MatchRuntime {
     const seat = useHud.getState().seats.find((s2) => s2.player === player);
     return seat
       ? {
-          name: seat.player === SELF_PLAYER ? 'You' : seat.name,
+          name: seat.player === this.selfPlayer ? 'You' : seat.name,
           championId: seat.championId,
           team: seat.team,
         }
@@ -321,7 +342,7 @@ export class MatchRuntime {
           break;
         }
         case 'purchase':
-          if (ev.player === SELF_PLAYER) {
+          if (ev.player === this.selfPlayer) {
             hud.shopResult(ev.ok, ev.reason);
             playCue(ev.ok ? 'shop_buy' : 'cast_denied', { bus: 'ui', volume: 0.7 });
           }
@@ -390,7 +411,9 @@ export class MatchRuntime {
     this.actors.sync(entities, dt, this.renderer.camera);
 
     // Follow + cursor lead.
-    const self = entities.find((e) => e.snap.kind === 'champion' && e.snap.player === SELF_PLAYER);
+    const self = entities.find(
+      (e) => e.snap.kind === 'champion' && e.snap.player === this.selfPlayer,
+    );
     if (self) this.camera.setTarget(self.x, self.z);
     this.input.update();
     this.camera.setCursor(this.input.cursorGround.x, this.input.cursorGround.z);
@@ -440,7 +463,7 @@ export class MatchRuntime {
 
     const snap = this.buffer.current;
     if (snap) {
-      useHud.getState().applySnapshot(snap, SELF_PLAYER);
+      useHud.getState().applySnapshot(snap, this.selfPlayer);
       this.bridge?.apply(snap.match);
     }
     this.bridge?.update(dt);

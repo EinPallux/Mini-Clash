@@ -42,8 +42,10 @@ export class SnapshotBuffer {
     const latest = this.latest;
     if (!latest) return [];
     const prev = this.prev;
-    const tickMs = 1000 / 30;
-    const alpha = prev ? Math.min(1, (performance.now() - this.latestAt) / tickMs) : 1;
+    // Cadence-aware: the worker sends every tick (33ms), the server 20 Hz with a
+    // 2-of-3 pattern — derive the gap from the snapshots themselves.
+    const gapMs = prev ? Math.max(1000 / 60, (latest.time - prev.time) * 1000) : 1000 / 30;
+    const alpha = prev ? Math.min(1, (performance.now() - this.latestAt) / gapMs) : 1;
     const out: RenderEntity[] = [];
     for (const e of latest.entities) {
       const p = prev?.entities.find((x) => x.id === e.id);
