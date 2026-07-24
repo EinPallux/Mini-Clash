@@ -20,8 +20,11 @@ export interface NetLink {
   readonly playerId: number;
   /** Smoothed round-trip estimate in ms (0 offline). */
   readonly rttMs: number;
+  /** Last intent sequence the authority confirmed applying (reconciliation). */
+  readonly ackedSeq: number;
   start(config: MatchConfig): Promise<void>;
-  send(intent: Intent): void;
+  /** Queue an intent; returns its sequence number. */
+  send(intent: Intent): number;
   dispose(): void;
 }
 
@@ -33,6 +36,7 @@ export class WorkerLink implements NetLink {
   onDropped: ((reason: string) => void) | null = null;
   readonly playerId: number;
   readonly rttMs = 0;
+  ackedSeq = -1;
 
   constructor(playerId: number) {
     this.playerId = playerId;
@@ -52,10 +56,13 @@ export class WorkerLink implements NetLink {
     });
   }
 
-  send(intent: Intent): void {
-    if (this.disposed) return;
+  send(intent: Intent): number {
+    if (this.disposed) return -1;
     const msg: IntentMsg = { seq: this.seq++, player: this.playerId, intent };
     this.worker.postMessage({ t: 'intents', msgs: [msg] });
+    // The worker applies before its next snapshot — everything sent is acked.
+    this.ackedSeq = msg.seq;
+    return msg.seq;
   }
 
   dispose(): void {
@@ -138,9 +145,11 @@ export class SocketLink implements NetLink {
     }, 2000);
   }
 
-  send(intent: Intent): void {
-    if (this.disposed || !this.room) return;
-    this.room.send('intents', [{ seq: this.seq++, player: this.playerId, intent }]);
+  send(intent: Intent): number {
+    if (this.disposed || !this.room) return -1;
+    const seq = this.seq++;
+    this.room.send('intents', [{ seq, player: this.playerId, intent }]);
+    return seq;
   }
 
   dispose(): void {

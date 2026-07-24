@@ -1,6 +1,28 @@
 import { Sim } from '@mini-clash/sim';
 import type { Client } from 'colyseus';
 import { Room } from 'colyseus';
+
+/**
+ * Lag simulation knobs (acceptance: playable at 150 ms + loss). TCP semantics:
+ * "loss" manifests as retransmit delay, so a lossy packet is a late packet.
+ *   MC_FAKE_LAG_MS    one-way delay applied to both directions
+ *   MC_FAKE_JITTER_MS uniform extra 0..N
+ *   MC_FAKE_LOSS      probability [0..1] a message is delayed an extra ~200 ms
+ */
+const FAKE_LAG = Number(process.env.MC_FAKE_LAG_MS ?? 0);
+const FAKE_JITTER = Number(process.env.MC_FAKE_JITTER_MS ?? 0);
+const FAKE_LOSS = Number(process.env.MC_FAKE_LOSS ?? 0);
+
+function delayed(fn: () => void): void {
+  if (FAKE_LAG <= 0 && FAKE_JITTER <= 0 && FAKE_LOSS <= 0) {
+    fn();
+    return;
+  }
+  let ms = FAKE_LAG + Math.random() * FAKE_JITTER;
+  if (FAKE_LOSS > 0 && Math.random() < FAKE_LOSS) ms += 200;
+  setTimeout(fn, ms);
+}
+
 import {
   applyIntent,
   createMatchState,
@@ -32,29 +54,11 @@ export class BridgeRoom extends Room {
     this.setMetadata({ mode: 'bridge', code: this.match.code });
 
     this.onMessage('intents', (client, msgs: unknown) => {
-      if (!this.sim || !Array.isArray(msgs)) return;
-      const player = this.seats.get(client.sessionId);
-      if (player === undefined) return;
-      // ≤30 intents/s per client — drop the excess, never the connection.
-      const budget = this.intentBudget.get(client.sessionId) ?? { windowStart: 0, count: 0 };
-      const now = Date.now();
-      if (now - budget.windowStart > 1000) {
-        budget.windowStart = now;
-        budget.count = 0;
-      }
-      for (const raw of msgs) {
-        if (budget.count >= 30) break;
-        budget.count++;
-        // The seat map is the identity authority — the wire player id is ignored.
-        applyIntent(this.sim, player, raw);
-        const seq = (raw as { seq?: number }).seq;
-        if (typeof seq === 'number') this.acked.set(client.sessionId, seq);
-      }
-      this.intentBudget.set(client.sessionId, budget);
+      delayed(() => this.applyIntentBatch(client, msgs));
     });
 
     this.onMessage('rtt', (client, msg: unknown) => {
-      client.send('rtt', msg);
+      delayed(() => client.send('rtt', msg));
     });
 
     this.onMessage('ready', (client) => {
@@ -62,6 +66,28 @@ export class BridgeRoom extends Room {
       void client;
       this.startIfReady();
     });
+  }
+
+  private applyIntentBatch(client: Client, msgs: unknown): void {
+    if (!this.sim || !Array.isArray(msgs)) return;
+    const player = this.seats.get(client.sessionId);
+    if (player === undefined) return;
+    // ≤30 intents/s per client — drop the excess, never the connection.
+    const budget = this.intentBudget.get(client.sessionId) ?? { windowStart: 0, count: 0 };
+    const now = Date.now();
+    if (now - budget.windowStart > 1000) {
+      budget.windowStart = now;
+      budget.count = 0;
+    }
+    for (const raw of msgs) {
+      if (budget.count >= 30) break;
+      budget.count++;
+      // The seat map is the identity authority — the wire player id is ignored.
+      applyIntent(this.sim, player, raw);
+      const seq = (raw as { seq?: number }).seq;
+      if (typeof seq === 'number') this.acked.set(client.sessionId, seq);
+    }
+    this.intentBudget.set(client.sessionId, budget);
   }
 
   override onJoin(client: Client, options: JoinOptions): void {
@@ -107,7 +133,8 @@ export class BridgeRoom extends Room {
       if (player === undefined) continue;
       const team = this.match.teamOf(player);
       const ack = this.acked.get(client.sessionId);
-      client.send('snap', ack === undefined ? views[team] : { ...(views[team] as object), ack });
+      const payload = ack === undefined ? views[team] : { ...(views[team] as object), ack };
+      delayed(() => client.send('snap', payload));
     }
   }
 

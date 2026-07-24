@@ -6,6 +6,7 @@ import type {
   SimEvent,
   TrainerCmd,
 } from '@mini-clash/protocol';
+import { NavGrid } from '@mini-clash/sim';
 import * as THREE from 'three';
 import { paletteColors, useSettings } from '../state/settings';
 import { ActorManager } from './actors';
@@ -19,6 +20,7 @@ import { useHud } from './hudStore';
 import { InputManager } from './input';
 import { SnapshotBuffer } from './interp';
 import { type NetLink, SocketLink, WorkerLink } from './link';
+import { PredictedSelf } from './predict';
 import { GameRenderer } from './renderer';
 import { AimIndicator, DamageNumbers, DecalPool, RingPool, SweepPool } from './ui3d';
 
@@ -67,6 +69,7 @@ export class MatchRuntime {
   private aim!: AimIndicator;
   private fx!: FxRunner;
   private buffer = new SnapshotBuffer();
+  private predicted: PredictedSelf | null = null;
   private bridge: BridgeSet | null = null;
   private raf = 0;
   private lastT = 0;
@@ -120,7 +123,21 @@ export class MatchRuntime {
     );
 
     this.link = net === 'socket' ? new SocketLink() : new WorkerLink(SELF_PLAYER);
-    this.link.onSnapshot = (snap) => this.buffer.push(snap);
+    if (net === 'socket') {
+      // Online: 100 ms interpolation delay for remotes; the local champion runs
+      // on client-side prediction instead (TECH §6).
+      this.buffer.delayMs = 100;
+      this.predicted = new PredictedSelf(new NavGrid(map));
+    }
+    this.link.onSnapshot = (snap) => {
+      this.buffer.push(snap);
+      if (this.predicted) {
+        const self = snap.entities.find(
+          (e) => e.kind === 'champion' && e.player === this.link.playerId,
+        );
+        if (self && self.kind === 'champion') this.predicted.reconcile(self, this.link.ackedSeq);
+      }
+    };
     this.link.onDropped = (reason) => {
       // Server/room died mid-match: clean failure, never a stuck client (v0.3
       // contract) — the HUD shows the message and routes back to the hub.
@@ -152,7 +169,17 @@ export class MatchRuntime {
     this.actors.setSelf(this.link.playerId, selfTeam ?? 0);
 
     this.input = new InputManager(canvas, this.camera, {
-      send: (intent) => this.link.send(intent),
+      send: (intent) => {
+        const seq = this.link.send(intent);
+        // Prediction hooks: movement starts instantly, stop halts instantly.
+        if (this.predicted) {
+          if (intent.t === 'move' || intent.t === 'attackMove') {
+            this.predicted.order(seq, intent.x, intent.z);
+          } else if (intent.t === 'stop' || intent.t === 'attackTarget') {
+            this.predicted.halt(seq);
+          }
+        }
+      },
       quickPing: mode === 'bridge' ? () => this.ping('attack') : undefined,
       pickEntity: (nx, ny) => this.pick(nx, ny),
       onEscape: () => this.onEscape?.(),
@@ -180,6 +207,9 @@ export class MatchRuntime {
   }
 
   private selfPos(): { x: number; z: number } {
+    // Online the champion renders at the predicted spot; report that one.
+    const p = this.predicted?.renderPos();
+    if (p) return p;
     const s = this.selfSnap();
     return s ? { x: s.x, z: s.z } : { x: 0, z: 0 };
   }
@@ -408,6 +438,28 @@ export class MatchRuntime {
     this.handleEvents(this.buffer.drainEvents());
 
     const entities = this.buffer.sample();
+    // Local champion: predicted transform replaces the interpolated one online.
+    if (this.predicted) {
+      this.predicted.update(rawDt);
+      const pos = this.predicted.renderPos();
+      if (pos) {
+        const self = entities.find(
+          (e) => e.snap.kind === 'champion' && e.snap.player === this.selfPlayer,
+        );
+        if (self) {
+          const dx = pos.x - self.x;
+          const dz = pos.z - self.z;
+          // Face along predicted travel when we're meaningfully moving.
+          if (Math.hypot(dx, dz) > 0.05) {
+            const len = Math.hypot(dx, dz);
+            self.fx = dx / len;
+            self.fz = dz / len;
+          }
+          self.x = pos.x;
+          self.z = pos.z;
+        }
+      }
+    }
     this.actors.sync(entities, dt, this.renderer.camera);
 
     // Follow + cursor lead.
@@ -475,6 +527,11 @@ export class MatchRuntime {
         cam: this.renderer.camera.position.toArray().map((v) => Math.round(v * 10) / 10),
         self: this.selfPos(),
         entities: this.buffer.current?.entities.length ?? 0,
+        maxCorrection: this.predicted
+          ? Math.round(this.predicted.maxCorrection * 100) / 100
+          : undefined,
+        maxError: this.predicted ? Math.round(this.predicted.maxError * 100) / 100 : undefined,
+        rtt: Math.round(this.link?.rttMs ?? 0),
         calls: this.renderer.renderer.info.render.calls,
         tris: this.renderer.renderer.info.render.triangles,
       };
