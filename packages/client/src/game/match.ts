@@ -75,6 +75,7 @@ export class MatchRuntime {
     championId: string,
     onProgress: (p: number) => void,
     mode: MatchMode = 'training',
+    roster?: MatchPlayerConfig[],
   ): Promise<void> {
     const map = mode === 'bridge' ? SHATTERBRIDGE_MAP : TRAINING_MAP;
     const manifest = await loadManifest();
@@ -116,7 +117,9 @@ export class MatchRuntime {
       seed: (Math.random() * 0xffffffff) >>> 0,
       mapId: map.id,
       players:
-        mode === 'bridge' ? bridgeRoster(championId) : [{ id: SELF_PLAYER, championId, team: 0 }],
+        mode === 'bridge'
+          ? (roster ?? bridgeRoster(championId))
+          : [{ id: SELF_PLAYER, championId, team: 0 }],
     });
     onProgress(0.95);
 

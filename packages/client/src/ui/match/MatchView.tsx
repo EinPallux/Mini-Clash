@@ -1,4 +1,4 @@
-import { STRINGS } from '@mini-clash/data';
+import { CHAMPIONS, STRINGS } from '@mini-clash/data';
 import { useEffect, useRef, useState } from 'react';
 import { uiSound } from '../../game/audio';
 import { MatchRuntime } from '../../game/match';
@@ -18,6 +18,7 @@ export function MatchView(): React.ReactElement {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const championId = useSession((s) => s.trainingChampion);
   const mode = useSession((s) => s.matchMode);
+  const lineup = useSession((s) => s.bridgeLineup);
   const goto = useSession((s) => s.goto);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: the runtime owns champion switching after boot — never restart the match on championId change
@@ -28,8 +29,9 @@ export function MatchView(): React.ReactElement {
     runtimeRef.current = runtime;
     runtime.onEscape = () => setMenuOpen((v) => !v);
     let alive = true;
+    const myChampion = mode === 'bridge' ? (lineup?.[0]?.championId ?? championId) : championId;
     runtime
-      .start(canvas, championId, (p) => alive && setProgress(p), mode)
+      .start(canvas, myChampion, (p) => alive && setProgress(p), mode, lineup ?? undefined)
       .then(() => alive && setReady(true))
       .catch((err: unknown) => alive && setError(err instanceof Error ? err.message : String(err)));
     return () => {
@@ -56,6 +58,18 @@ export function MatchView(): React.ReactElement {
             <h1 className="wordmark" style={{ fontSize: '3rem' }}>
               {mode === 'bridge' ? 'BRIDGE BRAWL' : STRINGS.training}
             </h1>
+            {mode === 'bridge' && lineup && !error && (
+              <div className="load-lineup">
+                {lineup
+                  .filter((p) => p.team === 0)
+                  .map((p) => (
+                    <div key={p.id} className="load-card">
+                      <span className="ltr">{CHAMPIONS[p.championId].name.slice(0, 1)}</span>
+                      <span className="who">{p.bot ? (p.name ?? 'Bot') : 'You'}</span>
+                    </div>
+                  ))}
+              </div>
+            )}
             {error ? (
               <>
                 <div className="panel" style={{ maxWidth: 420, textAlign: 'center' }}>

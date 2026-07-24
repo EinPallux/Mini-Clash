@@ -33,7 +33,7 @@ export function HubScreen(): React.ReactElement {
   const play = (mode: 'training' | 'bridge'): void => {
     uiSound('ui_click');
     setMatchMode(mode);
-    goto('match');
+    goto(mode === 'bridge' ? 'select' : 'match');
   };
 
   useEffect(() => {
@@ -46,7 +46,7 @@ export function HubScreen(): React.ReactElement {
       if (e.code === 'Enter' && !settingsOpen) {
         uiSound('ui_click');
         setMatchMode('bridge');
-        goto('match');
+        goto('select');
       }
     };
     window.addEventListener('keydown', onKey);
