@@ -1,4 +1,5 @@
 import { randomBytes } from 'node:crypto';
+import { SnapshotEncoder } from '@mini-clash/protocol';
 import { Sim } from '@mini-clash/sim';
 import type { Client } from 'colyseus';
 import { Room } from 'colyseus';
@@ -62,6 +63,11 @@ export class BridgeRoom extends Room {
   private startCap: ReturnType<typeof setTimeout> | null = null;
   /** Last intent wall-clock per client (AFK detection, GAME_DESIGN §17). */
   private lastIntent = new Map<string, number>();
+  /** Binary delta-snapshot encoders, one per team view (TECH §6). */
+  private encoders: [SnapshotEncoder, SnapshotEncoder] = [
+    new SnapshotEncoder(),
+    new SnapshotEncoder(),
+  ];
   /** Seats bot-covered because their human idled (reclaim on next intent). */
   private afkSeats = new Set<number>();
   private simStartedAt = 0;
@@ -150,6 +156,8 @@ export class BridgeRoom extends Room {
   }
 
   private sendSeat(client: Client, player: number, name: string): void {
+    // A (re)joined client has no snapshot context — key the next frame.
+    this.encoders[this.match.teamOf(player)].forceBaseline();
     client.send('seat', {
       player,
       roster: this.match.roster,
@@ -223,9 +231,9 @@ export class BridgeRoom extends Room {
   private broadcastSnapshots(): void {
     const sim = this.sim;
     if (!sim) return;
-    const views: Record<number, unknown> = {
-      0: this.filterView(sim.snapshotFor(0), 0),
-      1: this.filterView(sim.snapshotFor(1), 1),
+    const buffers: Record<number, Uint8Array> = {
+      0: this.encoders[0].encode(this.filterView(sim.snapshotFor(0), 0)),
+      1: this.encoders[1].encode(this.filterView(sim.snapshotFor(1), 1)),
     };
     sim.drainEvents();
     for (const client of this.clients) {
@@ -233,8 +241,12 @@ export class BridgeRoom extends Room {
       if (player === undefined) continue;
       const team = this.match.teamOf(player);
       const ack = this.acked.get(client.sessionId);
-      const payload = ack === undefined ? views[team] : { ...(views[team] as object), ack };
-      delayed(() => client.send('snap', payload));
+      // Per-client copy so the intent ack can be patched into the header.
+      const payload = new Uint8Array(buffers[team]);
+      if (ack !== undefined) {
+        new DataView(payload.buffer, payload.byteOffset).setInt32(3, ack);
+      }
+      delayed(() => client.send('snapb', payload));
     }
   }
 

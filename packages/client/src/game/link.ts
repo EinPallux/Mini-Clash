@@ -6,6 +6,7 @@ import type {
   Snapshot,
   WorkerToClient,
 } from '@mini-clash/protocol';
+import { SnapshotDecoder } from '@mini-clash/protocol';
 import { Client as ColyseusClient, type Room } from 'colyseus.js';
 
 /**
@@ -204,7 +205,13 @@ export class SocketLink implements NetLink {
     room.onMessage('afk', (msg: { on: boolean }) => {
       this.onAfk?.(Boolean(msg?.on));
     });
-    room.onMessage('snap', (snap: Snapshot & { ack?: number }) => {
+    // Binary delta snapshots (TECH §6): decode against accumulated state; a
+    // delta arriving before our baseline returns null and is skipped.
+    const decoder = new SnapshotDecoder();
+    room.onMessage('snapb', (raw: Uint8Array | ArrayBuffer) => {
+      const buf = raw instanceof Uint8Array ? raw : new Uint8Array(raw);
+      const snap = decoder.decode(buf);
+      if (!snap) return;
       if (typeof snap.ack === 'number') this.ackedSeq = snap.ack;
       this.onSnapshot?.(snap);
     });

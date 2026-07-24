@@ -1,6 +1,7 @@
 import { createServer } from 'node:http';
 import { WebSocketTransport } from '@colyseus/ws-transport';
 import type { Snapshot } from '@mini-clash/protocol';
+import { SnapshotDecoder } from '@mini-clash/protocol';
 import { Server } from 'colyseus';
 import { Client as JsClient, type Room as JsRoom } from 'colyseus.js';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -27,8 +28,13 @@ afterAll(async () => {
   await server.gracefullyShutdown(false);
 });
 
-function collectSnaps(room: JsRoom, into: Snapshot[]): void {
-  room.onMessage('snap', (snap: Snapshot) => into.push(snap));
+/** Snapshots arrive as binary delta frames — decode like the browser does. */
+function collectSnaps(room: JsRoom, into: (Snapshot & { ack?: number })[]): void {
+  const decoder = new SnapshotDecoder();
+  room.onMessage('snapb', (raw: Uint8Array | ArrayBuffer) => {
+    const snap = decoder.decode(raw instanceof Uint8Array ? raw : new Uint8Array(raw));
+    if (snap) into.push(snap);
+  });
 }
 
 async function waitFor(cond: () => boolean, ms = 8000): Promise<void> {
@@ -77,14 +83,10 @@ describe('bridge room', () => {
     // Trainer cheats never cross the wire.
     room.send('intents', [{ seq: 2, player: 1, intent: { t: 'trainer', cmd: { k: 'levelUp' } } }]);
     // Own-team pings arrive; the sim broadcast is team-scoped server-side.
-    const pingEvents: unknown[] = [];
-    room.onMessage('snap', (snap: Snapshot) => {
-      for (const ev of snap.events) if (ev.t === 'ping') pingEvents.push(ev);
-    });
     room.send('intents', [
       { seq: 3, player: 1, intent: { t: 'ping', kind: 'attack', x: 0, z: 0 } },
     ]);
-    await waitFor(() => pingEvents.length > 0);
+    await waitFor(() => snaps.some((s) => s.events.some((ev) => ev.t === 'ping')));
     const levelNow = snaps[snaps.length - 1].entities.find(
       (e) => e.kind === 'champion' && e.player === 1,
     );
@@ -118,7 +120,7 @@ describe('seat continuity (GAME_DESIGN §17)', () => {
       const afk: boolean[] = [];
       room.onMessage('afk', (msg: { on: boolean }) => afk.push(msg.on));
       room.onMessage('seat', () => {});
-      room.onMessage('snap', () => {});
+      room.onMessage('snapb', () => {});
       room.send('ready', {});
       // The 1 Hz sweep flags us once we idle past the (shrunk) threshold…
       await waitFor(() => afk.includes(true), 6000);
@@ -172,17 +174,15 @@ describe('link plumbing', () => {
     room.onMessage('rtt', (msg: unknown) => {
       echoed = msg;
     });
-    const acks: number[] = [];
-    room.onMessage('snap', (snap: Snapshot & { ack?: number }) => {
-      if (typeof snap.ack === 'number') acks.push(snap.ack);
-    });
+    const snaps: (Snapshot & { ack?: number })[] = [];
+    collectSnaps(room, snaps);
     room.onMessage('seat', () => {});
     room.send('ready', {});
     room.send('rtt', { t: 123.5 });
     await waitFor(() => echoed !== null);
     expect(echoed).toEqual({ t: 123.5 });
     room.send('intents', [{ seq: 7, player: 1, intent: { t: 'move', x: -57, z: 4 } }]);
-    await waitFor(() => acks.includes(7));
+    await waitFor(() => snaps.some((s) => s.ack === 7));
     await room.leave(true);
   }, 20000);
 });

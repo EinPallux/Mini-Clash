@@ -1,7 +1,8 @@
 /**
  * Client ⇄ simulation contract: intents in, snapshots + events out.
- * Pure types (no logic). Binary codecs join in v0.3 when the wire is a real network;
- * v0.1 transports these structures over Worker structured clone.
+ * Offline transports these structures over Worker structured clone; online they
+ * ride the binary delta-snapshot codec in ./codec (TECH §6 — quantized, dirty-
+ * masked, baseline-keyed, ≤ 12 KB/s per client, enforced by test).
  */
 import type { Slot, Team } from '@mini-clash/data';
 
@@ -370,3 +371,4 @@ export type WorkerToClient =
   | { t: 'ready' }
   | { t: 'snapshot'; snap: Snapshot }
   | { t: 'fatal'; message: string };
+export { BASELINE_EVERY, SnapshotDecoder, SnapshotEncoder } from './codec';

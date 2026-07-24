@@ -2,6 +2,7 @@ import { createServer } from 'node:http';
 import { WebSocketTransport } from '@colyseus/ws-transport';
 import { CHAMPIONS } from '@mini-clash/data';
 import type { LobbyMatchMsg, LobbySelectSnap, LobbySnap, Snapshot } from '@mini-clash/protocol';
+import { SnapshotDecoder } from '@mini-clash/protocol';
 import { Server } from 'colyseus';
 import { Client as JsClient, type Room as JsRoom } from 'colyseus.js';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -138,14 +139,18 @@ describe('lobby room', () => {
     m1.onMessage('seat', (msg: { player: number }) => {
       seat1 = msg;
     });
-    m1.onMessage('snap', () => {});
+    m1.onMessage('snapb', () => {});
     const m2 = await c2.joinById(friend.match!.roomId, { token: friend.match!.token });
     let seat2: { player: number; roster: { id: number; bot?: string }[] } | null = null;
     m2.onMessage('seat', (msg: { player: number; roster: { id: number; bot?: string }[] }) => {
       seat2 = msg;
     });
     const snaps2: Snapshot[] = [];
-    m2.onMessage('snap', (s: Snapshot) => snaps2.push(s));
+    const dec2 = new SnapshotDecoder();
+    m2.onMessage('snapb', (raw: Uint8Array | ArrayBuffer) => {
+      const s = dec2.decode(raw instanceof Uint8Array ? raw : new Uint8Array(raw));
+      if (s) snaps2.push(s);
+    });
     await waitFor(() => seat1 !== null && seat2 !== null);
     expect(seat1!.player).toBe(leader.match!.seat);
     expect(seat2!.player).toBe(friend.match!.seat);
