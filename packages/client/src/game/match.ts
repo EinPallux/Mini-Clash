@@ -19,7 +19,7 @@ import { FxRunner } from './fx/runner';
 import { useHud } from './hudStore';
 import { InputManager } from './input';
 import { SnapshotBuffer } from './interp';
-import { type NetLink, type SocketJoin, SocketLink, WorkerLink } from './link';
+import { clearRejoinTicket, type NetLink, type SocketJoin, SocketLink, WorkerLink } from './link';
 import { PredictedSelf } from './predict';
 import { GameRenderer } from './renderer';
 import { AimIndicator, DamageNumbers, DecalPool, RingPool, SweepPool } from './ui3d';
@@ -151,6 +151,7 @@ export class MatchRuntime {
       // contract) — the HUD shows the message and routes back to the hub.
       useHud.getState().dropped(reason);
     };
+    this.link.onAfk = (covered) => useHud.getState().setAfk(covered);
     // ?rig=win pre-damages enemy structures AND idles the enemy seats — offline
     // smoke hook so acceptance tests reach the win sequence in ~2 minutes
     // (harmless vs bots, and the v0.3 server ignores rig).
@@ -408,6 +409,8 @@ export class MatchRuntime {
           break;
         case 'matchOver':
           this.camera.shake('l');
+          // The match resolved — a later refresh should NOT rejoin its corpse.
+          clearRejoinTicket();
           break;
         default:
           break;

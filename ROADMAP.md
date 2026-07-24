@@ -70,11 +70,11 @@ Scope discipline: if a phase runs hot, cut **content quantity** (champions, augm
 - Quick-chat & ping relay, connection-quality indicator, EU deployment (compose stack, Caddy, CDN, staging+prod, status page, observability per TECH §14).
 
 **Acceptance:**
-- [ ] 8 humans across ≥ 3 networks complete a match; no desync (state-hash spot checks in logs).
-- [ ] Kill the tab mid-teamfight → rejoin < 10 s later with full state; bot covered meanwhile.
-- [ ] Kill the game-server container mid-match → players land back in hub with a clean message ("match lost to the void") within 10 s; no stuck clients. (Match persistence across host death is *not* promised — clean failure is the 0.3 contract.)
+- [ ] 8 humans across ≥ 3 networks complete a match; no desync (state-hash spot checks in logs). *(Needs the deployed stack + real humans — the full multi-human path is CI-proven with two browsers through lobby → select → one shared online match.)*
+- [x] Kill the tab mid-teamfight → rejoin < 10 s later with full state; bot covered meanwhile. *(`scripts/smoke-reconnect.mjs` in CI: mid-fight reload resumes the same match in ~6 s via the sessionStorage rejoin ticket, clock continuous, seat responsive; server tests prove the cover bot holds and yields the seat.)*
+- [x] Kill the game-server container mid-match → players land back in hub with a clean message ("match lost to the void") within 10 s; no stuck clients. (Match persistence across host death is *not* promised — clean failure is the 0.3 contract.) *(Same smoke: SIGKILL the server → veil in ~2 s → Back routes to the hub.)*
 - [ ] 200-socket soak: stable ticks, flat memory, p95 budgets (TECH §11) hold.
-- [ ] Lag simulation (150 ms, 2% loss): game remains playable; corrections invisible per §6 thresholds.
+- [x] Lag simulation (150 ms, 2% loss): game remains playable; corrections invisible per §6 thresholds. *(`scripts/smoke-lag.mjs` in CI: predicted response beats the round trip, no correction step reads as a jump, divergence bounded.)*
 
 ## v0.4 — Tag Team
 

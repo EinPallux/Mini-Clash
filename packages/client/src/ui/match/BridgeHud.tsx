@@ -40,6 +40,7 @@ export function BridgeHud({ runtime }: { runtime: () => MatchRuntime | null }): 
   const match = useHud((s) => s.match);
   const fps = useHud((s) => s.fps);
   const dropped = useHud((s) => s.droppedReason);
+  const afkCovered = useHud((s) => s.afkCovered);
   const goto = useSession((s) => s.goto);
   const [rtt, setRtt] = useState(0);
   useEffect(() => {
@@ -112,6 +113,12 @@ export function BridgeHud({ runtime }: { runtime: () => MatchRuntime | null }): 
       {banner && !match.over && (
         <div className="escalation-banner">
           <span>{banner}</span>
+        </div>
+      )}
+
+      {afkCovered && !match.over && (
+        <div className="afk-banner">
+          <span>A BOT HOLDS YOUR SEAT</span> — move or cast to take back control
         </div>
       )}
 

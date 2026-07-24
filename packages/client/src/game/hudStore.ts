@@ -91,6 +91,8 @@ interface HudState {
   shopMsg: { at: number; ok: boolean; reason?: string } | null;
   /** Set when the online transport dies — the match screen shows a clean exit. */
   droppedReason: string | null;
+  /** True while the server has a bot covering our seat (AFK, GAME_DESIGN §17). */
+  afkCovered: boolean;
   deniedAt: number;
   deniedReason: string;
   fps: number;
@@ -100,6 +102,7 @@ interface HudState {
   applySnapshot: (snap: Snapshot, selfPlayer: number) => void;
   addFeed: (entry: Omit<FeedEntry, 'id' | 'at'>) => void;
   dropped: (reason: string) => void;
+  setAfk: (covered: boolean) => void;
   shopResult: (ok: boolean, reason?: string) => void;
   denied: (reason: string) => void;
   setFps: (fps: number) => void;
@@ -118,6 +121,7 @@ export const useHud = create<HudState>()((set, get) => ({
   feed: [],
   shopMsg: null,
   droppedReason: null,
+  afkCovered: false,
   deniedAt: 0,
   deniedReason: '',
   fps: 0,
@@ -129,6 +133,7 @@ export const useHud = create<HudState>()((set, get) => ({
   addFeed: (entry) =>
     set((s) => ({ feed: [...s.feed.slice(-5), { ...entry, id: feedId++, at: Date.now() }] })),
   dropped: (reason) => set({ droppedReason: reason }),
+  setAfk: (covered) => set({ afkCovered: covered }),
   shopResult: (ok, reason) => set({ shopMsg: { at: Date.now(), ok, reason } }),
   reset: () =>
     set({
@@ -141,6 +146,7 @@ export const useHud = create<HudState>()((set, get) => ({
       feed: [],
       shopMsg: null,
       droppedReason: null,
+      afkCovered: false,
       noCooldowns: false,
       infiniteEnergy: false,
     }),

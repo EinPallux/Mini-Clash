@@ -1,3 +1,4 @@
+import { randomBytes } from 'node:crypto';
 import { Sim } from '@mini-clash/sim';
 import type { Client } from 'colyseus';
 import { Room } from 'colyseus';
@@ -12,6 +13,11 @@ import { Room } from 'colyseus';
 const FAKE_LAG = Number(process.env.MC_FAKE_LAG_MS ?? 0);
 const FAKE_JITTER = Number(process.env.MC_FAKE_JITTER_MS ?? 0);
 const FAKE_LOSS = Number(process.env.MC_FAKE_LOSS ?? 0);
+
+/** 45 s without input → bot takeover (GAME_DESIGN §17). Env-tunable for tests. */
+function afkMs(): number {
+  return Number(process.env.MC_AFK_MS ?? 45_000);
+}
 
 function delayed(fn: () => void): void {
   if (FAKE_LAG <= 0 && FAKE_JITTER <= 0 && FAKE_LOSS <= 0) {
@@ -54,6 +60,11 @@ export class BridgeRoom extends Room {
   /** Clients that finished loading. */
   private loaded = new Set<string>();
   private startCap: ReturnType<typeof setTimeout> | null = null;
+  /** Last intent wall-clock per client (AFK detection, GAME_DESIGN §17). */
+  private lastIntent = new Map<string, number>();
+  /** Seats bot-covered because their human idled (reclaim on next intent). */
+  private afkSeats = new Set<number>();
+  private simStartedAt = 0;
 
   override onCreate(options: JoinOptions): void {
     this.maxClients = 8;
@@ -106,6 +117,13 @@ export class BridgeRoom extends Room {
     if (!this.sim || !Array.isArray(msgs)) return;
     const player = this.seats.get(client.sessionId);
     if (player === undefined) return;
+    this.lastIntent.set(client.sessionId, Date.now());
+    // Any input reclaims an AFK-covered seat instantly (GAME_DESIGN §17).
+    if (this.afkSeats.has(player)) {
+      this.afkSeats.delete(player);
+      this.match.reclaimSeat(this.sim, player);
+      client.send('afk', { on: false });
+    }
     // ≤30 intents/s per client — drop the excess, never the connection.
     const budget = this.intentBudget.get(client.sessionId) ?? { windowStart: 0, count: 0 };
     const now = Date.now();
@@ -124,8 +142,25 @@ export class BridgeRoom extends Room {
     this.intentBudget.set(client.sessionId, budget);
   }
 
+  /** One-time rejoin/handoff token for a seat (refresh-proof, GAME_DESIGN §17). */
+  private mintRejoin(player: number, name: string): string {
+    const token = randomBytes(12).toString('hex');
+    this.reservations.set(token, { player, name });
+    return token;
+  }
+
+  private sendSeat(client: Client, player: number, name: string): void {
+    client.send('seat', {
+      player,
+      roster: this.match.roster,
+      seed: this.match.seed,
+      rejoin: this.mintRejoin(player, name),
+    });
+  }
+
   override onJoin(client: Client, options: JoinOptions & { token?: string }): void {
-    // Lobby handoff: a one-time token maps to the exact seat the lobby assigned.
+    // Seat tokens: lobby handoff or a refresh-proof rejoin — either maps to the
+    // exact seat it was minted for.
     const token = typeof options?.token === 'string' ? options.token : null;
     if (token !== null) {
       const entry = this.reservations.get(token);
@@ -133,15 +168,13 @@ export class BridgeRoom extends Room {
       this.reservations.delete(token);
       this.awaited.delete(entry.player);
       this.seats.set(client.sessionId, entry.player);
-      // Late arrival after the 20 s cap: reclaim the seat from its cover bot.
+      // Arriving after the cap (or after a refresh): take the seat back from
+      // its cover bot.
       if (this.sim && this.match.covered.has(entry.player)) {
+        this.afkSeats.delete(entry.player);
         this.match.reclaimSeat(this.sim, entry.player);
       }
-      client.send('seat', {
-        player: entry.player,
-        roster: this.match.roster,
-        seed: this.match.seed,
-      });
+      this.sendSeat(client, entry.player, entry.name);
       if (this.everyoneReady()) this.startIfReady();
       return;
     }
@@ -155,7 +188,7 @@ export class BridgeRoom extends Room {
       throw new Error('room is full');
     }
     this.seats.set(client.sessionId, seat);
-    client.send('seat', { player: seat, roster: this.match.roster, seed: this.match.seed });
+    this.sendSeat(client, seat, options?.name ?? '');
   }
 
   private startIfReady(): void {
@@ -165,6 +198,7 @@ export class BridgeRoom extends Room {
       this.startCap = null;
     }
     this.sim = new Sim(this.match.config());
+    this.simStartedAt = Date.now();
     // Reserved humans that never arrived: a bot stands in until they do.
     for (const player of this.awaited) {
       this.match.coverSeat(this.sim, player);
@@ -177,6 +211,7 @@ export class BridgeRoom extends Room {
       tickIndex++;
       // 20 Hz downstream from a 30 Hz sim: send on 2 of every 3 ticks.
       if (tickIndex % 3 !== 0) this.broadcastSnapshots();
+      if (tickIndex % 30 === 0) this.sweepAfk();
       if (sim.world.match?.over && !this.match.overAt) {
         this.match.overAt = Date.now();
         // Hold the room for the podium/summary, then fold it.
@@ -203,6 +238,25 @@ export class BridgeRoom extends Room {
     }
   }
 
+  /** Idle humans lose their seat to a bot until they act again (GAME_DESIGN §17). */
+  private sweepAfk(): void {
+    const sim = this.sim;
+    if (!sim || sim.world.match?.over) return;
+    const cutoff = Date.now() - afkMs();
+    for (const client of this.clients) {
+      const player = this.seats.get(client.sessionId);
+      if (player === undefined || this.match.covered.has(player)) continue;
+      const seat = this.match.roster.find((p) => p.id === player);
+      if (!seat || seat.bot) continue;
+      const last = this.lastIntent.get(client.sessionId) ?? this.simStartedAt;
+      if (last < cutoff) {
+        this.afkSeats.add(player);
+        this.match.coverSeat(sim, player);
+        client.send('afk', { on: true });
+      }
+    }
+  }
+
   /** Team-scope the event feed: pings are team comms, everything else is public. */
   private filterView(
     snap: ReturnType<Sim['snapshotFor']>,
@@ -226,9 +280,10 @@ export class BridgeRoom extends Room {
       try {
         await this.allowReconnection(client, 90);
         this.awaited.delete(player);
+        this.afkSeats.delete(player);
         if (this.sim && this.match.covered.has(player)) this.match.reclaimSeat(this.sim, player);
         this.seats.set(client.sessionId, player);
-        client.send('seat', { player, roster: this.match.roster, seed: this.match.seed });
+        this.sendSeat(client, player, '');
         return;
       } catch {
         // Reservation expired — the bot keeps the seat for the rest of the match.
@@ -237,6 +292,7 @@ export class BridgeRoom extends Room {
     this.seats.delete(client.sessionId);
     this.intentBudget.delete(client.sessionId);
     this.loaded.delete(client.sessionId);
+    this.lastIntent.delete(client.sessionId);
     // A leaver may have been the last thing loading was waiting on.
     if (!this.sim && this.startCap !== null && this.everyoneReady()) this.startIfReady();
   }

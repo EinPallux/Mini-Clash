@@ -17,6 +17,8 @@ export interface NetLink {
   onSnapshot: ((snap: Snapshot) => void) | null;
   /** Fires when the transport dies unexpectedly (server crash, network loss). */
   onDropped: ((reason: string) => void) | null;
+  /** Server-side AFK cover state changed (socket transports only). */
+  onAfk?: ((covered: boolean) => void) | null;
   /** Local player's seat id (assigned by the server online; SELF offline). */
   readonly playerId: number;
   /** Smoothed round-trip estimate in ms (0 offline). */
@@ -95,6 +97,38 @@ export interface SocketJoin {
   token: string;
 }
 
+/** sessionStorage key holding the refresh-proof rejoin ticket (GAME_DESIGN §17). */
+export const REJOIN_KEY = 'mc.rejoin';
+
+export interface RejoinTicket {
+  roomId: string;
+  token: string;
+  seat: number;
+  at: number;
+}
+
+export function readRejoinTicket(): RejoinTicket | null {
+  try {
+    const raw = sessionStorage.getItem(REJOIN_KEY);
+    if (!raw) return null;
+    const t = JSON.parse(raw) as RejoinTicket;
+    if (typeof t.roomId !== 'string' || typeof t.token !== 'string') return null;
+    // Matches cap out well under 30 minutes — older tickets are dead rooms.
+    if (Date.now() - t.at > 30 * 60 * 1000) return null;
+    return t;
+  } catch {
+    return null;
+  }
+}
+
+export function clearRejoinTicket(): void {
+  try {
+    sessionStorage.removeItem(REJOIN_KEY);
+  } catch {
+    /* storage unavailable */
+  }
+}
+
 export class SocketLink implements NetLink {
   private room: Room | null = null;
   private seq = 0;
@@ -103,6 +137,8 @@ export class SocketLink implements NetLink {
   private rttTimer: ReturnType<typeof setInterval> | null = null;
   onSnapshot: ((snap: Snapshot) => void) | null = null;
   onDropped: ((reason: string) => void) | null = null;
+  /** Server put a bot on our seat (AFK) / gave it back. */
+  onAfk: ((covered: boolean) => void) | null = null;
   playerId = 0;
   /** Last intent sequence the server acknowledged applying (reconciliation). */
   ackedSeq = -1;
@@ -118,25 +154,55 @@ export class SocketLink implements NetLink {
   async start(config: MatchConfig): Promise<void> {
     const client = new ColyseusClient(this.opts.endpoint ?? serverEndpoint());
     // Lobby matches join a reserved seat by token; solo online creates a room.
-    const room = this.opts.join
-      ? await client.joinById(this.opts.join.roomId, {
-          name: this.opts.name,
-          token: this.opts.join.token,
-        })
-      : await client.create('bridge', {
-          name: this.opts.name,
-          roster: config.players,
-          seed: config.seed,
-          rig: config.rig,
-        });
+    let room: Room;
+    try {
+      room = this.opts.join
+        ? await client.joinById(this.opts.join.roomId, {
+            name: this.opts.name,
+            token: this.opts.join.token,
+          })
+        : await client.create('bridge', {
+            name: this.opts.name,
+            roster: config.players,
+            seed: config.seed,
+            rig: config.rig,
+          });
+    } catch (err) {
+      // Dead room / spent token: burn the ticket so boot stops retrying it.
+      clearRejoinTicket();
+      throw err instanceof Error ? err : new Error(String(err));
+    }
     this.room = room;
 
     const seated = new Promise<void>((resolve) => {
-      room.onMessage('seat', (msg: { player: number; roster?: MatchPlayerConfig[] }) => {
-        this.playerId = msg.player;
-        if (Array.isArray(msg.roster)) this.roster = msg.roster;
-        resolve();
-      });
+      room.onMessage(
+        'seat',
+        (msg: { player: number; roster?: MatchPlayerConfig[]; rejoin?: string }) => {
+          this.playerId = msg.player;
+          if (Array.isArray(msg.roster)) this.roster = msg.roster;
+          // Every seat message carries a fresh one-time rejoin token: a tab
+          // refresh mid-match reads it back and lands on the same seat.
+          if (typeof msg.rejoin === 'string') {
+            try {
+              sessionStorage.setItem(
+                REJOIN_KEY,
+                JSON.stringify({
+                  roomId: room.roomId,
+                  token: msg.rejoin,
+                  seat: msg.player,
+                  at: Date.now(),
+                } satisfies RejoinTicket),
+              );
+            } catch {
+              /* storage unavailable — refresh just won't resume */
+            }
+          }
+          resolve();
+        },
+      );
+    });
+    room.onMessage('afk', (msg: { on: boolean }) => {
+      this.onAfk?.(Boolean(msg?.on));
     });
     room.onMessage('snap', (snap: Snapshot & { ack?: number }) => {
       if (typeof snap.ack === 'number') this.ackedSeq = snap.ack;
@@ -171,6 +237,8 @@ export class SocketLink implements NetLink {
     if (this.disposed) return;
     this.disposed = true;
     if (this.rttTimer !== null) clearInterval(this.rttTimer);
+    // Deliberate exit — a refresh never runs this, so the ticket survives it.
+    clearRejoinTicket();
     this.room?.leave(true).catch(() => {
       /* already gone */
     });

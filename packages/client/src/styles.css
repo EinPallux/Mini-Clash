@@ -2567,3 +2567,22 @@ input[type="range"] {
   background: rgba(255, 90, 107, 0.3);
   color: #fff;
 }
+
+/* AFK takeover banner (GAME_DESIGN §17) */
+.afk-banner {
+  position: absolute;
+  top: 64px;
+  left: 50%;
+  transform: translateX(-50%) skewX(-6deg);
+  background: rgba(255, 179, 92, 0.94);
+  color: #241505;
+  font-size: 0.86rem;
+  font-weight: 700;
+  padding: 9px 20px;
+  z-index: 26;
+  animation: bannerpulse 1.6s ease-in-out infinite;
+}
+.afk-banner > span {
+  font-weight: 900;
+  letter-spacing: 0.06em;
+}

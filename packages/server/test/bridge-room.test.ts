@@ -109,6 +109,61 @@ describe('bridge room', () => {
   }, 20000);
 });
 
+describe('seat continuity (GAME_DESIGN §17)', () => {
+  it('covers an idle human with a bot and returns the seat instantly on input', async () => {
+    process.env.MC_AFK_MS = '600';
+    try {
+      const client = new JsClient(`ws://127.0.0.1:${port}`);
+      const room = await client.create('bridge', { name: 'Idler', seed: 7 });
+      const afk: boolean[] = [];
+      room.onMessage('afk', (msg: { on: boolean }) => afk.push(msg.on));
+      room.onMessage('seat', () => {});
+      room.onMessage('snap', () => {});
+      room.send('ready', {});
+      // The 1 Hz sweep flags us once we idle past the (shrunk) threshold…
+      await waitFor(() => afk.includes(true), 6000);
+      // …and any input takes the seat back from the cover bot immediately.
+      room.send('intents', [{ seq: 1, player: 1, intent: { t: 'move', x: -57, z: 4 } }]);
+      await waitFor(() => afk.includes(false), 4000);
+      await room.leave(true);
+    } finally {
+      delete process.env.MC_AFK_MS;
+    }
+  }, 20000);
+
+  it('rejoins the same seat with the rejoin ticket after a hard drop', async () => {
+    const client = new JsClient(`ws://127.0.0.1:${port}`);
+    const room = await client.create('bridge', { name: 'Refresher', seed: 8 });
+    let seat: { player: number; rejoin?: string } | null = null;
+    room.onMessage('seat', (msg: { player: number; rejoin?: string }) => {
+      seat = msg;
+    });
+    const snaps: Snapshot[] = [];
+    collectSnaps(room, snaps);
+    room.send('ready', {});
+    await waitFor(() => seat !== null && snaps.length > 2);
+    const ticket = seat!.rejoin;
+    expect(typeof ticket).toBe('string');
+    const roomId = room.roomId;
+
+    // Hard drop (tab close) — the server holds the seat with a cover bot.
+    await room.leave(false);
+    const back = await new JsClient(`ws://127.0.0.1:${port}`).joinById(roomId, { token: ticket });
+    let seat2: { player: number; rejoin?: string } | null = null;
+    back.onMessage('seat', (msg: { player: number; rejoin?: string }) => {
+      seat2 = msg;
+    });
+    const snaps2: Snapshot[] = [];
+    collectSnaps(back, snaps2);
+    back.send('ready', {});
+    await waitFor(() => seat2 !== null && snaps2.length > 2);
+    expect(seat2!.player).toBe(seat!.player); // same seat, not a new one
+    expect(typeof seat2!.rejoin).toBe('string'); // fresh ticket for the next refresh
+    expect(seat2!.rejoin).not.toBe(ticket);
+    await back.leave(true);
+  }, 20000);
+});
+
 describe('link plumbing', () => {
   it('echoes rtt probes and reports the applied intent seq as ack', async () => {
     const client = new JsClient(`ws://127.0.0.1:${port}`);
