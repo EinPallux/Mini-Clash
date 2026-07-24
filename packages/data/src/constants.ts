@@ -28,3 +28,44 @@ export const MELEE_ARC_DEG = 70;
 export const CAST_CANCEL_TAIL = 0.3;
 
 export const PROTOCOL_VERSION = 1;
+
+/** Bridge Brawl match rules (GAME_DESIGN §5, §11–§13). */
+export const BRIDGE = {
+  /** Starting gold — exactly one Tier-1 item at 0:00. */
+  startingGold: 500,
+  ambientXpPerSec: 2,
+  ambientGoldPerSec: 2.5,
+  /** Dead players keep half ambient income (comeback rule). */
+  deadIncomeFactor: 0.5,
+  /** Mini kill gold splits / XP grants within this radius. */
+  shareRadius: 10,
+  killGold: 300,
+  streakBounty: 50,
+  streakBountyCap: 300,
+  assistPool: 150,
+  /** Takedown XP = this × victim level, full to killer and each assister. */
+  takedownXpPerLevel: 60,
+  towerGold: 150,
+  towerXp: 90,
+  /** Seconds a damager stays kill/assist-eligible. */
+  assistWindow: 10,
+  respawnBase: 5,
+  respawnPerLevel: 2.5,
+  respawnCap: 32,
+  rUnlockLevel: 4,
+  /** Fountain shop window after 0:00 (dead players always shop). */
+  shopUntil: 60,
+  shopRadius: 7,
+  orb: { heal: 0.18, energy: 40, xp: 20, splashHeal: 0.06, splashRadius: 4, radius: 0.55 },
+  wave: { bruisers: 3, zappers: 2, ramEvery: 2 },
+  /** Fountain plate: rapid heal + energy while standing on it. */
+  fountain: { radius: 4.5, hpPctPerSec: 0.09, energyPerSec: 15 },
+  /** Champions cut through Minis (waves are speed bumps for heroes, walls for each other). */
+  champVsMiniMul: 2,
+  /** 16:00 Corebreaker: Cores take double damage, waves turn all-Ram (GAME_DESIGN §5/§9). */
+  overtime: { at: 960, coreDamageMul: 2, waveRams: 4 },
+  /** 20:00 Sudden Death: both Cores decay; higher-HP Core survives (§5). */
+  suddenDeath: { at: 1200, decayPctPerSec: 0.01 },
+  /** Brush: attacking/casting reveals you for this long. */
+  brushRevealAfterAction: 1.5,
+} as const;

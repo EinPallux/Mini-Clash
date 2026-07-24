@@ -20,7 +20,7 @@ export interface ScalingValue {
   apRatio?: number;
 }
 
-export type CcKind = 'slow' | 'root' | 'stun' | 'knockup' | 'knockback';
+export type CcKind = 'slow' | 'root' | 'stun' | 'knockup' | 'knockback' | 'fear';
 
 export interface CcSpec {
   kind: CcKind;
@@ -48,6 +48,10 @@ export interface BuffDef {
   damageReduction?: number;
   /** Movement-speed burst that decays linearly to 0 over the duration. */
   decayingMsBonus?: number;
+  /** Absorb pool granted on application (Horn of Rally, Nullwave). */
+  shield?: number;
+  /** Additive damage-dealt fraction per stack (+0.04 = +4%; negative = dampen). */
+  damageAmp?: number;
   maxStacks?: number;
 }
 
@@ -69,6 +73,8 @@ export interface ProjectileDef {
   maxRange: number;
   /** What stops it. Units always block unless listed; walls always block. */
   pierces?: 'none' | 'all';
+  /** Carries through targets it kills (Mortis Q overkill rewards wave-timing). */
+  pierceOnKill?: boolean;
   /** Pulse damage at fixed travel distances (skipshot); each unit hit once per projectile. */
   pulses?: { atDistance: number; radius: number; damageMul: number }[];
   /** FX timeline fired at each pulse position. */
@@ -99,9 +105,17 @@ export type Action =
       amount: ScalingValue;
       type: DamageType;
       cc?: CcSpec;
+      /** Applied to Minis instead of `cc` (Grukk's Bellow fears Minis, slows champions). */
+      ccMinis?: CcSpec;
+      /** Extra cc duration when the target carries this buff (Mortis vs inscribed). */
+      ccBonusBuff?: { buff: string; extra: number };
+      /** Resolve after this many seconds (telegraphed eruptions). Position locks at cast. */
+      delay?: number;
+      /** FX timeline fired at the aim point when the delay starts. */
+      telegraphFx?: string;
       alsoStructures?: boolean;
     }
-  | { t: 'projectile'; proj: string }
+  | { t: 'projectile'; proj: string; angleOffsetDeg?: number }
   | {
       t: 'buff';
       buff: string;
@@ -124,7 +138,68 @@ export type Action =
       type: DamageType;
       maxHitsPerTarget: number;
     }
-  | { t: 'heal'; who: 'self'; amount: ScalingValue };
+  | { t: 'heal'; who: 'self'; amount: ScalingValue }
+  /** Caster-centred channel: damage ticks follow the caster (Mortis R). */
+  | {
+      t: 'channel';
+      duration: number;
+      tickEvery: number;
+      radius: number;
+      amount: ScalingValue;
+      type: DamageType;
+      /** Move-speed multiplier while channelling. */
+      moveSpeedMul: number;
+      /** Applied to each tick's victims (approximates the leave-slow). */
+      ccPerTick?: CcSpec;
+      tickFx?: string;
+    }
+  /** Line dash toward aim with a sweep hit; champions in the far `zone` are pulled back. */
+  | {
+      t: 'dash';
+      distance: number;
+      duration: number;
+      width: number;
+      amount?: ScalingValue;
+      type?: DamageType;
+      tipPull?: { zone: number; pull: number };
+    }
+  /** Spawn a destructible marker (Rattle's skull) and remember it in passive scratch. */
+  | { t: 'placeMarker'; marker: string; unit: string; duration: number }
+  /** Blink to the remembered marker if it still stands, consuming it. */
+  | { t: 'blinkToMarker'; marker: string }
+  /** Blink behind the nearest enemy champion at the aim point and strike (Rattle R). */
+  | {
+      t: 'blinkStrike';
+      amount: ScalingValue;
+      type: DamageType;
+      behind: number;
+      /** Kill within this window refunds the slot's cooldown fraction + grants MS. */
+      harvest?: { window: number; refund: number; msBonus: number; msDuration: number };
+    }
+  /** Self shield (absorb pool) — Grukk's Bellow. */
+  | { t: 'shieldSelf'; buffId: string; amount: ScalingValue; duration: number }
+  /** Bloom the caster's flowers inside a shape (Sylva). */
+  | { t: 'bloom'; at: TargetPoint; shape: AreaShape }
+  /** Garden zone at aim: ally heal-over-time, slow-cleanse, enemy damage dampen (Sylva W). */
+  | {
+      t: 'zone';
+      radius: number;
+      duration: number;
+      healPerSec: ScalingValue;
+      cleanseSlows: boolean;
+      enemyDamageAmp: number;
+    }
+  /** Vine cone: damage + root extended per bloomed flower in the cone (Sylva R). */
+  | {
+      t: 'vineGrasp';
+      shape: AreaShape;
+      amount: ScalingValue;
+      type: DamageType;
+      baseRoot: number;
+      rootPerFlower: number;
+      rootMax: number;
+      flowerHealRadius: number;
+    };
 
 export type TargetPoint = 'aim' | 'self';
 
@@ -145,8 +220,16 @@ export interface AbilityDef {
     | { kind: 'line'; length: number; width: number }
     | { kind: 'point'; radius: number };
   actions: Action[];
-  /** Optional recast stage (Rook Q backswing). */
-  recast?: { window: number; actions: Action[]; name: string };
+  /** Optional recast stage (Rook Q backswing; Grukk R chains slams via `charges`). */
+  recast?: {
+    window: number;
+    actions: Action[];
+    name: string;
+    /** How many recasts fit in the window (default 1). */
+    charges?: number;
+    /** Actions for the final recast, if different (Grukk's knock-up slam). */
+    finalActions?: Action[];
+  };
   /** Recovery fraction of castTime tail that can be move-cancelled (feel rule; client-side). */
   unlocksAt?: number;
 }
@@ -218,6 +301,8 @@ export interface ChampionDef {
   passive: PassiveDef;
   abilities: Record<Slot, AbilityDef>;
   entrance: PassiveDef;
+  /** Bot shopping list: relic + item purchase order (components auto-discount). */
+  botBuild: { relic: string; items: string[] };
   visual: ChampionVisual;
 }
 
@@ -229,11 +314,29 @@ export interface UnitDef {
   ward: number;
   radius: number;
   /** Dummies clamp at 1 HP and reset; destructibles die. */
-  behavior: 'dummy' | 'destructible';
+  behavior: 'dummy' | 'destructible' | 'mini';
   /** Seconds of no damage before a dummy resets to full and closes its DPS window. */
   resetAfter?: number;
   /** Destructibles that explode (powder keg): fires on death OR after `delay` seconds. Scales off owner stats. */
   explode?: { delay: number; radius: number; amount: ScalingValue; type: DamageType; cc?: CcSpec };
+  /** Mini combat block (behavior 'mini'). */
+  mini?: {
+    kind: 'bruiser' | 'zapper' | 'ram';
+    damage: number;
+    range: number;
+    attackInterval: number;
+    moveSpeed: number;
+    aggroRange: number;
+    gold: number;
+    xp: number;
+    /** Damage multiplier vs structures / taken-from-structures multiplier. */
+    vsStructures: number;
+    fromStructures: number;
+    /** Damage multiplier vs other Minis (waves must grind through each other). */
+    vsMinis: number;
+    /** Per-minute stat scaling (+3%/min). */
+    scalePerMin: number;
+  };
   visual: { model?: string; prim?: 'barrel'; scale: number; tint?: number };
 }
 
@@ -265,6 +368,22 @@ export interface MapDef {
   skybox: string;
   spawns: { team: Team; x: number; z: number; facingDeg: number }[];
   dummies: { unit: string; x: number; z: number }[];
+  /** Bridge-mode battlefield (GAME_DESIGN §6). Absent on training maps. */
+  battle?: {
+    towers: { team: Team; x: number; z: number; tier: 'outer' | 'inner' }[];
+    cores: { team: Team; x: number; z: number }[];
+    gates: { team: Team; x: number; z: number }[];
+    /** Mini marching route for team 0 (team 1 walks it reversed). */
+    lane: [number, number][];
+    orbPads: { x: number; z: number }[];
+    brush: { x: number; z: number; w: number; d: number }[];
+    /** Spawn barrier drops at this many seconds (movement gate at each team's gate line). */
+    barrierUntil: number;
+    firstWaveAt: number;
+    waveEvery: number;
+    orbEvery: number;
+    firstOrbAt: number;
+  };
   lighting: {
     sunDir: [number, number, number];
     sunColor: number;

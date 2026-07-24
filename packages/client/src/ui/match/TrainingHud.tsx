@@ -39,12 +39,7 @@ export function TrainingHud({
           <button
             type="button"
             key={c.id}
-            className="hud-chip"
-            style={
-              champ.championId === c.id
-                ? { borderColor: 'var(--gold)', color: 'var(--gold)' }
-                : undefined
-            }
+            className={`hud-chip ${champ.championId === c.id ? 'on' : ''}`}
             onClick={() => {
               uiSound('ui_click');
               runtime()?.switchChampion(c.id);
@@ -61,7 +56,7 @@ export function TrainingHud({
       {/* top-right: trainer panel + dummy DPS */}
       <div className="hud-topright">
         <div className="trainer-panel">
-          <h4>🎯 {STRINGS.cheats}</h4>
+          <h4>{STRINGS.cheats}</h4>
           <div className="set-row">
             <span>{STRINGS.cheatCooldowns}</span>
             <button
@@ -97,7 +92,7 @@ export function TrainingHud({
                 runtime()?.trainer({ k: 'levelUp' });
               }}
             >
-              ⬆ {STRINGS.cheatLevelUp} ({champ.level})
+              {STRINGS.cheatLevelUp} ({champ.level})
             </button>
             <button
               type="button"
@@ -107,7 +102,7 @@ export function TrainingHud({
                 runtime()?.trainer({ k: 'resetDummies' });
               }}
             >
-              ♻ {STRINGS.cheatResetDummies}
+              {STRINGS.cheatResetDummies}
             </button>
           </div>
         </div>
@@ -122,11 +117,13 @@ export function TrainingHud({
       {/* cast-denied feedback */}
       {showDeny && (
         <div className="deny-flash" key={deniedAt}>
-          {deniedReason === 'energy'
-            ? 'Not enough energy!'
-            : deniedReason === 'cooldown'
-              ? 'Not ready!'
-              : 'Can’t do that now'}
+          <span>
+            {deniedReason === 'energy'
+              ? 'Not enough energy'
+              : deniedReason === 'cooldown'
+                ? 'Not ready'
+                : 'Unavailable'}
+          </span>
         </div>
       )}
 
@@ -166,12 +163,17 @@ export function TrainingHud({
         </div>
       </div>
 
+      <div className="keyhint">
+        <span className="cap">ESC</span>
+        <span className="lbl">Menu</span>
+      </div>
+
       {/* death veil */}
       {champ.dead && (
         <div className="loading-veil" style={{ background: 'rgba(10, 6, 10, 0.55)' }}>
           <div className="screen" style={{ position: 'static' }}>
-            <h1 className="title-hero" style={{ fontSize: '2.4rem' }}>
-              Respawning… {champ.respawnIn.toFixed(1)}s
+            <h1 className="wordmark" style={{ fontSize: '2.6rem' }}>
+              Respawning <span className="clash">{champ.respawnIn.toFixed(1)}s</span>
             </h1>
           </div>
         </div>

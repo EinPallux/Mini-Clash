@@ -26,7 +26,6 @@ export function BootScreen(): React.ReactElement {
         });
       }
       await Promise.allSettled(steps);
-      // Let the logo breathe even on instant loads.
       const elapsed = performance.now() - started;
       await new Promise((r) => setTimeout(r, Math.max(0, 700 - elapsed)));
       if (alive) goto(profile ? 'hub' : 'name');
@@ -38,9 +37,9 @@ export function BootScreen(): React.ReactElement {
   }, [goto, profile]);
 
   return (
-    <div className="screen">
-      <h1 className="title-hero">
-        MINI <span className="clash">CLASH</span>
+    <div className="screen backdrop-dark">
+      <h1 className="wordmark">
+        Mini <span className="clash">Clash</span>
       </h1>
       <div className="boot-bar">
         <div style={{ width: `${Math.round(progress * 100)}%` }} />

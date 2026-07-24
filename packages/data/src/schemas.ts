@@ -10,7 +10,7 @@ const scaling = z.object({
 });
 
 const cc = z.object({
-  kind: z.enum(['slow', 'root', 'stun', 'knockup', 'knockback']),
+  kind: z.enum(['slow', 'root', 'stun', 'knockup', 'knockback', 'fear']),
   duration: z.number().positive(),
   strength: z.number().optional(),
 });
@@ -49,6 +49,8 @@ export const buffSchema = z.object({
   mul: z.record(statKey, z.number()).optional(),
   damageReduction: z.number().min(0).max(1).optional(),
   decayingMsBonus: z.number().optional(),
+  shield: z.number().positive().optional(),
+  damageAmp: z.number().min(-0.9).optional(),
   maxStacks: z.number().int().positive().optional(),
 });
 
@@ -63,9 +65,17 @@ const action: z.ZodType<unknown> = z.lazy(() =>
       amount: scaling,
       type: z.enum(['physical', 'arcane']),
       cc: cc.optional(),
+      ccMinis: cc.optional(),
+      ccBonusBuff: z.object({ buff: z.string(), extra: z.number().positive() }).optional(),
+      delay: z.number().positive().optional(),
+      telegraphFx: z.string().optional(),
       alsoStructures: z.boolean().optional(),
     }),
-    z.object({ t: z.literal('projectile'), proj: z.string() }),
+    z.object({
+      t: z.literal('projectile'),
+      proj: z.string(),
+      angleOffsetDeg: z.number().optional(),
+    }),
     z.object({
       t: z.literal('buff'),
       buff: z.string(),
@@ -105,6 +115,72 @@ const action: z.ZodType<unknown> = z.lazy(() =>
       maxHitsPerTarget: z.number().int().positive(),
     }),
     z.object({ t: z.literal('heal'), who: z.literal('self'), amount: scaling }),
+    z.object({
+      t: z.literal('channel'),
+      duration: z.number().positive(),
+      tickEvery: z.number().positive(),
+      radius: z.number().positive(),
+      amount: scaling,
+      type: z.enum(['physical', 'arcane']),
+      moveSpeedMul: z.number().positive().max(1),
+      ccPerTick: cc.optional(),
+      tickFx: z.string().optional(),
+    }),
+    z.object({
+      t: z.literal('dash'),
+      distance: z.number().positive(),
+      duration: z.number().positive(),
+      width: z.number().positive(),
+      amount: scaling.optional(),
+      type: z.enum(['physical', 'arcane']).optional(),
+      tipPull: z.object({ zone: z.number().positive(), pull: z.number().positive() }).optional(),
+    }),
+    z.object({
+      t: z.literal('placeMarker'),
+      marker: z.string().min(1),
+      unit: z.string().min(1),
+      duration: z.number().positive(),
+    }),
+    z.object({ t: z.literal('blinkToMarker'), marker: z.string().min(1) }),
+    z.object({
+      t: z.literal('blinkStrike'),
+      amount: scaling,
+      type: z.enum(['physical', 'arcane']),
+      behind: z.number().positive(),
+      harvest: z
+        .object({
+          window: z.number().positive(),
+          refund: z.number().positive().max(1),
+          msBonus: z.number().positive(),
+          msDuration: z.number().positive(),
+        })
+        .optional(),
+    }),
+    z.object({
+      t: z.literal('shieldSelf'),
+      buffId: z.string().min(1),
+      amount: scaling,
+      duration: z.number().positive(),
+    }),
+    z.object({ t: z.literal('bloom'), at: targetPoint, shape }),
+    z.object({
+      t: z.literal('zone'),
+      radius: z.number().positive(),
+      duration: z.number().positive(),
+      healPerSec: scaling,
+      cleanseSlows: z.boolean(),
+      enemyDamageAmp: z.number().min(-0.9).max(0),
+    }),
+    z.object({
+      t: z.literal('vineGrasp'),
+      shape,
+      amount: scaling,
+      type: z.enum(['physical', 'arcane']),
+      baseRoot: z.number().positive(),
+      rootPerFlower: z.number().positive(),
+      rootMax: z.number().positive(),
+      flowerHealRadius: z.number().positive(),
+    }),
   ]),
 );
 
@@ -114,6 +190,7 @@ export const projectileSchema = z.object({
   radius: z.number().positive(),
   maxRange: z.number().positive(),
   pierces: z.enum(['none', 'all']).optional(),
+  pierceOnKill: z.boolean().optional(),
   pulses: z
     .array(
       z.object({
@@ -161,7 +238,13 @@ export const abilitySchema = z.object({
   indicator,
   actions: z.array(action).min(1),
   recast: z
-    .object({ window: z.number().positive(), actions: z.array(action).min(1), name: z.string() })
+    .object({
+      window: z.number().positive(),
+      actions: z.array(action).min(1),
+      name: z.string(),
+      charges: z.number().int().positive().optional(),
+      finalActions: z.array(action).min(1).optional(),
+    })
     .optional(),
   unlocksAt: z.number().optional(),
 });
@@ -208,6 +291,7 @@ export const championSchema = z.object({
     description: z.string(),
     params: z.record(z.string(), z.number()),
   }),
+  botBuild: z.object({ relic: z.string().min(1), items: z.array(z.string()).min(4) }),
   visual: z.object({
     model: z.string(),
     scale: z.number().positive(),
@@ -236,8 +320,24 @@ export const unitSchema = z.object({
   armor: z.number().min(0),
   ward: z.number().min(0),
   radius: z.number().positive(),
-  behavior: z.enum(['dummy', 'destructible']),
+  behavior: z.enum(['dummy', 'destructible', 'mini']),
   resetAfter: z.number().positive().optional(),
+  mini: z
+    .object({
+      kind: z.enum(['bruiser', 'zapper', 'ram']),
+      damage: z.number().positive(),
+      range: z.number().positive(),
+      attackInterval: z.number().positive(),
+      moveSpeed: z.number().positive(),
+      aggroRange: z.number().positive(),
+      gold: z.number().positive(),
+      xp: z.number().positive(),
+      vsStructures: z.number().positive(),
+      fromStructures: z.number().positive(),
+      vsMinis: z.number().positive(),
+      scalePerMin: z.number().min(0),
+    })
+    .optional(),
   explode: z
     .object({
       delay: z.number().positive(),
@@ -300,6 +400,39 @@ export const mapSchema = z.object({
     }),
   ),
   dummies: z.array(z.object({ unit: z.string(), x: z.number(), z: z.number() })),
+  battle: z
+    .object({
+      towers: z.array(
+        z.object({
+          team: z.union([z.literal(0), z.literal(1)]),
+          x: z.number(),
+          z: z.number(),
+          tier: z.enum(['outer', 'inner']),
+        }),
+      ),
+      cores: z.array(
+        z.object({ team: z.union([z.literal(0), z.literal(1)]), x: z.number(), z: z.number() }),
+      ),
+      gates: z.array(
+        z.object({ team: z.union([z.literal(0), z.literal(1)]), x: z.number(), z: z.number() }),
+      ),
+      lane: z.array(z.tuple([z.number(), z.number()])).min(2),
+      orbPads: z.array(z.object({ x: z.number(), z: z.number() })),
+      brush: z.array(
+        z.object({
+          x: z.number(),
+          z: z.number(),
+          w: z.number().positive(),
+          d: z.number().positive(),
+        }),
+      ),
+      barrierUntil: z.number().positive(),
+      firstWaveAt: z.number().positive(),
+      waveEvery: z.number().positive(),
+      orbEvery: z.number().positive(),
+      firstOrbAt: z.number().positive(),
+    })
+    .optional(),
   lighting: z.object({
     sunDir: z.tuple([z.number(), z.number(), z.number()]),
     sunColor: z.number(),

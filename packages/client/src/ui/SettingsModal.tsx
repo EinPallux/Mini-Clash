@@ -77,7 +77,7 @@ export function SettingsModal({ onClose }: { onClose: () => void }): React.React
     <div className="modal-veil" onPointerDown={(e) => e.target === e.currentTarget && onClose()}>
       <div className="panel settings-panel">
         <div className="row spread">
-          <h2>{STRINGS.settings}</h2>
+          <h2 style={{ fontStyle: 'italic' }}>{STRINGS.settings}</h2>
           <button type="button" className="btn" onClick={onClose}>
             ✕
           </button>
@@ -94,13 +94,13 @@ export function SettingsModal({ onClose }: { onClose: () => void }): React.React
             <button
               type="button"
               key={t}
-              className={`btn ${tab === t ? 'on' : ''}`}
+              className={`tab ${tab === t ? 'on' : ''}`}
               onClick={() => {
                 uiSound('ui_hover');
                 setTab(t);
               }}
             >
-              {label}
+              <span>{label}</span>
             </button>
           ))}
         </div>

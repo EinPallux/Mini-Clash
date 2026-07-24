@@ -3,6 +3,7 @@ import type {
   BuffDef,
   ChampionDef,
   ProjectileDef,
+  RelicDef,
   Slot,
   Team,
   UnitDef,
@@ -20,6 +21,8 @@ export interface BuffInstance {
   stacks: number;
   /** Full block of the next hit (entrance Shieldwall). */
   blockNextHit?: boolean;
+  /** Remaining absorb (shield buffs). */
+  shieldLeft?: number;
 }
 
 export interface CastState {
@@ -47,13 +50,38 @@ export interface LeapState {
 export interface ChampState {
   player: PlayerId;
   def: ChampionDef;
+  bot: import('@mini-clash/protocol').BotTier | null;
+  name: string;
   level: number;
   xp: number;
+  gold: number;
+  kills: number;
+  deaths: number;
+  assists: number;
+  /** Kills since last death (bounty streak). */
+  streak: number;
+  items: string[];
+  relic: { def: RelicDef; cd: number } | null;
+  /** Recent champion damagers: player → world.time of last hit (assist credit). */
+  recentDamagers: Map<PlayerId, number>;
+  /** Item passive scratch (dragonfang counter, nullwave timer…). */
+  itemState: Record<string, number>;
+  /** world.time of last damage dealt or taken (windrunner). */
+  lastCombatAt: number;
+  /** world.time of last damage taken (nullwave recharge). */
+  lastDamagedAt: number;
+  /** world.time this champion last damaged an enemy champion (tower aggro switch). */
+  lastChampHitAt: number;
+  /** world.time of last attack/cast/relic commit (brush reveal). */
+  lastActionAt: number;
+  inBrush: boolean;
+  /** Index into World.brushRects while inBrush (reveal checks), else -1. */
+  brushIdx: number;
   energy: number;
   cds: Record<Slot, number>;
   aaCd: number;
   cast: CastState | null;
-  recast: { slot: Slot; tLeft: number; ability: AbilityDef } | null;
+  recast: { slot: Slot; tLeft: number; ability: AbilityDef; left: number } | null;
   leap: LeapState | null;
   /** Move / attack-move orders */
   order:
@@ -129,9 +157,94 @@ export interface ProjState {
   size: number;
 }
 
+export interface MiniState {
+  def: UnitDef;
+  /** Team-relative step along the lane waypoint list. */
+  waypoint: number;
+  targetId: EntityId | null;
+  atkCd: number;
+  attacking: boolean;
+  /** Damage after per-minute scaling, resolved at spawn. */
+  damage: number;
+  path: [number, number][];
+  pathVersion: number;
+  /** Current path goal (re-path when it drifts). */
+  goalX: number;
+  goalZ: number;
+}
+
+export interface TowerState {
+  tier: 'outer' | 'inner';
+  shotCd: number;
+  aggro: EntityId | null;
+  ramp: number;
+  /** Nav cells stamped by this tower (unstamped on fall). */
+  navCells: number[];
+  /** Death consequences processed (rewards, nav, core exposure). */
+  fallen: boolean;
+}
+
+export interface CoreState {
+  invulnerable: boolean;
+  pulseCd: number;
+}
+
+/** Sylva's pollen flowers: bloomed by her abilities for area heals. */
+export interface FlowerState {
+  owner: EntityId;
+  tLeft: number;
+}
+
+/** Ground aura zone (Sylva's Blooming Ward). */
+export interface ZoneState {
+  owner: EntityId;
+  tLeft: number;
+  duration: number;
+  radius: number;
+  /** Resolved at cast. */
+  healPerSec: number;
+  enemyDamageAmp: number;
+  cleanseSlows: boolean;
+  cleansed: Set<EntityId>;
+}
+
+/** Bridge-mode match orchestration state (absent on training maps). */
+export interface MatchState {
+  mode: 'training' | 'bridge';
+  barrierDown: boolean;
+  /** Stamped barrier nav cells, unstamped when the barrier drops. */
+  barrierCells: number[];
+  /** Kills scored BY each team. */
+  teamKills: [number, number];
+  /** Towers destroyed BY each team. */
+  towersDown: [number, number];
+  /** Structure damage dealt BY each team (Sudden Death tiebreak). */
+  structDamage: [number, number];
+  over: { winner: Team } | null;
+  nextOrbAt: number | null;
+  nextWaveAt: number | null;
+  /** 1-based counter of spawned waves (every 2nd adds a Ram; Overtime = all Rams). */
+  waveIndex: number;
+  /** 16:00 Corebreaker active. */
+  overtime: boolean;
+  /** 20:00 Core decay active. */
+  suddenDeath: boolean;
+}
+
 export interface Entity {
   id: EntityId;
-  kind: 'champion' | 'dummy' | 'keg' | 'wall' | 'projectile';
+  kind:
+    | 'champion'
+    | 'dummy'
+    | 'keg'
+    | 'wall'
+    | 'projectile'
+    | 'mini'
+    | 'tower'
+    | 'core'
+    | 'orb'
+    | 'flower'
+    | 'zone';
   team: Team;
   x: number;
   z: number;
@@ -150,6 +263,11 @@ export interface Entity {
   keg?: KegState;
   wall?: WallState;
   proj?: ProjState;
+  mini?: MiniState;
+  tower?: TowerState;
+  core?: CoreState;
+  flower?: FlowerState;
+  zone?: ZoneState;
 }
 
 export interface ScheduledTask {
@@ -167,6 +285,13 @@ export class World {
   events: SimEvent[] = [];
   tasks: ScheduledTask[] = [];
   private taskSeq = 0;
+
+  /** Team fountain centers (shop zone, respawns, bot retreat). */
+  spawnPoints?: Record<Team, { x: number; z: number }>;
+  /** Brush rectangles (axis-aligned, from MapDef.battle). */
+  brushRects: { x: number; z: number; w: number; d: number }[] = [];
+  /** Bridge match orchestration (null on training maps). */
+  match: MatchState | null = null;
 
   constructor(
     public nav: NavGrid,
@@ -225,17 +350,33 @@ export class World {
     for (const t of due) t.run(this);
   }
 
-  /** Alive, damageable units (champions + dummies + kegs). */
+  /** Alive, damageable units (champions + dummies + kegs + minis). */
   *units(): IterableIterator<Entity> {
     for (const e of this.entities) {
       if (e.dead) continue;
-      if (e.kind === 'champion' || e.kind === 'dummy' || e.kind === 'keg') yield e;
+      if (e.kind === 'champion' || e.kind === 'dummy' || e.kind === 'keg' || e.kind === 'mini')
+        yield e;
+    }
+  }
+
+  /** Damageable structures. */
+  *structures(): IterableIterator<Entity> {
+    for (const e of this.entities) {
+      if (e.dead) continue;
+      if (e.kind === 'tower' || e.kind === 'core') yield e;
     }
   }
 
   *enemiesOf(team: Team): IterableIterator<Entity> {
     for (const e of this.units()) {
       if (e.team !== team) yield e;
+    }
+  }
+
+  /** Alive champions. */
+  *champions(): IterableIterator<Entity> {
+    for (const e of this.entities) {
+      if (e.kind === 'champion' && !e.dead) yield e;
     }
   }
 }

@@ -40,6 +40,8 @@ Design and architecture are already decided. Implement from these documents; do 
 - `pnpm typecheck` — per-package `tsc --noEmit`
 - `pnpm boundaries` — package dependency-rule check
 - `node scripts/smoke.mjs` — headless-Chromium visual smoke (builds must exist; screenshots to `test-results/smoke/`)
+- `node scripts/determinism.mjs` — cross-environment replay-hash check (Node vs headless Chromium)
+- `node scripts/botmatch.mjs --matches 20 --tier elite --vs recruit` — balance harness: headless bot-vs-bot Bridge Brawls (lengths, winners, champion winrates; `--mixed` for random tier pools)
 
 ## Git
 

@@ -158,13 +158,14 @@ export function findSocket(
   root: THREE.Object3D,
   socket: 'handRight' | 'handLeft' | 'back' | 'root',
 ): THREE.Object3D {
+  // Covers both rig families: Kenney ('arm-right') and KayKit ('handslot.r').
   const want =
     socket === 'handRight'
-      ? ['arm-right', 'armright', 'hand-right']
+      ? ['handslot.r', 'hand.r', 'arm-right', 'armright', 'hand-right']
       : socket === 'handLeft'
-        ? ['arm-left', 'armleft', 'hand-left']
+        ? ['handslot.l', 'hand.l', 'arm-left', 'armleft', 'hand-left']
         : socket === 'back'
-          ? ['torso', 'body']
+          ? ['chest', 'torso', 'body']
           : ['root'];
   let found: THREE.Object3D | null = null;
   root.traverse((obj) => {

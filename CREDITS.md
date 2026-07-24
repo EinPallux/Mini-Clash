@@ -17,8 +17,8 @@ License: [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/) — https://g
 
 ## Fonts (SIL Open Font License 1.1)
 
-- **Lilita One** — Juan Montoreano
-- **Nunito** — Vernon Adams, Cyreal, Jacques Le Bailly
+- **Oswald** — Vernon Adams, Kalapi Gajjar, Cyreal
+- **Barlow Semi Condensed** — Jeremy Tribby
 
 ## Everything else
 

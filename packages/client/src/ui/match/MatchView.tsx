@@ -44,9 +44,9 @@ export function MatchView(): React.ReactElement {
       {ready && <TrainingHud runtime={() => runtimeRef.current} />}
 
       {(!ready || error) && (
-        <div className="loading-veil">
+        <div className="loading-veil backdrop-dark">
           <div className="screen" style={{ position: 'static' }}>
-            <h1 className="title-hero" style={{ fontSize: '2.6rem' }}>
+            <h1 className="wordmark" style={{ fontSize: '3rem' }}>
               {STRINGS.training}
             </h1>
             {error ? (
@@ -77,7 +77,7 @@ export function MatchView(): React.ReactElement {
             <div className="col">
               <button
                 type="button"
-                className="btn blue"
+                className="btn primary"
                 onClick={() => {
                   uiSound('ui_click');
                   setMenuOpen(false);

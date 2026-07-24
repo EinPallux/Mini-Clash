@@ -1,7 +1,7 @@
-import { RESIST_CONSTANT, type ScalingValue, type StatKey } from '@mini-clash/data';
+import { ITEMS, RESIST_CONSTANT, type ScalingValue, type StatKey } from '@mini-clash/data';
 import type { Entity } from './world';
 
-/** Resolved per-tick stat totals for a champion (base + level growth + buffs). */
+/** Resolved per-tick stat totals for a champion (base + level growth + items + buffs). */
 export interface StatTotals {
   hpMax: number;
   ad: number;
@@ -13,6 +13,34 @@ export interface StatTotals {
   haste: number;
   range: number;
   damageReduction: number;
+  /** Additive damage-dealt modifier (+0.12 = +12%; floor −0.9). */
+  damageAmp: number;
+}
+
+const ATTACK_SPEED_CAP = 2.5;
+
+/** Aggregated additive stats from carried items. */
+export function itemAdds(items: string[]): Partial<Record<StatKey, number>> {
+  const out: Partial<Record<StatKey, number>> = {};
+  for (const id of items) {
+    const def = ITEMS[id];
+    if (!def?.add) continue;
+    for (const k of Object.keys(def.add) as StatKey[]) {
+      out[k] = (out[k] ?? 0) + (def.add[k] ?? 0);
+    }
+  }
+  return out;
+}
+
+/** Params of a carried item passive, or null. */
+export function hasItemPassive(e: Entity, passiveId: string): Record<string, number> | null {
+  const c = e.champ;
+  if (!c) return null;
+  for (const id of c.items) {
+    const p = ITEMS[id]?.passive;
+    if (p && p.id === passiveId) return p.params;
+  }
+  return null;
 }
 
 export function championStats(e: Entity): StatTotals {
@@ -31,8 +59,14 @@ export function championStats(e: Entity): StatTotals {
     haste: 0,
     range: s.range,
     damageReduction: 0,
+    damageAmp: 0,
   };
+  if (c.items.length > 0) {
+    const adds = itemAdds(c.items);
+    for (const k of Object.keys(adds) as StatKey[]) t[k] += adds[k] ?? 0;
+  }
   applyBuffs(e, t);
+  t.attackSpeed = Math.min(ATTACK_SPEED_CAP, t.attackSpeed);
   return t;
 }
 
@@ -49,6 +83,7 @@ export function unitStats(e: Entity, base: { armor: number; ward: number }): Sta
     haste: 0,
     range: 0,
     damageReduction: 0,
+    damageAmp: 0,
   };
   applyBuffs(e, t);
   return t;
@@ -72,12 +107,20 @@ function applyBuffs(e: Entity, t: StatTotals): void {
     if (b.def.damageReduction) {
       t.damageReduction = 1 - (1 - t.damageReduction) * (1 - b.def.damageReduction);
     }
+    if (b.def.damageAmp) {
+      t.damageAmp = Math.max(-0.9, t.damageAmp + b.def.damageAmp * b.stacks);
+    }
     if (b.def.decayingMsBonus) {
       const frac = b.tLeft / b.def.duration;
       t.moveSpeed *= 1 + b.def.decayingMsBonus * frac;
     }
   }
   return;
+}
+
+/** Effective cooldown after haste (haste 0.15 = 15% faster cycling). */
+export function hastedCooldown(base: number, haste: number): number {
+  return base / (1 + haste);
 }
 
 export function resolveScaling(v: ScalingValue, level: number, ad: number, ap: number): number {

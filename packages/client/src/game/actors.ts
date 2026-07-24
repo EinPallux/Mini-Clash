@@ -73,6 +73,8 @@ class ChampionActor implements Actor {
   private lastDead = false;
   private yaw = 0;
   private championId: string;
+  private idleFor = 0;
+  private nextFidget = 5 + Math.random() * 5;
 
   constructor(snap: ChampionSnap, scene: THREE.Scene, isSelf: boolean) {
     this.def = CHAMPIONS[snap.championId];
@@ -169,9 +171,24 @@ class ChampionActor implements Actor {
     this.lastCast = castKey;
 
     if (!snap.dead && !snap.casting) {
-      if (snap.dancing) this.anim.setBase('dance');
-      else if (snap.speed > 0.25) this.anim.setBase('run', snap.speed / this.def.stats.moveSpeed);
-      else this.anim.setBase('idle');
+      if (snap.dancing) {
+        this.anim.setBase('dance');
+        this.idleFor = 0;
+      } else if (snap.speed > 0.25) {
+        this.anim.setBase('run', snap.speed / this.def.stats.moveSpeed);
+        this.idleFor = 0;
+      } else {
+        this.anim.setBase('idle');
+        // Idle fidgets: nothing on stage is a statue (ART_DIRECTION §10).
+        this.idleFor += dt;
+        if (this.idleFor >= this.nextFidget) {
+          this.idleFor = 0;
+          this.nextFidget = 6 + Math.random() * 6;
+          this.anim.play('fidget', { pop: 0.06 });
+        }
+      }
+    } else {
+      this.idleFor = 0;
     }
 
     this.anim.update(dt);

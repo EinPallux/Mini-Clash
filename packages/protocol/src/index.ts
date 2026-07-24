@@ -18,6 +18,10 @@ export type Intent =
   | { t: 'attackTarget'; target: EntityId }
   | { t: 'stop' }
   | { t: 'cast'; slot: Slot; x: number; z: number }
+  | { t: 'useRelic'; x: number; z: number }
+  | { t: 'buy'; itemId: string }
+  | { t: 'buyRelic'; relicId: string }
+  | { t: 'sell'; itemId: string }
   | { t: 'dance' }
   | { t: 'trainer'; cmd: TrainerCmd };
 
@@ -36,14 +40,19 @@ export interface IntentMsg {
 
 /* ------------------------------ Match config ------------------------------ */
 
+export type BotTier = 'recruit' | 'veteran' | 'elite';
+
 export interface MatchPlayerConfig {
   id: PlayerId;
   championId: string;
   team: Team;
+  /** Present = sim-driven bot at this tier. */
+  bot?: BotTier;
+  name?: string;
 }
 
 export interface MatchConfig {
-  mode: 'training';
+  mode: 'training' | 'bridge';
   seed: number;
   mapId: string;
   players: MatchPlayerConfig[];
@@ -83,10 +92,21 @@ export interface ChampionSnap extends EntityBase {
   kind: 'champion';
   player: PlayerId;
   championId: string;
+  bot: boolean;
+  name: string;
   dead: boolean;
   respawnIn: number;
   energy: number;
   level: number;
+  gold: number;
+  kills: number;
+  deaths: number;
+  assists: number;
+  items: string[];
+  relic: { id: string; cd: number; cdMax: number } | null;
+  /** True while standing in brush and hidden to enemies (client fade). */
+  inBrush: boolean;
+  shield: number;
   /** Seconds of cooldown remaining per slot. */
   cooldowns: Record<Slot, number>;
   /** Max cooldown per slot after haste (for radial display). */
@@ -117,6 +137,8 @@ export interface DummySnap extends EntityBase {
 
 export interface KegSnap extends EntityBase {
   kind: 'keg';
+  /** Unit def id — picks the model (powder keg, Rattle's skull…). */
+  unitId: string;
   fuseLeft: number;
   /** Toss arc phase 0..1 (client renders the lob). */
   tossPhase?: number;
@@ -140,9 +162,76 @@ export interface ProjectileSnap extends EntityBase {
   travelFrac: number;
 }
 
-export type EntitySnap = ChampionSnap | DummySnap | KegSnap | WallSnap | ProjectileSnap;
+export interface MiniSnap extends EntityBase {
+  kind: 'mini';
+  unitId: string;
+  miniKind: 'bruiser' | 'zapper' | 'ram';
+  attacking: boolean;
+}
+
+export interface TowerSnap extends EntityBase {
+  kind: 'tower';
+  tier: 'outer' | 'inner';
+  /** Current aggro target (client draws the tether). */
+  aggro: EntityId | null;
+  ramp: number;
+  /** Inner towers are immune until the outer falls (destroy-in-order rule). */
+  invulnerable: boolean;
+  dead: boolean;
+}
+
+export interface CoreSnap extends EntityBase {
+  kind: 'core';
+  invulnerable: boolean;
+}
+
+export interface OrbSnap extends EntityBase {
+  kind: 'orb';
+}
+
+/** Sylva's planted flower (client renders bud → bloom on removal fx). */
+export interface FlowerSnap extends EntityBase {
+  kind: 'flower';
+  tLeft: number;
+}
+
+/** Ground aura zone (Sylva's ward). */
+export interface ZoneSnap extends EntityBase {
+  kind: 'zone';
+  tLeft: number;
+  duration: number;
+}
+
+export type EntitySnap =
+  | ChampionSnap
+  | DummySnap
+  | KegSnap
+  | WallSnap
+  | ProjectileSnap
+  | MiniSnap
+  | TowerSnap
+  | CoreSnap
+  | OrbSnap
+  | FlowerSnap
+  | ZoneSnap;
 
 /* --------------------------------- Events --------------------------------- */
+
+export interface MatchStateSnap {
+  mode: 'training' | 'bridge';
+  /** Seconds since match start. */
+  time: number;
+  barrierDown: boolean;
+  teamKills: [number, number];
+  towersDown: [number, number];
+  over: { winner: Team } | null;
+  /** Seconds until next orb spawn (HUD ticker). */
+  nextOrbIn: number | null;
+  /** 16:00 Corebreaker active (cores take double damage, all-Ram waves). */
+  overtime: boolean;
+  /** 20:00 Core decay active. */
+  suddenDeath: boolean;
+}
 
 export type SimEvent =
   | {
@@ -168,12 +257,37 @@ export type SimEvent =
   | { t: 'death'; id: EntityId; x: number; z: number }
   | { t: 'respawn'; id: EntityId }
   | { t: 'levelup'; id: EntityId; level: number }
-  | { t: 'castDenied'; player: PlayerId; reason: 'cooldown' | 'energy' | 'dead' | 'casting' }
-  | { t: 'dummyReset'; id: EntityId };
+  | {
+      t: 'castDenied';
+      player: PlayerId;
+      reason: 'cooldown' | 'energy' | 'dead' | 'casting' | 'level';
+    }
+  | { t: 'dummyReset'; id: EntityId }
+  | {
+      t: 'kill';
+      killer: PlayerId | null;
+      victim: PlayerId;
+      assists: PlayerId[];
+      x: number;
+      z: number;
+    }
+  | { t: 'towerDown'; team: Team; tier: 'outer' | 'inner'; byTeam: Team }
+  | { t: 'matchOver'; winner: Team }
+  | {
+      t: 'purchase';
+      player: PlayerId;
+      itemId: string;
+      ok: boolean;
+      reason?: 'gold' | 'slots' | 'zone' | 'owned';
+    }
+  | { t: 'barrierDown' }
+  | { t: 'overtime' }
+  | { t: 'suddenDeath' };
 
 export interface Snapshot {
   tick: number;
   time: number;
+  match: MatchStateSnap;
   entities: EntitySnap[];
   events: SimEvent[];
 }

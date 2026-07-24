@@ -182,17 +182,19 @@ Auto-acquire on attack-move (A) targeting nearest by priority (champions in expl
 ## 11. XP & levels (in-match)
 
 - Levels 1→10. Cumulative XP: 0 / 80 / 200 / 360 / 560 / 800 / 1090 / 1430 / 1820 / 2260.
-- Sources: ambient 2 XP/s to every living player (1/s while dead — comeback rule); Mini kill 14 XP shared in 10 u (full to each nearby ally); champion takedown 60 × victim-level shared; orbs 20 XP; golem 120 XP team-wide; tower 90 XP team-wide.
+- Sources: ambient 2 XP/s to every living player (1/s while dead — comeback rule); Mini kill 14 XP shared in 10 u (full to each nearby ally); champion takedown 60 × victim-level, split evenly among killer + assisters; orbs 20 XP; golem 120 XP team-wide; tower 90 XP team-wide.
 - Expected pace: L3 ≈ 1:30, L6 ≈ 5:00, L9 ≈ 9:30, L10 ≈ 13:00 (drafts align at 3/6/9).
 - Per-level: champion stat growth per CHAMPIONS.md tables; R unlocks at 4; small heal on level-up (4% max HP, with level-up burst VFX).
 
 ## 12. Gold & items
 
 ### 12.1 Gold income
-Ambient 2.5 g/s (1.25 while dead). Mini kills (shared evenly among allies within 10 u): Bruiser 18 g, Zapper 14 g, Ram 45 g. Champion kill 300 g (+streak bounty 50×streak, cap +300; assist pool 150 g split). Towers 150 g each, global. Golem 90 g team-wide. Coin Rain pickups 2–6 g each. No last-hitting requirement (proximity share) — lane presence, not CS drills.
+Everyone starts with **500 g** (exactly one Tier-1 item at 0:00). Ambient 2.5 g/s (1.25 while dead). Mini kills (shared evenly among allies within 10 u): Bruiser 18 g, Zapper 14 g, Ram 45 g. Champion kill 300 g (+streak bounty 50×streak, cap +300; assist pool 150 g split). Towers 150 g each, global. Golem 90 g team-wide. Coin Rain pickups 2–6 g each. No last-hitting requirement (proximity share) — lane presence, not CS drills.
 
 ### 12.2 Shop rules
-Buy at fountain during 0:00–1:00, or **any time while dead** (the death screen *is* the shop — turns downtime into decisions). 4 item slots + 1 Relic slot. Sell for 70%. No consumables.
+Buy at fountain during 0:00–1:00, or **any time while dead** (the death screen *is* the shop — turns downtime into decisions). 4 item slots + 1 Relic slot. Tier 2/3 items build from one lower-tier component: owning it discounts the price by its full cost and consumes it. Sell for 70%. No consumables.
+
+The fountain plate itself heals **9% max HP + 15 Energy per second** while you stand on it — resets are fast, base-camping is still losing tempo.
 
 ### 12.3 Items — Tier 1 (500 g, single stat)
 | Item | Stats |
@@ -237,20 +239,20 @@ Buy at fountain during 0:00–1:00, or **any time while dead** (the death screen
 ## 13. Units & structures
 
 ### 13.1 Minis
-Waves every 25 s from each gate (first 0:35): 3 **Bruisers** (melee, 480 HP, 14 dmg) + 2 **Zappers** (ranged 5 u, 300 HP, 21 dmg); every 3rd wave adds a **Ram** (900 HP, 3× damage vs towers, takes −70% from towers). All Mini stats scale +3%/min. Models: Kenney Blocky Characters in team palettes (Bruiser sword, Zapper wand-bolt, Ram carries a log ram); they're characters, not blobs — full walk/attack/death animations.
+Waves every 25 s from each gate (first 0:35): 3 **Bruisers** (melee, 480 HP, 14 dmg) + 2 **Zappers** (ranged 5 u, 300 HP, 21 dmg); every 2nd wave adds a **Ram** (900 HP, 3× damage vs towers, takes −70% from towers). Bruisers and Zappers deal **2.5× damage to enemy Minis** (waves grind through each other instead of stockpiling; Rams ignore the wave and go for structures), and **champions deal 2× damage to Minis** — waves are speed bumps for heroes, walls for each other. All Mini stats scale +3%/min. Models: Kenney Blocky Characters in team palettes (Bruiser sword, Zapper wand-bolt, Ram carries a log ram); they're characters, not blobs — full walk/attack/death animations.
 
 ### 13.2 Watchtowers
-3000 HP, 40 Armor/Ward, backdoor protection (−50% damage taken when no enemy Minis within 8 u). Attack: 180 dmg shots every 1.2 s, range 8.5 u, +40% ramp per consecutive shot on the same champion. Priority: Minis > champion attacking an allied champion (instant aggro-switch) > nearest champion. Aggro is visualized (red tether + tower eye glow — honesty rule).
+2400 HP, 40 Armor/Ward, backdoor protection (−50% damage taken when no enemy Minis within 11 u). Attack: 180 dmg shots every 1.2 s, range 8.5 u, +40% ramp per consecutive shot on the same champion. Priority: Minis > champion attacking an allied champion (instant aggro-switch) > nearest champion. Aggro is visualized (red tether + tower eye glow — honesty rule).
 
 ### 13.3 Clash Core
-4200 HP, 30 resists, exposed only after both Watchtowers fall. Self-defense: slow AoE pulse (120 dmg, 8 u) every 2 s when enemies are in range. Destruction = victory. The Core is a huge crystal-heart machine (Castle + Factory kit build) with damage states (cracks, leaking light, alarm klaxon under 25%).
+3600 HP, 30 resists, exposed only after both Watchtowers fall. Self-defense: slow AoE pulse (120 dmg, 8 u) every 2 s when enemies are in range. Destruction = victory. The Core is a huge crystal-heart machine (Castle + Factory kit build) with damage states (cracks, leaking light, alarm klaxon under 25%).
 
 ### 13.4 Health orbs
 Pads at the 30 u / 90 u marks spawn an orb every 45 s (first 1:30). Touch: heal 18% max HP + 40 Energy + 20 XP to toucher, small splash heal (6%) to nearby allies. Contested by design (pads sit in the poke zone).
 
 ## 14. Death & comeback
 
-- Respawn timer: `5 + 1.5 × level` s (cap 20 s; +25% during Overtime). Death screen = shop + killcam-lite (damage recap).
+- Respawn timer: `5 + 2.5 × level` s (cap 32 s; +25% during Overtime) — death windows must be long enough late-game that a won fight can become a tower. Death screen = shop + killcam-lite (damage recap).
 - Comeback levers (all systemic, none feel like charity): dead players keep 50% ambient XP/gold · kill bounties · Augment pity odds (§8) · event resets (a won Golem can swing a losing game) · Collapse forces closure.
 - No XP/gold theft mechanics; no deny play.
 

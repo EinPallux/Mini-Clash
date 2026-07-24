@@ -30,8 +30,14 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      # Unit + content + determinism tests (Node side of the cross-env hash check).
+      # Unit + content + determinism tests.
       - run: pnpm test
+      # Cross-environment replay hash: Node vs headless Chromium (TECH §4).
+      - name: Install Playwright Chromium
+        run: pnpm exec playwright install chromium --with-deps
+      - run: node scripts/determinism.mjs
+        env:
+          SMOKE_CHROME: ''
 
   build-and-smoke:
     runs-on: ubuntu-latest

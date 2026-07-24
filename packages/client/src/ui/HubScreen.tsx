@@ -1,14 +1,21 @@
 import { CHAMPION_LIST, STRINGS } from '@mini-clash/data';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { uiSound } from '../game/audio';
 import { useSession } from '../state/session';
 import { SettingsModal } from './SettingsModal';
 
-const ROLE_EMOJI: Record<string, string> = {
-  vanguard: '🛡',
-  gunner: '🏴‍☠️',
-  caster: '💀',
-  support: '🌿',
+/** Main menu — hero-shooter chrome: dark top nav, light diamond backdrop, flat tiles. */
+
+const ROLE_ICON: Record<string, string> = {
+  vanguard: 'checked-shield',
+  gunner: 'cannon-ball',
+  caster: 'tower-fall',
+  support: 'three-friends',
+};
+
+const CHAMP_THEME: Record<string, { from: string; to: string; line: string }> = {
+  rook: { from: '#8a94a6', to: '#3d4656', line: '#aab6cc' },
+  fathom: { from: '#2e5aa8', to: '#14274d', line: '#3ba7ff' },
 };
 
 export function HubScreen(): React.ReactElement {
@@ -18,56 +25,103 @@ export function HubScreen(): React.ReactElement {
   const setChampion = useSession((s) => s.setTrainingChampion);
   const [settingsOpen, setSettingsOpen] = useState(false);
 
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.code === 'Enter' && !settingsOpen) {
+        uiSound('ui_click');
+        goto('match');
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [goto, settingsOpen]);
+
   return (
-    <div className="screen" style={{ justifyContent: 'flex-start', paddingTop: '5.5rem' }}>
-      <div className="hub-topbar">
-        <div className="profile-chip">
-          <div className="avatar">{profile?.name.slice(0, 1).toUpperCase() ?? '?'}</div>
-          {profile?.name}
+    <div className="hub-root backdrop-light">
+      <nav className="top-nav">
+        <div className="brand">
+          <span className="mark">◢◤</span> MINI CLASH
         </div>
-        <button
-          type="button"
-          className="btn ghost"
-          onClick={() => {
-            uiSound('ui_click');
-            setSettingsOpen(true);
-          }}
-        >
-          ⚙ {STRINGS.settings}
-        </button>
-      </div>
+        <div className="nav-tabs">
+          <button type="button" className="nav-tab active">
+            <span>Play</span>
+          </button>
+          <button type="button" className="nav-tab locked" title={`${STRINGS.comingSoon} (v0.7)`}>
+            <span>Heroes</span>
+            <span className="mini-tag">v0.7</span>
+          </button>
+          <button type="button" className="nav-tab locked" title={`${STRINGS.comingSoon} (v0.7)`}>
+            <span>Store</span>
+            <span className="mini-tag">v0.7</span>
+          </button>
+          <button type="button" className="nav-tab locked" title={`${STRINGS.comingSoon} (v0.8)`}>
+            <span>Tournament</span>
+            <span className="mini-tag">v0.8</span>
+          </button>
+        </div>
+        <div className="nav-right">
+          <span className="nav-chip" title={`Clash Coins — ${STRINGS.comingSoon} (v0.7)`}>
+            <span className="coin">⬢</span> 0
+          </span>
+          <button
+            type="button"
+            className="nav-chip"
+            onClick={() => {
+              uiSound('ui_click');
+              setSettingsOpen(true);
+            }}
+          >
+            ⚙
+          </button>
+          <div className="profile-tile">
+            <div className="avatar">{profile?.name.slice(0, 1).toUpperCase() ?? '?'}</div>
+            {profile?.name}
+          </div>
+        </div>
+      </nav>
 
-      <div className="hub-center">
-        <h1 className="title-hero" style={{ fontSize: '3.4rem' }}>
-          MINI <span className="clash">CLASH</span>
-        </h1>
+      <div className="hub-content">
+        <h1 className="menu-heading">Play</h1>
 
-        <div className="champ-pick">
-          {CHAMPION_LIST.map((c) => (
-            <button
-              type="button"
-              key={c.id}
-              className={`champ-card ${champion === c.id ? 'sel' : ''}`}
-              onClick={() => {
-                uiSound('ui_hover');
-                setChampion(c.id);
-              }}
-            >
-              <div
-                className="face"
-                style={{
-                  background: `linear-gradient(145deg, #${c.visual.portraitColor.toString(16).padStart(6, '0')}, #1c2438)`,
+        <div className="section-label">Choose your champion</div>
+        <div className="champ-row">
+          {CHAMPION_LIST.map((c) => {
+            const theme = CHAMP_THEME[c.id] ?? CHAMP_THEME.rook;
+            return (
+              <button
+                type="button"
+                key={c.id}
+                className={`champ-card ${champion === c.id ? 'sel' : ''}`}
+                onClick={() => {
+                  uiSound('ui_hover');
+                  setChampion(c.id);
                 }}
               >
-                {ROLE_EMOJI[c.role] ?? '⚔'}
-              </div>
-              <h3>{c.name}</h3>
-              <div className="role">{c.role}</div>
-            </button>
-          ))}
+                <div
+                  className="art"
+                  style={{ background: `linear-gradient(160deg, ${theme.from}, ${theme.to})` }}
+                >
+                  <span className="letter">{c.name.slice(0, 1)}</span>
+                </div>
+                <div className="plate">
+                  <span className="nm">{c.name}</span>
+                  <span
+                    className="role-ic"
+                    title={c.role}
+                    style={{
+                      maskImage: `url(/icons/${ROLE_ICON[c.role] ?? 'sword-clash'}.svg)`,
+                      WebkitMaskImage: `url(/icons/${ROLE_ICON[c.role] ?? 'sword-clash'}.svg)`,
+                    }}
+                  />
+                </div>
+                <div className="underline" style={{ background: theme.line }} />
+              </button>
+            );
+          })}
         </div>
 
-        <div className="row" style={{ alignItems: 'stretch' }}>
+        <div className="section-label">Game modes</div>
+        <div className="mode-row">
           <button
             type="button"
             className="mode-card"
@@ -76,27 +130,80 @@ export function HubScreen(): React.ReactElement {
               goto('match');
             }}
           >
-            <h3>🎯 {STRINGS.training}</h3>
-            <span className="subtle">{STRINGS.trainingDesc}</span>
-            <div>
-              <span className="tag">PLAY NOW</span>
+            <span className="ribbon">
+              <span>Available now</span>
+            </span>
+            <div
+              className="hero"
+              style={{ background: 'linear-gradient(135deg, #2ea860, #1c6e3e)' }}
+            >
+              <span
+                className="glyph"
+                style={{
+                  maskImage: 'url(/icons/crossed-swords.svg)',
+                  WebkitMaskImage: 'url(/icons/crossed-swords.svg)',
+                }}
+              />
+            </div>
+            <div className="info">
+              <div className="mode-kind">Solo · Sandbox</div>
+              <h3>{STRINGS.training}</h3>
+              <div className="desc">{STRINGS.trainingDesc}</div>
             </div>
           </button>
+
           <div className="mode-card locked" aria-disabled>
-            <h3>⚔ Bridge Brawl vs Bots</h3>
-            <span className="subtle">The full 4v4 ARAM on the Shatterbridge.</span>
-            <div>
-              <span className="tag">v0.2 — {STRINGS.comingSoon}</span>
+            <span className="ribbon dim">
+              <span>v0.2</span>
+            </span>
+            <div
+              className="hero"
+              style={{ background: 'linear-gradient(135deg, #b23a3a, #6e1c1c)' }}
+            >
+              <span
+                className="glyph"
+                style={{
+                  maskImage: 'url(/icons/tower-fall.svg)',
+                  WebkitMaskImage: 'url(/icons/tower-fall.svg)',
+                }}
+              />
+            </div>
+            <div className="info">
+              <div className="mode-kind">4v4 · vs Bots</div>
+              <h3>Bridge Brawl</h3>
+              <div className="desc">The full ARAM on the Shatterbridge.</div>
             </div>
           </div>
+
           <div className="mode-card locked" aria-disabled>
-            <h3>🌐 Play with friends</h3>
-            <span className="subtle">Custom lobbies with invite codes.</span>
-            <div>
-              <span className="tag">v0.3 — {STRINGS.comingSoon}</span>
+            <span className="ribbon dim">
+              <span>v0.3</span>
+            </span>
+            <div
+              className="hero"
+              style={{ background: 'linear-gradient(135deg, #3b6fd4, #1d3a78)' }}
+            >
+              <span
+                className="glyph"
+                style={{
+                  maskImage: 'url(/icons/three-friends.svg)',
+                  WebkitMaskImage: 'url(/icons/three-friends.svg)',
+                }}
+              />
+            </div>
+            <div className="info">
+              <div className="mode-kind">Online · Custom lobby</div>
+              <h3>Play with friends</h3>
+              <div className="desc">Invite codes, bots fill empty seats.</div>
             </div>
           </div>
         </div>
+      </div>
+
+      <div className="hintbar on-light">Mini Clash v0.1 — Training Grounds</div>
+      <div className="keyhint on-light">
+        <span className="cap">ENTER</span>
+        <span className="lbl">Play</span>
       </div>
 
       {settingsOpen && <SettingsModal onClose={() => setSettingsOpen(false)} />}

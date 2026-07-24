@@ -98,6 +98,17 @@ export const FATHOM: ChampionDef = {
     description: 'On arrival, flip a coin: your next basic attack within 2s deals +40% damage.',
     params: { window: 2, bonus: 0.4 },
   },
+  botBuild: {
+    relic: 'blink_prism',
+    items: [
+      'sharpened_fang',
+      'vampire_seal',
+      'whetstone',
+      'dragonfang_blade',
+      'executioners_edge',
+      'phantom_anchor',
+    ],
+  },
   visual: {
     model: 'chars/character-female-b',
     scale: 1,

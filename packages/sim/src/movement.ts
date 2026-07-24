@@ -80,11 +80,13 @@ export function updateMovement(w: World, e: Entity, dt: number): void {
   }
 }
 
-/** Soft push-out so champions don't stack inside units (dummies/kegs are anchors). */
+/** Soft push-out so champions/Minis don't stack inside units (dummies/kegs are anchors). */
 export function applySeparation(w: World, dt: number): void {
   const movers: Entity[] = [];
   for (const u of w.units()) {
-    if (u.kind === 'champion' && !u.dead && !u.champ?.leap) movers.push(u);
+    if (u.dead) continue;
+    if (u.kind === 'champion' && !u.champ?.leap) movers.push(u);
+    else if (u.kind === 'mini') movers.push(u);
   }
   for (const m of movers) {
     for (const other of w.units()) {
