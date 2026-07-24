@@ -28,7 +28,7 @@ pnpm build        # asset pipeline + production client build → packages/client
 install `pnpm install --frozen-lockfile`, build `pnpm build`, output
 `packages/client/dist`. In the Vercel project settings, leave **Root Directory**
 at the repository root (a root of `packages/client` bypasses `vercel.json` and
-skips the asset pipeline, which 404s the game at runtime). Requires Node 22+.
+skips the asset pipeline, which 404s the game at runtime). Requires Node 22.18+ (the pipeline runs TypeScript directly via Node's built-in type stripping; `engines` pins the 22.x line so hosts resolve a compatible runtime).
 
 ## Documentation index
 

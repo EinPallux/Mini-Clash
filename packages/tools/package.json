@@ -4,8 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "assets:build": "node --experimental-strip-types src/asset-pipeline/build.ts",
-    "assets:inspect": "node --experimental-strip-types src/asset-pipeline/inspect.ts",
+    "assets:build": "node src/asset-pipeline/build.ts",
+    "assets:inspect": "node src/asset-pipeline/inspect.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
