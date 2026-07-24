@@ -74,6 +74,8 @@ export interface ChampState {
   lastChampHitAt: number;
   /** world.time of last attack/cast/relic commit (brush reveal). */
   lastActionAt: number;
+  /** world.time of last ping (rate limit). */
+  lastPingAt: number;
   inBrush: boolean;
   /** Index into World.brushRects while inBrush (reveal checks), else -1. */
   brushIdx: number;
@@ -209,6 +211,14 @@ export interface ZoneState {
 }
 
 /** Bridge-mode match orchestration state (absent on training maps). */
+export interface TeamPing {
+  team: number;
+  kind: 'danger' | 'omw' | 'attack' | 'help';
+  x: number;
+  z: number;
+  tick: number;
+}
+
 export interface MatchState {
   mode: 'training' | 'bridge';
   barrierDown: boolean;
@@ -292,6 +302,8 @@ export class World {
   brushRects: { x: number; z: number; w: number; d: number }[] = [];
   /** Bridge match orchestration (null on training maps). */
   match: MatchState | null = null;
+  /** Recent team pings (bots read these; trimmed to the last ~5 s each tick). */
+  pings: TeamPing[] = [];
 
   constructor(
     public nav: NavGrid,

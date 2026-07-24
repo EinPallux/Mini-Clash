@@ -536,6 +536,35 @@ export const SOUND_CUES: Record<string, SynthCue> = {
     id: 'mini_thump',
     layers: [{ wave: 'noise', freq: 1, attack: 0.002, decay: 0.06, volume: 0.1, lowpass: 1200 }],
   },
+  shop_buy: {
+    id: 'shop_buy',
+    layers: [
+      { wave: 'square', freq: 950, freqEnd: 700, attack: 0.001, decay: 0.05, volume: 0.16 },
+      { wave: 'triangle', freq: 1420, attack: 0.001, decay: 0.11, volume: 0.12, delay: 0.05 },
+      { wave: 'noise', freq: 1, attack: 0.001, decay: 0.04, volume: 0.06, lowpass: 4200 },
+    ],
+  },
+  ping_mark: {
+    id: 'ping_mark',
+    layers: [
+      { wave: 'sine', freq: 880, freqEnd: 1320, attack: 0.002, decay: 0.09, volume: 0.12 },
+      { wave: 'sine', freq: 1760, attack: 0.03, decay: 0.12, volume: 0.06 },
+    ],
+  },
+  ping_danger: {
+    id: 'ping_danger',
+    layers: [
+      { wave: 'square', freq: 720, freqEnd: 430, attack: 0.002, decay: 0.16, volume: 0.1 },
+      { wave: 'square', freq: 360, freqEnd: 215, attack: 0.05, decay: 0.16, volume: 0.08 },
+    ],
+  },
+  mini_pop: {
+    id: 'mini_pop',
+    layers: [
+      { wave: 'square', freq: 340, freqEnd: 120, attack: 0.001, decay: 0.11, volume: 0.1 },
+      { wave: 'noise', freq: 1, attack: 0.001, decay: 0.08, volume: 0.07, lowpass: 2400 },
+    ],
+  },
   relic_blink: {
     id: 'relic_blink',
     layers: [

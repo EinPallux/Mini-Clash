@@ -158,22 +158,25 @@ export function findSocket(
   root: THREE.Object3D,
   socket: 'handRight' | 'handLeft' | 'back' | 'root',
 ): THREE.Object3D {
-  // Covers both rig families: Kenney ('arm-right') and KayKit ('handslot.r').
+  // Covers both rig families: Kenney ('arm-right') and KayKit ('handslot.r' —
+  // which GLTFLoader sanitizes to 'handslotr' at load time). Candidates are in
+  // priority order: dedicated weapon slots before the bare hand/arm bones.
   const want =
     socket === 'handRight'
-      ? ['handslot.r', 'hand.r', 'arm-right', 'armright', 'hand-right']
+      ? ['handslotr', 'arm-right', 'handr', 'hand-right']
       : socket === 'handLeft'
-        ? ['handslot.l', 'hand.l', 'arm-left', 'armleft', 'hand-left']
+        ? ['handslotl', 'arm-left', 'handl', 'hand-left']
         : socket === 'back'
           ? ['chest', 'torso', 'body']
           : ['root'];
-  let found: THREE.Object3D | null = null;
-  root.traverse((obj) => {
-    if (found) return;
-    const n = obj.name.toLowerCase();
-    if (want.some((w) => n.includes(w))) found = obj;
-  });
-  return found ?? root;
+  for (const w of want) {
+    let found: THREE.Object3D | null = null;
+    root.traverse((obj) => {
+      if (!found && obj.name.toLowerCase().includes(w)) found = obj;
+    });
+    if (found) return found;
+  }
+  return root;
 }
 
 export async function preload(

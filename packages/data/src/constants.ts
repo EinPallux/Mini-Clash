@@ -63,9 +63,11 @@ export const BRIDGE = {
   /** Champions cut through Minis (waves are speed bumps for heroes, walls for each other). */
   champVsMiniMul: 2,
   /** 16:00 Corebreaker: Cores take double damage, waves turn all-Ram (GAME_DESIGN §5/§9). */
-  overtime: { at: 960, coreDamageMul: 2, waveRams: 4 },
+  overtime: { at: 900, coreDamageMul: 3, waveRams: 5 },
   /** 20:00 Sudden Death: both Cores decay; higher-HP Core survives (§5). */
-  suddenDeath: { at: 1200, decayPctPerSec: 0.01 },
+  /** Surrender unlocks at 8:00 (UI_UX §8). Solo-vs-bots concedes immediately. */
+  surrenderAt: 480,
+  suddenDeath: { at: 1050, decayPctPerSec: 0.015 },
   /** Brush: attacking/casting reveals you for this long. */
   brushRevealAfterAction: 1.5,
 } as const;

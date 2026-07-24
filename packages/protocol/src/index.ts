@@ -12,6 +12,8 @@ export type PlayerId = number;
 
 /* --------------------------------- Intents -------------------------------- */
 
+export type PingKind = 'danger' | 'omw' | 'attack' | 'help';
+
 export type Intent =
   | { t: 'move'; x: number; z: number }
   | { t: 'attackMove'; x: number; z: number }
@@ -23,6 +25,8 @@ export type Intent =
   | { t: 'buyRelic'; relicId: string }
   | { t: 'sell'; itemId: string }
   | { t: 'dance' }
+  | { t: 'ping'; kind: PingKind; x: number; z: number }
+  | { t: 'surrender' }
   | { t: 'trainer'; cmd: TrainerCmd };
 
 export type TrainerCmd =
@@ -56,6 +60,8 @@ export interface MatchConfig {
   seed: number;
   mapId: string;
   players: MatchPlayerConfig[];
+  /** Test/dev hook (offline smokes only — the v0.3 server ignores it). */
+  rig?: { enemyCoreHp?: number; enemyTowerHp?: number };
 }
 
 /* -------------------------------- Snapshots ------------------------------- */
@@ -282,7 +288,9 @@ export type SimEvent =
     }
   | { t: 'barrierDown' }
   | { t: 'overtime' }
-  | { t: 'suddenDeath' };
+  | { t: 'suddenDeath' }
+  | { t: 'ping'; player: PlayerId; team: Team; kind: PingKind; x: number; z: number }
+  | { t: 'surrendered'; team: Team };
 
 export interface Snapshot {
   tick: number;

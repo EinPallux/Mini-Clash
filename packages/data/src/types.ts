@@ -337,14 +337,23 @@ export interface UnitDef {
     /** Per-minute stat scaling (+3%/min). */
     scalePerMin: number;
   };
-  visual: { model?: string; prim?: 'barrel'; scale: number; tint?: number };
+  visual: {
+    model?: string;
+    prim?: 'barrel';
+    scale: number;
+    tint?: number;
+    /** Animated units (Minis) map logical states to clips like champions do. */
+    anim?: AnimMap;
+    props?: PropAttachment[];
+  };
 }
 
 export interface MapProp {
   model: string;
   position: [number, number, number];
   rotationDeg?: number;
-  scale?: number;
+  /** Uniform, or per-axis [x, y, z] (rails: wide without growing tall). */
+  scale?: number | [number, number, number];
   tint?: number;
 }
 
@@ -364,7 +373,15 @@ export interface MapDef {
   navCell: number;
   obstacles: MapObstacle[];
   props: MapProp[];
-  floor: { tile: string; accentTile: string; size: number };
+  floor: {
+    tile: string;
+    accentTile: string;
+    size: number;
+    /** Limit floor tiles to |z| ≤ deckHalf (sky-bridge over the void). */
+    deckHalf?: number;
+    /** Drop a deterministic scatter of edge tiles (fractured-bridge silhouette). */
+    frayEnds?: boolean;
+  };
   skybox: string;
   spawns: { team: Team; x: number; z: number; facingDeg: number }[];
   dummies: { unit: string; x: number; z: number }[];

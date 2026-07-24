@@ -108,7 +108,7 @@ On level 3/6/9: bottom-center dock slides up with 3 cards (game continues behind
 
 ## 10. Death screen (= the shop)
 
-Grey-out + respawn ring (timer). Left: killcam-lite damage recap (top 3 sources with ability icons — teaches counterplay). Center: **the shop** (tier columns T1/T2/T3 + relic row; owned/affordable states; one-click buy with hammer-clink; build-suggestion chips per champion, dismissible). Right: live team status ("Fight at Golem in 0:12!" contextual hints). Buying is only possible here + pre-1:00 fountain — the screen makes death useful, not dead time.
+Grey-out + respawn ring (timer). Left: killcam-lite damage recap (top 3 sources with ability icons — teaches counterplay; *ships in v0.3 with per-ability damage attribution — v0.2 has no recap panel*). Center: **the shop** (tier columns T1/T2/T3 + relic row; owned/affordable states; one-click buy with hammer-clink; build-suggestion chips per champion, dismissible). Right: live team status ("Fight at Golem in 0:12!" contextual hints). Buying is only possible here + pre-1:00 fountain — the screen makes death useful, not dead time.
 
 ## 11. Tab scoreboard (hold)
 

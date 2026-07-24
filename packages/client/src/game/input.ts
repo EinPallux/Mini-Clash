@@ -11,6 +11,8 @@ import type { FollowCamera } from './camera';
  */
 
 export interface InputCallbacks {
+  /** Alt+right-click quick ping (bridge mode). */
+  quickPing?: () => void;
   send: (intent: Intent) => void;
   pickEntity: (ndcX: number, ndcY: number) => number | null;
   onEscape: () => void;
@@ -69,6 +71,12 @@ export class InputManager {
     unlockAudio();
     this.toNdc(e);
     if (e.button === 2) {
+      // Alt+right-click = quick Attack ping (UI_UX §8 comms).
+      if (e.altKey && this.cb.quickPing) {
+        this.camera.screenToGround(this.ndc.x, this.ndc.y, this.cursorGround);
+        this.cb.quickPing();
+        return;
+      }
       this.moveHeld = true;
       this.issueMove(true);
       return;

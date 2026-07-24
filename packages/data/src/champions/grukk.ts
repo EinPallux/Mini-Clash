@@ -11,7 +11,7 @@ export const GRUKK: ChampionDef = {
     hp: 940,
     hpPerLevel: 112.2,
     regenPctPerSec: 0.005,
-    ad: 63,
+    ad: 67,
     adPerLevel: 6.6,
     attackSpeed: 0.78,
     attackSpeedPerLevel: 0.013,
@@ -82,7 +82,7 @@ export const GRUKK: ChampionDef = {
         {
           t: 'shieldSelf',
           buffId: 'grukk_bellow_shield',
-          amount: { base: 164, perLevel: 11.2 },
+          amount: { base: 190, perLevel: 13 },
           duration: 2.5,
         },
       ],

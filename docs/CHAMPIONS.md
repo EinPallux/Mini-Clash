@@ -36,11 +36,11 @@ Duo randomness means any two roles can pair — every kit must be self-sufficien
 | Champion | HP | AD | AS | MS | Range | Armor/Ward |
 |---|---|---|---|---|---|---|
 | Rook | 1080 → 2160 | 58 → 104 | 0.72 | 3.5 | 1.8 | 32/30 → 62/58 |
-| Fathom | 640 → 1310 | 62 → 128 | 0.88 | 3.6 | 6.5 | 22/20 → 44/40 |
-| Mortis | 600 → 1220 | 50 → 82 | 0.70 | 3.5 | 6.8 | 20/24 → 40/48 |
-| Rattle | 660 → 1350 | 64 → 132 | 0.95 | 3.8 | 1.8 | 24/20 → 47/40 |
-| Grukk | 940 → 1950 | 63 → 122 | 0.78 | 3.6 | 2.2 | 30/26 → 58/52 |
-| Sylva | 620 → 1260 | 52 → 88 | 0.80 | 3.6 | 6.0 | 21/25 → 42/49 |
+| Fathom | 615 → 1285 | 58 → 124 | 0.80 | 3.45 | 6.0 | 22/20 → 44/40 |
+| Mortis | 650 → 1270 | 50 → 82 | 0.70 | 3.5 | 6.8 | 20/24 → 40/48 |
+| Rattle | 740 → 1430 | 64 → 132 | 0.95 | 3.8 | 1.8 | 28/20 → 51/40 |
+| Grukk | 940 → 1950 | 67 → 126 | 0.78 | 3.6 | 2.2 | 30/26 → 58/52 |
+| Sylva | 680 → 1320 | 52 → 88 | 0.80 | 3.6 | 6.0 | 21/25 → 42/49 |
 | Boltz | 650 → 1330 | 60 → 122 | 0.92 | 3.6 | 6.0 | 22/22 → 44/44 |
 | Wisp | 590 → 1200 | 48 → 78 | 0.75 | 3.7 | 6.5 | 19/26 → 38/51 |
 | Piper | 640 → 1300 | 54 → 96 | 0.82 | 3.6 | 5.5 | 22/24 → 44/47 |
@@ -73,8 +73,8 @@ A stoic living statue of the old bridge-keepers' order; fights like a piece of a
 A swaggering pirate whose hand-cannon is technically ship's artillery; treats the bridge as her quarterdeck.
 
 - **Model:** `Kenney_CuteCharacters/character-female-b.glb` (navy coat, gold trim palette). Prop: scaled `Kenney_PirateKit/cannon.glb` as hand-cannon (right hand); `bottle.glb` on belt.
-- **Passive — Powder Rounds:** every 4th basic attack is a powder blast: +`30 (+20% AD)` splash (1.2 u) and pushes the target 0.5 u back. Barrel glows + fuse-hiss telegraph on the 3rd shot.
-- **Q — Skipshot:** 30⚡ / 6 s / 7.5 u line. Cannonball skips 3 times (hits at 2.5/5/7.5 u): `75 (+70% AD)` physical, −15% per skip already spent; final skip knocks Minis aside. *Anim:* `holding-right-shoot` with recoil-lunge exaggerated ×1.5, cannonball is a real `cannon-ball.glb` with water-splash-style dust rings at each skip, tracer smoke ribbon.
+- **Passive — Powder Rounds:** every 4th basic attack is a powder blast: +`20 (+20% AD)` splash (1.2 u) and pushes the target 0.5 u back. Barrel glows + fuse-hiss telegraph on the 3rd shot.
+- **Q — Skipshot:** 30⚡ / 6 s / 7.5 u line. Cannonball skips 3 times (hits at 2.5/5/7.5 u): `70 (+45% AD)` physical, −15% per skip already spent; final skip knocks Minis aside. *Anim:* `holding-right-shoot` with recoil-lunge exaggerated ×1.5, cannonball is a real `cannon-ball.glb` with water-splash-style dust rings at each skip, tracer smoke ribbon.
 - **W — Powder Keg:** 35⚡ / 11 s / toss to 5 u. Throws a keg (`barrel.glb`, 2 s fuse or shoot-triggered — hers and allies' attacks detonate it): `110 (+60% AD)` in 2.2 u + 30% slow 2 s. Enemies can walk away from the fuse; shooting it early is her skill line. *Anim:* `throw`-style underarm lob (`interact-left` retimed), keg wobbles, fuse spark particle, barrel-stave explosion with ring shockwave.
 - **R — Broadside!:** ⏱ 80 s / global-length lane strip (4 u wide) along her facing. The **ghost ship** (`Kenney_PirateKit/ship-ghost.glb`, spectral shader) surfaces from the void mist alongside the bridge over 1.2 s, then fires 5 sequential cannon volleys down the strip (each `90 (+45% AD)` in 1.8 u, same target hit max twice). *Anim:* Fathom raises her hat (`emote-yes` + prop flourish); ship rises with sea-mist VFX, cannon-fire muzzle flashes, splash decals march down the lane; ship dives back into the void. This is the game's marquee "wow" ultimate.
 - **Entrance:** *Lucky Doubloon* — flips a coin; next basic within 2 s deals +40% (coin-sparkle trail).
@@ -89,8 +89,8 @@ The skeleton archivist who's been on the bridge longer than the war; casts from 
 - **Model:** `KayKit_Skeletons/Skeleton_Mage.glb` + staff `KayKit_FantasyWeaponsBits` (crystal staff). KayKit-Medium rig, retargeted library clips.
 - **Passive — Soul Ledger:** enemies hit by abilities are "inscribed" 4 s; Mortis's basic attacks vs inscribed targets deal +`12 (+15% AP)` arcane and refund 4⚡ (glyph floats over target).
 - **Q — Soulbolt:** 25⚡ / 4.5 s / 7 u skillshot. `85 (+60% AP)` arcane; passes through Minis it kills (overkill carry-through rewards wave-timing). *Anim:* `Throw` retarget with staff sweep; bolt = wisp skull with ribbon trail, impact = ledger-glyph burst.
-- **W — Grasping Stacks:** 40⚡ / 10 s / 5.5 u circle (2 u). After 0.7 s telegraph, bone bookshelf-hands erupt: `95 (+65% AP)` + root 1.2 s (inscribed targets: 1.6 s). *Anim:* `Use_Item` slam; eruption uses KayKit dungeon bone/shelf props bursting through a crack decal, pages flutter.
-- **R — Overdue Maelstrom:** ⏱ 75 s / self-centered 4.5 u, 3 s channel (move at 40% speed). A vortex of bones and burning pages: `70 (+35% AP)` arcane per 0.5 s tick; victims are slowed 30% (lingers 1 s, so leaving doesn't shake it instantly). *Anim:* `Idle_B` upper-hold with staff overhead, procedural spin layer; GPU-instanced bone + page meshes orbit in two counter-rings, building to a slam finale.
+- **W — Grasping Stacks:** 40⚡ / 10 s / 5.5 u circle (2 u). After 0.7 s telegraph, bone bookshelf-hands erupt: `112 (+65% AP)` + root 1.4 s (inscribed targets: 1.8 s). *Anim:* `Use_Item` slam; eruption uses KayKit dungeon bone/shelf props bursting through a crack decal, pages flutter.
+- **R — Overdue Maelstrom:** ⏱ 75 s / self-centered 4.5 u, 3 s channel (move at 40% speed). A vortex of bones and burning pages: `82 (+35% AP)` arcane per 0.5 s tick; victims are slowed 30% (lingers 1 s, so leaving doesn't shake it instantly). *Anim:* `Idle_B` upper-hold with staff overhead, procedural spin layer; GPU-instanced bone + page meshes orbit in two counter-rings, building to a slam finale.
 - **Entrance:** *Re-shelved* — erupts from the ground (`Spawn_Ground` — the clip exists and it's perfect): 0.5 s, small 1.5 u `40 (+20% AP)` dust nova.
 - **Signature Augments:** ①**Marginalia** (Silver): Passive refund doubles; inscribed duration 6 s. ②**Special Collections** (Gold): Q forks backward off inscribed targets (60% damage bolt toward a second enemy). ③**The Restricted Section** (Prismatic): R pulls enemies 1 u/s inward and its finale silences 1 s.
 
@@ -117,7 +117,7 @@ An orc who decided the bridge needs a toll booth and that he is the toll booth.
 - **Model:** `Kenney_Minidungeon/character-orc.glb` + `weapon-spear.glb`, `shield-round.glb` on back.
 - **Passive — Toll Paid:** hitting a champion with any ability grants a stacking `4% (+1%/level ÷ 2)` damage-dealt buff, 3 stacks, 4 s (stack pips glow on his spear).
 - **Q — Skewer:** 30⚡ / 7 s / 4.5 u thrust-dash. Lunges 2.5 u with spear extended: `80 (+70% AD)`; champions hit at max reach (tip 1 u) are **pulled 1.5 u** toward Grukk (tip marker on indicator). *Anim:* `attack-melee-right` retimed over dash root-motion; spear-tip gleam, pull = fishhook yank with dust.
-- **W — War Bellow:** 25⚡ / 12 s / 4 u cone. Roar: `50 (+40% AD)` + Minis flee 1.5 s; champions dealt 20% slow and Grukk shields himself `164 (+11.2/level)` (≈ 70 + 10% max HP across the curve). *Anim:* `emote-no` head-shake converted to roar with jaw-open morphless head-tilt + camera micro-zoom, ring distortion VFX.
+- **W — War Bellow:** 25⚡ / 12 s / 4 u cone. Roar: `50 (+40% AD)` + Minis flee 1.5 s; champions dealt 20% slow and Grukk shields himself `190 (+13/level)` (≈ 70 + 10% max HP across the curve). *Anim:* `emote-no` head-shake converted to roar with jaw-open morphless head-tilt + camera micro-zoom, ring distortion VFX.
 - **R — Seismic Tantrum:** ⏱ 75 s / 3 casts within 6 s, each 3 u slam. Three ground slams (recast to place each): `90 (+55% AD)` + 20% slow, third slam knocks up 0.8 s. *Anim:* alternating `attack-kick-right`/`attack-melee-right` slams with squash-stretch ×1.3, crack decals persist and connect — the floor *remembers* the tantrum.
 - **Entrance:** *Booth Rules* — 1 s: 20% slow aura in 2.5 u (toll-sign pops over his head — pure charm frame).
 - **Signature Augments:** ①**Exact Change** (Silver): Q refunds 15⚡ per champion hit. ②**Double Shift** (Gold): W shield +100% while below 40% HP, cone widened. ③**Seismic Overtime** (Prismatic): R gains a 4th slam that pulls enemies 2 u inward.
@@ -131,8 +131,8 @@ Keeper of the bridge's improbable garden; kind to allies, horticulturally ruthle
 - **Model:** `Kenney_CuteCharacters/character-female-d.glb` (leaf-green + bloom palette). Prop: gnarled staff (`KayKit_RPGToolsBits`), flower crown (color variant).
 - **Passive — Pollen Trail:** Sylva plants a flower every 6 u walked (max 5, 20 s). Her abilities that touch a flower bloom it: nearby allies heal `20 (+15% AP)`. The map slowly becomes her garden — spatial-play support.
 - **Q — Thorn Dart:** 25⚡ / 5 s / 6.5 u skillshot. `70 (+55% AP)` arcane + 20% slow 1 s; blooms flowers it passes. *Anim:* `holding-right-shoot` reskinned as staff flick; dart = spinning seed with petal trail; bloom = instanced flower pop with sparkle.
-- **W — Blooming Ward:** 40⚡ / 11 s / 5 u circle (2.2 u). Garden zone 3 s: allies inside heal `30 (+25% AP)`/s and cleanse slows on entry; enemy hits inside it are −10% damage. *Anim:* `interact-right` staff plant; zone = animated grass/flower growth (Nature Kit meshes scale-in), fireflies, soft god-ray.
-- **R — Wildwood Embrace:** ⏱ 80 s / 6 u cone, 0.5 s cast. Vines surge: `120 (+70% AP)` arcane + root 1.4 s; every bloomed flower in the cone extends the root +0.3 s (max +0.9) and heals allies in 2 u of it. *Anim:* both-arms raise (`holding-both` hold-frame + procedural tremble); vine meshes lash out in 3 waves, leaf-storm particles, rooted enemies get thorn-cage props.
+- **W — Blooming Ward:** 40⚡ / 11 s / 5 u circle (2.2 u). Garden zone 3 s: allies inside heal `40 (+25% AP)`/s and cleanse slows on entry; enemy hits inside it are −10% damage. *Anim:* `interact-right` staff plant; zone = animated grass/flower growth (Nature Kit meshes scale-in), fireflies, soft god-ray.
+- **R — Wildwood Embrace:** ⏱ 80 s / 6 u cone, 0.5 s cast. Vines surge: `150 (+70% AP)` arcane + root 1.4 s; every bloomed flower in the cone extends the root +0.3 s (max +0.9) and heals allies in 2 u of it. *Anim:* both-arms raise (`holding-both` hold-frame + procedural tremble); vine meshes lash out in 3 waves, leaf-storm particles, rooted enemies get thorn-cage props.
 - **Entrance:** *Fresh Cuttings* — instantly plants 2 flowers at her feet.
 - **Signature Augments:** ①**Overgrowth** (Silver): flower cap +3, flowers last 30 s. ②**Nettle Garden** (Gold): blooms also sting enemies `35 (+20% AP)` in 1.5 u. ③**Heartwood** (Prismatic): W ward follows Sylva (attached zone) and grants 10% MS to allies inside.
 

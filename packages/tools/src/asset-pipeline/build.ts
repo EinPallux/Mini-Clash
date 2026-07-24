@@ -118,6 +118,11 @@ async function main(): Promise<void> {
       }
     }
 
+    // Bounds must be measured pre-transform: quantize() rewrites positions into
+    // normalized grid space and getBounds would report the quantization cube.
+    const preScene = root.getDefaultScene() ?? root.listScenes()[0];
+    const bounds = preScene ? getBounds(preScene) : { min: [0, 0, 0], max: [1, 1, 1] };
+
     // prune() can orphan secondary skins (stretched-vertex artifacts); skip it for rigged
     // files. Rigged files instead get keyframe resampling + quantization — the animation
     // libraries ship dense curves that dwarf the mesh data.
@@ -125,8 +130,6 @@ async function main(): Promise<void> {
       await doc.transform(resample({ tolerance: 0.01 }), dedup(), quantize());
     else await doc.transform(dedup(), prune());
 
-    const scene = root.getDefaultScene() ?? root.listScenes()[0];
-    const bounds = scene ? getBounds(scene) : { min: [0, 0, 0], max: [1, 1, 1] };
     const clips = root.listAnimations().map((a) => a.getName());
     const bones = [
       ...new Set(root.listSkins().flatMap((s) => s.listJoints().map((j) => j.getName()))),

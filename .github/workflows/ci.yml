@@ -57,9 +57,15 @@ jobs:
         run: node scripts/smoke.mjs
         env:
           SMOKE_CHROME: ''
+      - name: Bridge smoke (select → rigged win → podium → summary → offline)
+        run: node scripts/smoke-bridge.mjs
+        env:
+          SMOKE_CHROME: ''
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: smoke-screenshots
-          path: test-results/smoke
+          path: |
+            test-results/smoke
+            test-results/smoke-bridge
           retention-days: 14

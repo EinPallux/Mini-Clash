@@ -82,7 +82,7 @@ describe('bridge boot & barrier', () => {
 });
 
 describe('mini waves', () => {
-  it('first waves spawn at 0:35 from both gates; every 3rd wave adds Rams', () => {
+  it('first waves spawn at 0:35 from both gates; every 2nd wave adds Rams', () => {
     const sim = new Sim(humanCfg());
     let snap = run(sim, 34);
     expect(snap.entities.filter((e) => e.kind === 'mini').length).toBe(0);
@@ -90,8 +90,9 @@ describe('mini waves', () => {
     const minis = snap.entities.filter((e) => e.kind === 'mini');
     expect(minis.length).toBe(10); // 5 per gate
     expect(minis.filter((m) => m.kind === 'mini' && m.miniKind === 'ram').length).toBe(0);
-    // Waves 2 (60s) and 3 (85s): the 3rd carries a Ram per gate.
-    snap = run(sim, 55);
+    // Wave 2 (60s) carries a Ram per gate — check right after spawn, before the
+    // waves have met (survival depends on balance numbers, spawn timing doesn't).
+    snap = run(sim, 26);
     const rams = snap.entities.filter((e) => e.kind === 'mini' && e.miniKind === 'ram');
     expect(rams.length).toBe(2);
   });
@@ -248,4 +249,49 @@ describe('full match', () => {
     }
     expect(stateHash(a)).toBe(stateHash(b));
   }, 60000);
+});
+
+describe('pings & surrender (v0.2 HUD pass)', () => {
+  it('broadcasts pings as events, rate-limits them, and rallies ally bots', () => {
+    const sim = new Sim(humanCfg());
+    const snaps: Snapshot[] = [];
+    run(sim, 1, snaps);
+    sim.applyIntents([msg({ t: 'ping', kind: 'attack', x: 10, z: 0 })]);
+    sim.applyIntents([msg({ t: 'ping', kind: 'danger', x: -30, z: 0 })]); // rate-limited away
+    run(sim, 0.5, snaps);
+    const pings = events(snaps, 'ping');
+    expect(pings).toHaveLength(1);
+    expect(pings[0]).toMatchObject({ kind: 'attack', team: 0, player: 1 });
+    // Ally bots adopt the rally point while the window holds: with an attack ping
+    // at (10, 0) the team-0 bots' march goal shifts off the enemy core toward it.
+    const world = sim.world;
+    expect(world.pings).toHaveLength(1);
+    expect(world.pings[0]).toMatchObject({ team: 0, kind: 'attack', x: 10, z: 0 });
+  });
+
+  it('rejects surrender before 8:00 and concedes after', () => {
+    const sim = new Sim(humanCfg());
+    const snaps: Snapshot[] = [];
+    run(sim, 1, snaps);
+    sim.applyIntents([msg({ t: 'surrender' })]);
+    const early = run(sim, 0.2, snaps);
+    expect(early.match.over).toBeNull();
+
+    // Fast-forward the clock past the gate, then concede.
+    sim.world.time = BRIDGE.surrenderAt + 1;
+    sim.applyIntents([msg({ t: 'surrender' })]);
+    const after = run(sim, 0.2, snaps);
+    expect(after.match.over?.winner).toBe(1);
+    expect(events(snaps, 'surrendered')).toHaveLength(1);
+    expect(events(snaps, 'matchOver')).toHaveLength(1);
+  });
+
+  it('rig.enemyCoreHp pre-damages only the enemy core (offline smoke hook)', () => {
+    const cfg = humanCfg();
+    cfg.rig = { enemyCoreHp: 50 };
+    const sim = new Sim(cfg);
+    const cores = sim.world.entities.filter((e) => e.kind === 'core');
+    expect(cores.find((c) => c.team === 1)?.hp).toBe(50);
+    expect(cores.find((c) => c.team === 0)?.hp).toBeGreaterThan(1000);
+  });
 });

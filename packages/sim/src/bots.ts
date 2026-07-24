@@ -68,6 +68,12 @@ export interface BotBrain {
   buildIdx: number;
   relicBought: boolean;
   goal: 'push' | 'fight' | 'retreat' | 'orb';
+  /** Ally-ping reaction window (world.time) + the honored ping. */
+  pingUntil: number;
+  pingKind: 'danger' | 'omw' | 'attack' | 'help' | null;
+  pingX: number;
+  pingZ: number;
+  lastPingTick: number;
 }
 
 export function makeBrain(seed: number, player: PlayerId, tier: BotTier): BotBrain {
@@ -82,6 +88,11 @@ export function makeBrain(seed: number, player: PlayerId, tier: BotTier): BotBra
     buildIdx: 0,
     relicBought: false,
     goal: 'push',
+    pingUntil: 0,
+    pingKind: null,
+    pingX: 0,
+    pingZ: 0,
+    lastPingTick: -1,
   };
 }
 
@@ -222,12 +233,34 @@ function act(w: World, e: Entity, brain: BotBrain, tp: TierParams, map: MapDef):
     if (nearest && nearestD < 5 && !commit) siege = undefined; // point-blank threat → deal with them
   }
 
+  // --- Pings (GAME_DESIGN §comms: pings must matter even vs bots) -----------
+  // Adopt the newest ally ping: Danger near us forces a disengage window; Attack /
+  // Help / On-my-way set a rally point that outranks the default core march.
+  for (const pg of w.pings) {
+    if (pg.team !== e.team || pg.tick <= brain.lastPingTick) continue;
+    brain.lastPingTick = pg.tick;
+    if (pg.kind === 'danger') {
+      if (dist(e.x, e.z, pg.x, pg.z) < 16) {
+        brain.pingKind = 'danger';
+        brain.pingUntil = w.time + 2.5;
+      }
+    } else {
+      brain.pingKind = pg.kind;
+      brain.pingX = pg.x;
+      brain.pingZ = pg.z;
+      brain.pingUntil = w.time + 4.5;
+    }
+  }
+  if (brain.pingUntil <= w.time) brain.pingKind = null;
+
   // --- Goal selection -------------------------------------------------------
   // One relentless ARAM macro for every tier: shove the Core, break off to heal,
   // come back. Combat is an overlay whenever someone is in weapon reach — there is
   // no "stand at mid and fight" state to lose tempo in. Tiers differ in micro.
   const retreatAt = tp.retreatAt * pm.retreat;
-  if (brain.goal === 'retreat' && hpFrac < 0.72 && !(nearest && nearestD < 4)) {
+  if (brain.pingKind === 'danger' && !(nearest && nearestD < 4)) {
+    brain.goal = 'retreat'; // ally called danger — disengage even at full health
+  } else if (brain.goal === 'retreat' && hpFrac < 0.72 && !(nearest && nearestD < 4)) {
     // stay committed to the retreat
   } else if (hpFrac < retreatAt || (towerOnMe && hpFrac < 0.55)) {
     brain.goal = 'retreat';
@@ -360,7 +393,12 @@ function act(w: World, e: Entity, brain: BotBrain, tp: TierParams, map: MapDef):
   if (brain.goal === 'push') {
     // ARAM macro is simple and honest: march on the Core as a team. Tier skill
     // lives in micro (aim, dodging, focus, siege clicks, retreat discipline).
-    out.push({ t: 'attackMove', x: enemyCore.x, z: enemyCore.z });
+    // An active rally ping outranks the default march.
+    if (brain.pingKind && brain.pingKind !== 'danger') {
+      out.push({ t: 'attackMove', x: brain.pingX, z: brain.pingZ });
+    } else {
+      out.push({ t: 'attackMove', x: enemyCore.x, z: enemyCore.z });
+    }
   }
   return out;
 }

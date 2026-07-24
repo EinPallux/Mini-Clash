@@ -1,5 +1,6 @@
-import { existsSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { createHash } from 'node:crypto';
+import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import react from '@vitejs/plugin-react';
 import { defineConfig, type Plugin } from 'vite';
@@ -29,8 +30,41 @@ function requireGameAssets(): Plugin {
   };
 }
 
+/**
+ * Inject the real precache list into dist/sw.js after the bundle lands. The
+ * service worker caches everything at install, so airplane mode never depends
+ * on which first-visit requests raced past worker activation.
+ */
+function injectSwPrecache(): Plugin {
+  return {
+    name: 'inject-sw-precache',
+    apply: 'build',
+    closeBundle() {
+      const dist = join(dirname(fileURLToPath(import.meta.url)), 'dist');
+      const swPath = join(dist, 'sw.js');
+      if (!existsSync(swPath)) return;
+      const files: string[] = [];
+      const walk = (dir: string): void => {
+        for (const name of readdirSync(dir)) {
+          const full = join(dir, name);
+          if (statSync(full).isDirectory()) walk(full);
+          else files.push(`/${relative(dist, full).split('\\').join('/')}`);
+        }
+      };
+      walk(dist);
+      const precache = ['/', ...files.filter((f) => f !== '/sw.js' && f !== '/index.html')];
+      const version = createHash('sha1').update(JSON.stringify(precache)).digest('hex').slice(0, 8);
+      let sw = readFileSync(swPath, 'utf8');
+      sw = sw.replace("self.__PRECACHE_MANIFEST__ || ['/']", JSON.stringify(precache));
+      sw = sw.replace("self.__PRECACHE_VERSION__ || 'dev'", JSON.stringify(version));
+      writeFileSync(swPath, sw);
+      this.info?.(`sw precache: ${precache.length} entries, version ${version}`);
+    },
+  };
+}
+
 export default defineConfig({
-  plugins: [react(), requireGameAssets()],
+  plugins: [react(), requireGameAssets(), injectSwPrecache()],
   server: { host: true, port: 5173 },
   build: {
     target: 'es2022',

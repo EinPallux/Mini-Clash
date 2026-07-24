@@ -1352,6 +1352,76 @@ export const FX: Record<string, FxTimeline> = {
     id: 'mini.zap.fire',
     events: [{ time: 0, op: { t: 'sound', cue: 'mini_zap', volume: 0.35 } }],
   },
+  'mini.bruiser.death': {
+    id: 'mini.bruiser.death',
+    events: [
+      { time: 0, op: { t: 'sound', cue: 'mini_pop', volume: 0.4 } },
+      {
+        time: 0,
+        op: {
+          t: 'burst',
+          at: 'origin',
+          count: 12,
+          color: 0xd8dde8,
+          color2: 0x8a94a6,
+          size: 0.11,
+          speed: 3,
+          up: 2.6,
+          life: 0.45,
+          gravity: 8,
+          shape: 'shard',
+        },
+      },
+    ],
+  },
+  'mini.zapper.death': {
+    id: 'mini.zapper.death',
+    events: [
+      { time: 0, op: { t: 'sound', cue: 'mini_pop', volume: 0.4 } },
+      {
+        time: 0,
+        op: {
+          t: 'burst',
+          at: 'origin',
+          count: 14,
+          color: 0x9fe8ff,
+          color2: 0xffffff,
+          size: 0.09,
+          speed: 3.2,
+          up: 2.4,
+          life: 0.4,
+          shape: 'spark',
+        },
+      },
+    ],
+  },
+  'mini.ram.death': {
+    id: 'mini.ram.death',
+    events: [
+      { time: 0, op: { t: 'sound', cue: 'mini_pop', volume: 0.6 } },
+      {
+        time: 0,
+        op: {
+          t: 'burst',
+          at: 'origin',
+          count: 22,
+          color: 0xa9773f,
+          color2: 0x6e4a24,
+          size: 0.15,
+          speed: 4,
+          up: 3,
+          life: 0.6,
+          gravity: 9,
+          shape: 'shard',
+        },
+      },
+      { time: 0, op: { t: 'shake', power: 's' } },
+      {
+        time: 0.02,
+        op: { t: 'prop', at: 'origin', model: 'castle/siege-ram-broken', scale: 1, life: 1.4 },
+      },
+    ],
+  },
   'mini.melee.hit': {
     id: 'mini.melee.hit',
     events: [{ time: 0, op: { t: 'sound', cue: 'mini_thump', volume: 0.3 } }],

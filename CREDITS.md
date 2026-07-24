@@ -9,9 +9,9 @@ Mini Clash is built on generously licensed art. Everything listed here is used w
 
 ## Icons (CC BY 3.0)
 
-Ability icons from **game-icons.net**, recolored:
-- "Sword clash", "Tower fall", "Cannon ball", "Galleon" by **Lorc**
-- "Brick wall", "Barrel" by **Delapouite**
+Ability, item and relic icons from **game-icons.net**, recolored:
+- "Sword clash", "Tower fall", "Cannon ball", "Galleon", "Ink swirl", "Grasping claws", "Vortex", "Thrown daggers", "Backstab", "Barbed spear", "Shouting", "Quake stomp", "Thorny vine", "Vine whip", "Saber tooth", "Crystal growth", "Cracked shield", "Magic swirl", "Rock", "Wingfoot", "Battle axe", "Lightning storm", "Scale mail", "Cloak dagger", "Bleeding heart", "Dragon head", "Star swirl", "White tower", "Anchor", "Totem head", "Fist", "Bell shield", "Fire bottle", "Horn internal" by **Lorc**
+- "Brick wall", "Barrel", "Skull staff", "Flower emblem", "Metal plate", "Prism" by **Delapouite**
 
 License: [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/) — https://game-icons.net
 

@@ -1,20 +1,29 @@
+import type { MatchPlayerConfig } from '@mini-clash/protocol';
 import { create } from 'zustand';
 
-export type Screen = 'boot' | 'name' | 'hub' | 'match';
+export type Screen = 'boot' | 'name' | 'hub' | 'select' | 'match';
 
 interface Profile {
   id: string;
   name: string;
 }
 
+export type MatchMode = 'training' | 'bridge';
+
 interface SessionState {
   screen: Screen;
   profile: Profile | null;
+  /** Mode the next match launches into. */
+  matchMode: MatchMode;
   /** Champion chosen for the next Training session. */
   trainingChampion: string;
+  /** Full 8-seat roster produced by champion select (bridge matches). */
+  bridgeLineup: MatchPlayerConfig[] | null;
   goto: (s: Screen) => void;
   setProfile: (name: string) => void;
+  setMatchMode: (m: MatchMode) => void;
   setTrainingChampion: (id: string) => void;
+  setBridgeLineup: (l: MatchPlayerConfig[] | null) => void;
 }
 
 const PROFILE_KEY = 'mc.profile';
@@ -34,7 +43,9 @@ function loadProfile(): Profile | null {
 export const useSession = create<SessionState>()((set) => ({
   screen: 'boot',
   profile: loadProfile(),
+  matchMode: 'training',
   trainingChampion: 'rook',
+  bridgeLineup: null,
   goto: (s) => set({ screen: s }),
   setProfile: (name) => {
     const existing = loadProfile();
@@ -42,7 +53,9 @@ export const useSession = create<SessionState>()((set) => ({
     localStorage.setItem(PROFILE_KEY, JSON.stringify(profile));
     set({ profile });
   },
+  setMatchMode: (m) => set({ matchMode: m }),
   setTrainingChampion: (id) => set({ trainingChampion: id }),
+  setBridgeLineup: (l) => set({ bridgeLineup: l }),
 }));
 
 const ADJ = [
