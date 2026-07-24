@@ -8,6 +8,7 @@ import {
   UNITS,
 } from '@mini-clash/data';
 import type {
+  BotTier,
   ChampionSnap,
   EntitySnap,
   IntentMsg,
@@ -416,7 +417,18 @@ export class Sim {
     this.world.fx('generic.dummyreset', d.x, d.z, { target: d.id });
   }
 
+  /** Advance one tick and return the viewer-team snapshot (worker path). */
   tick(): Snapshot {
+    this.step();
+    return this.snapshot();
+  }
+
+  /**
+   * Advance the world WITHOUT building a snapshot or draining events — the
+   * server steps the sim, then builds one `snapshotFor()` view per team and
+   * drains events itself once all views exist.
+   */
+  step(): void {
     const w = this.world;
     const dt = TICK_DT;
     w.tick++;
@@ -424,7 +436,7 @@ export class Sim {
 
     if (w.match?.over) {
       // Victory freeze: the world holds its pose for the podium sequence.
-      return this.snapshot();
+      return;
     }
 
     // 0. Trim stale team pings (~5 s), then bot brains issue intents through the
@@ -508,8 +520,6 @@ export class Sim {
 
     // 7. Match orchestration: barrier, waves, orbs.
     this.updateMatchFlow();
-
-    return this.snapshot();
   }
 
   private updateMatchFlow(): void {
@@ -766,17 +776,47 @@ export class Sim {
     }
   }
 
+  /**
+   * Seat cover (TECH §6 reconnect): a bot brain drives a disconnected human's
+   * champion. Deterministic per (seed, player) — the brain uses the same RNG
+   * stream a from-the-start bot in that seat would.
+   */
+  coverSeat(player: PlayerId, tier: BotTier): void {
+    if (this.brains.has(player)) return;
+    this.brains.set(player, makeBrain(this.config.seed, player, tier));
+  }
+
+  /** Return a covered seat to human control. */
+  releaseSeat(player: PlayerId): void {
+    const wasBot = this.config.players.find((p) => p.id === player)?.bot;
+    if (!wasBot) this.brains.delete(player);
+  }
+
   snapshot(): Snapshot {
+    const snap = this.snapshotFor(this.viewerTeam);
+    this.world.events = [];
+    return snap;
+  }
+
+  /**
+   * Team-scoped view (server: one per team per tick — brush-hidden enemies never
+   * leave the sim, so neither team can wallhack). Does NOT drain the event queue;
+   * the caller drains via `drainEvents()` after building every view it needs.
+   */
+  snapshotFor(team: 0 | 1): Snapshot {
     const w = this.world;
     const entities: EntitySnap[] = [];
     for (const e of w.entities) {
       // Brush concealment: hidden enemies never leave the sim (map-hack impossible).
-      if (e.kind === 'champion' && isHiddenFrom(w, this.viewerTeam, e)) continue;
+      if (e.kind === 'champion' && isHiddenFrom(w, team, e)) continue;
       entities.push(this.snapEntity(e));
     }
-    const events = w.events;
-    w.events = [];
-    return { tick: w.tick, time: w.time, match: this.matchSnap(), entities, events };
+    return { tick: w.tick, time: w.time, match: this.matchSnap(), entities, events: w.events };
+  }
+
+  /** Clear the per-tick event queue after all per-team views are built. */
+  drainEvents(): void {
+    this.world.events = [];
   }
 
   private matchSnap(): MatchStateSnap {

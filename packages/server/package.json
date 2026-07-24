@@ -1,0 +1,23 @@
+{
+  "name": "@mini-clash/server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "src/index.ts",
+  "scripts": {
+    "dev": "node run.mjs",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@mini-clash/data": "workspace:*",
+    "@mini-clash/protocol": "workspace:*",
+    "@mini-clash/sim": "workspace:*",
+    "colyseus": "^0.16.0",
+    "@colyseus/ws-transport": "^0.16.0",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "colyseus.js": "^0.16.0",
+    "esbuild": "^0.28.1"
+  }
+}
