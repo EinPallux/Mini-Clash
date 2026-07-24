@@ -24,11 +24,13 @@ pnpm install
 pnpm build        # asset pipeline + production client build → packages/client/dist
 ```
 
-**Vercel** (or any host): the repo-root `vercel.json` sets everything —
-install `pnpm install --frozen-lockfile`, build `pnpm build`, output
-`packages/client/dist`. In the Vercel project settings, leave **Root Directory**
-at the repository root (a root of `packages/client` bypasses `vercel.json` and
-skips the asset pipeline, which 404s the game at runtime). Requires Node 22.18+ (the pipeline runs TypeScript directly via Node's built-in type stripping; `engines` pins the 22.x line so hosts resolve a compatible runtime).
+**Vercel** (or any host): a `vercel.json` exists at the repo root *and* in
+`packages/client`, so both Root Directory configurations work — install
+`pnpm install --frozen-lockfile`, build `pnpm build`, output the client `dist`.
+The client's own `build` script runs the asset pipeline first (`pnpm -w
+assets:build`), so there is no host configuration that can skip it. The
+pipeline launches through esbuild (`run.mjs`), making it independent of the
+host's Node TypeScript support; any Node ≥20 works.
 
 ## Documentation index
 

@@ -18,6 +18,7 @@ Entry categories: `Added` · `Changed` · `Fixed` · `Balance` · `Content` · `
 
 ### Fixed
 - **Deployments 404'd on `game-assets/manifest.json`** (e.g. Vercel with the Vite preset): hosts that ran the client's bare `vite build` shipped without the pipeline-generated assets. Added a repo-root `vercel.json` (install/build/output wired to the root `pnpm build`), a Vite build guard that fails with an actionable message when `public/game-assets/` is missing, and a README **Build & deploy** section.
+- **Vercel builds now succeed under any project configuration:** the client's `build` script runs the asset pipeline itself (`pnpm -w assets:build && vite build`) and a second `vercel.json` inside `packages/client` covers projects whose Root Directory points there — no dashboard setting can skip the pipeline anymore. The pipeline also launches through an esbuild bundler (`run.mjs`) instead of Node's version-dependent TypeScript stripping (`--experimental-strip-types` is 22.6+-only and had hard-failed the build), with the repo root located by workspace-marker walk-up so the bundle runs from anywhere.
 
 ### Balance
 - Watchtower HP 3000 → 2400 and Clash Core 4200 → 3600; backdoor-protection radius 8 u → 11 u; Rams every 3rd wave → every 2nd; Bruisers/Zappers deal 2.5× to enemy Minis. First harness runs showed doc-spec sieges stalling matches past 25 min (waves stockpiled, structures outlived every push window); numbers mirrored into GAME_DESIGN §13.

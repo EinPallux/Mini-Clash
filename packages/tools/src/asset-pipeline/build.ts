@@ -14,8 +14,22 @@ import { ALL_EXTENSIONS } from '@gltf-transform/extensions';
 import { dedup, prune, quantize, resample } from '@gltf-transform/functions';
 import { ASSET_MANIFEST } from './manifest.ts';
 
-const here = dirname(fileURLToPath(import.meta.url));
-const repoRoot = resolve(here, '../../../..');
+/** Repo root by workspace-marker walk-up — survives bundling (import.meta moves). */
+function findRepoRoot(): string {
+  const starts = [process.cwd(), dirname(fileURLToPath(import.meta.url))];
+  for (const start of starts) {
+    let dir = resolve(start);
+    for (let i = 0; i < 8; i++) {
+      if (existsSync(join(dir, 'pnpm-workspace.yaml'))) return dir;
+      const parent = dirname(dir);
+      if (parent === dir) break;
+      dir = parent;
+    }
+  }
+  throw new Error('asset pipeline: could not locate the repo root (pnpm-workspace.yaml)');
+}
+
+const repoRoot = findRepoRoot();
 const assetsRoot = join(repoRoot, 'assets');
 const outDir = join(repoRoot, 'packages/client/public/game-assets');
 

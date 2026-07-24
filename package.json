@@ -8,7 +8,7 @@
   },
   "scripts": {
     "dev": "pnpm --filter @mini-clash/client dev",
-    "build": "pnpm assets:build && pnpm --filter @mini-clash/client build",
+    "build": "pnpm --filter @mini-clash/client build",
     "preview": "pnpm --filter @mini-clash/client preview",
     "assets:build": "pnpm --filter @mini-clash/tools assets:build",
     "test": "vitest run",
