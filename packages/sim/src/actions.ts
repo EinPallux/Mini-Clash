@@ -125,6 +125,7 @@ function executeAction(ctx: ActionCtx, a: Action): void {
         : 0;
       w.add({
         kind: 'projectile',
+        srcLabel: ctx.ability.slot,
         team: caster.team,
         x: ctx.ox + dx * (caster.radius + 0.2),
         z: ctx.oz + dz * (caster.radius + 0.2),
@@ -220,6 +221,7 @@ function executeAction(ctx: ActionCtx, a: Action): void {
       if (!unit) throw new Error(`unknown unit '${a.unit}'`);
       const ent = w.add({
         kind: 'keg',
+        srcLabel: ctx.ability.slot,
         team: caster.team,
         x: ctx.aimX,
         z: ctx.aimZ,
@@ -267,7 +269,7 @@ function executeAction(ctx: ActionCtx, a: Action): void {
             if (n >= a.maxHitsPerTarget) continue;
             hits.set(u.id, n + 1);
             const src = world.get(casterId);
-            if (src) dealDamage(world, { source: src }, u, amount, a.type);
+            if (src) dealDamage(world, { source: src, label: ctx.ability.slot }, u, amount, a.type);
           }
         });
       }
@@ -299,7 +301,7 @@ function executeAction(ctx: ActionCtx, a: Action): void {
           for (const u of [...world.enemiesOf(src.team)]) {
             if (u.kind === 'keg') continue;
             if (dist(src.x, src.z, u.x, u.z) <= a.radius + u.radius) {
-              dealDamage(world, { source: src }, u, amount, a.type);
+              dealDamage(world, { source: src, label: ctx.ability.slot }, u, amount, a.type);
               if (a.ccPerTick) applyCc(u, a.ccPerTick);
             }
           }
@@ -336,7 +338,7 @@ function executeAction(ctx: ActionCtx, a: Action): void {
         for (const u of [...w.enemiesOf(caster.team)]) {
           if (u.kind === 'keg') continue;
           if (!inRect(fromX, fromZ, dx, dz, end + 0.4, a.width, u.x, u.z, u.radius)) continue;
-          dealDamage(w, { source: caster }, u, amount, a.type);
+          dealDamage(w, { source: caster, label: ctx.ability.slot }, u, amount, a.type);
           if (a.tipPull && u.kind === 'champion') {
             const along = (u.x - fromX) * dx + (u.z - fromZ) * dz;
             if (along >= end - a.tipPull.zone) {
@@ -354,6 +356,7 @@ function executeAction(ctx: ActionCtx, a: Action): void {
       if (!unit) throw new Error(`unknown unit '${a.unit}'`);
       const ent = w.add({
         kind: 'keg',
+        srcLabel: ctx.ability.slot,
         team: caster.team,
         x: caster.x,
         z: caster.z,
@@ -427,7 +430,7 @@ function executeAction(ctx: ActionCtx, a: Action): void {
       c.path = [];
       grantDashCharges(w, caster);
       const amount = resolveScaling(a.amount, c.level, stats.ad, stats.ap);
-      dealDamage(w, { source: caster }, target, amount, a.type);
+      dealDamage(w, { source: caster, label: ctx.ability.slot }, target, amount, a.type);
       if (a.harvest && !target.dead) {
         c.passive.harvestId = target.id;
         c.passive.harvestUntil = w.time + a.harvest.window;
@@ -491,7 +494,7 @@ function executeAction(ctx: ActionCtx, a: Action): void {
       const rootDur = a.baseRoot + Math.min(a.rootMax, a.rootPerFlower * bloomed);
       const amount = resolveScaling(a.amount, c.level, stats.ad, stats.ap);
       for (const target of shapeTargets(ctx, 'self', a.shape, 'enemies')) {
-        dealDamage(w, { source: caster }, target, amount, a.type);
+        dealDamage(w, { source: caster, label: ctx.ability.slot }, target, amount, a.type);
         applyCc(target, { kind: 'root', duration: rootDur });
       }
       break;
@@ -507,7 +510,7 @@ function resolveAreaDamage(ctx: ActionCtx, a: Extract<Action, { t: 'areaDamage' 
   const stats = championStats(caster);
   const amount = resolveScaling(a.amount, c.level, stats.ad, stats.ap);
   for (const target of shapeTargets(ctx, a.at, a.shape, 'enemies')) {
-    dealDamage(w, { source: caster }, target, amount, a.type);
+    dealDamage(w, { source: caster, label: ctx.ability.slot }, target, amount, a.type);
     const cc = target.kind === 'mini' && a.ccMinis ? a.ccMinis : a.cc;
     if (cc) {
       if (cc.kind === 'knockback') {

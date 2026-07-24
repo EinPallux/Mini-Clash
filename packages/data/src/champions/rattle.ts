@@ -8,7 +8,7 @@ export const RATTLE: ChampionDef = {
   role: 'slayer',
   difficulty: 3,
   stats: {
-    hp: 740,
+    hp: 765,
     hpPerLevel: 76.7,
     regenPctPerSec: 0.0035,
     ad: 64,
@@ -17,7 +17,7 @@ export const RATTLE: ChampionDef = {
     attackSpeedPerLevel: 0.016,
     moveSpeed: 3.8,
     range: 1.8,
-    armor: 28,
+    armor: 31,
     armorPerLevel: 2.6,
     ward: 20,
     wardPerLevel: 2.2,

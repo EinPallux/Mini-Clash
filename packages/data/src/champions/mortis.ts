@@ -17,7 +17,7 @@ export const MORTIS: ChampionDef = {
     attackSpeedPerLevel: 0.01,
     moveSpeed: 3.5,
     range: 6.8,
-    armor: 20,
+    armor: 24,
     armorPerLevel: 2.2,
     ward: 24,
     wardPerLevel: 2.7,

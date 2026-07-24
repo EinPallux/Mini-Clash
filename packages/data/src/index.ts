@@ -21,7 +21,7 @@ export { SHATTERBRIDGE_MAP } from './maps/shatterbridge';
 export { TRAINING_MAP } from './maps/training';
 export { PROJECTILES } from './projectiles';
 export * from './schemas';
-export { STRINGS, type StringKey } from './strings';
+export { QUICK_CHAT, STRINGS, type StringKey } from './strings';
 export { CORE_DEF, type CoreDef, TOWER_DEF, type TowerDef } from './structures';
 export * from './types';
 export { UNITS } from './units';

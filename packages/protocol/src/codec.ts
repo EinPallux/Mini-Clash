@@ -308,6 +308,8 @@ function rareJson(e: EntitySnap): string {
         items: e.items,
         relic: e.relic ? { id: e.relic.id, cdMax: e.relic.cdMax } : null,
         cooldownMax: e.cooldownMax,
+        // Death recap: appears at death, static while dead — one resend each.
+        recap: e.recap ?? null,
       });
     case 'mini':
       return JSON.stringify({
@@ -843,6 +845,7 @@ export class SnapshotDecoder {
       const relic = data.relic as { id: string; cdMax: number } | null;
       const cd = (e as { __relicCd?: number }).__relicCd ?? 0;
       data.relic = relic ? { id: relic.id, cd, cdMax: relic.cdMax } : null;
+      if (data.recap === null) data.recap = undefined;
     }
     Object.assign(e, data);
   }

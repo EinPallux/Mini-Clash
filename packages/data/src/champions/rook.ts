@@ -8,7 +8,7 @@ export const ROOK: ChampionDef = {
   role: 'vanguard',
   difficulty: 1,
   stats: {
-    hp: 1080,
+    hp: 1050,
     hpPerLevel: 120,
     regenPctPerSec: 0.006,
     ad: 58,

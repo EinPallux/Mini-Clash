@@ -1,4 +1,5 @@
 import { randomBytes } from 'node:crypto';
+import { QUICK_CHAT } from '@mini-clash/data';
 import { SnapshotEncoder } from '@mini-clash/protocol';
 import { Sim } from '@mini-clash/sim';
 import type { Client } from 'colyseus';
@@ -109,6 +110,10 @@ export class BridgeRoom extends Room {
 
     this.onMessage('rtt', (client, msg: unknown) => {
       delayed(() => client.send('rtt', msg));
+    });
+
+    this.onMessage('chat', (client, msg: unknown) => {
+      delayed(() => this.relayChat(client, msg));
     });
 
     this.onMessage('ready', (client) => {
@@ -269,6 +274,29 @@ export class BridgeRoom extends Room {
       }
       snapshotBytes.inc(payload.length);
       delayed(() => client.send('snapb', payload));
+    }
+  }
+
+  /** Team-scoped quick-chat relay (GAME_DESIGN §17): whitelist + rate limit. */
+  private lastChat = new Map<string, number>();
+
+  private relayChat(client: Client, msg: unknown): void {
+    const id = (msg as { id?: unknown })?.id;
+    if (typeof id !== 'string' || !QUICK_CHAT[id]) return;
+    const player = this.seats.get(client.sessionId);
+    if (player === undefined) return;
+    const now = Date.now();
+    if (now - (this.lastChat.get(client.sessionId) ?? 0) < 700) return;
+    this.lastChat.set(client.sessionId, now);
+    this.lastIntent.set(client.sessionId, now); // chatting is not AFK
+    const seat = this.match.roster.find((p) => p.id === player);
+    const team = this.match.teamOf(player);
+    const payload = { player, name: seat?.name ?? `P${player}`, phrase: id };
+    for (const c of this.clients) {
+      const p = this.seats.get(c.sessionId);
+      if (p !== undefined && this.match.teamOf(p) === team) {
+        delayed(() => c.send('chat', payload));
+      }
     }
   }
 

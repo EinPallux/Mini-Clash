@@ -35,12 +35,12 @@ Duo randomness means any two roles can pair — every kit must be self-sufficien
 
 | Champion | HP | AD | AS | MS | Range | Armor/Ward |
 |---|---|---|---|---|---|---|
-| Rook | 1080 → 2160 | 58 → 104 | 0.72 | 3.5 | 1.8 | 32/30 → 62/58 |
-| Fathom | 615 → 1285 | 58 → 124 | 0.80 | 3.45 | 6.0 | 22/20 → 44/40 |
-| Mortis | 650 → 1270 | 50 → 82 | 0.70 | 3.5 | 6.8 | 20/24 → 40/48 |
-| Rattle | 740 → 1430 | 64 → 132 | 0.95 | 3.8 | 1.8 | 28/20 → 51/40 |
-| Grukk | 940 → 1950 | 67 → 126 | 0.78 | 3.6 | 2.2 | 30/26 → 58/52 |
-| Sylva | 680 → 1320 | 52 → 88 | 0.80 | 3.6 | 6.0 | 21/25 → 42/49 |
+| Rook | 1050 → 2130 | 58 → 104 | 0.72 | 3.5 | 1.8 | 32/30 → 62/58 |
+| Fathom | 615 → 1285 | 56 → 122 | 0.80 | 3.45 | 5.7 | 22/20 → 44/40 |
+| Mortis | 650 → 1270 | 50 → 82 | 0.70 | 3.5 | 6.8 | 24/24 → 44/48 |
+| Rattle | 765 → 1455 | 64 → 132 | 0.95 | 3.8 | 1.8 | 31/20 → 54/40 |
+| Grukk | 940 → 1950 | 65 → 124 | 0.78 | 3.6 | 2.2 | 30/26 → 58/52 |
+| Sylva | 705 → 1345 | 52 → 88 | 0.80 | 3.6 | 6.0 | 24/25 → 45/49 |
 | Boltz | 650 → 1330 | 60 → 122 | 0.92 | 3.6 | 6.0 | 22/22 → 44/44 |
 | Wisp | 590 → 1200 | 48 → 78 | 0.75 | 3.7 | 6.5 | 19/26 → 38/51 |
 | Piper | 640 → 1300 | 54 → 96 | 0.82 | 3.6 | 5.5 | 22/24 → 44/47 |
@@ -131,7 +131,7 @@ Keeper of the bridge's improbable garden; kind to allies, horticulturally ruthle
 - **Model:** `Kenney_CuteCharacters/character-female-d.glb` (leaf-green + bloom palette). Prop: gnarled staff (`KayKit_RPGToolsBits`), flower crown (color variant).
 - **Passive — Pollen Trail:** Sylva plants a flower every 6 u walked (max 5, 20 s). Her abilities that touch a flower bloom it: nearby allies heal `20 (+15% AP)`. The map slowly becomes her garden — spatial-play support.
 - **Q — Thorn Dart:** 25⚡ / 5 s / 6.5 u skillshot. `70 (+55% AP)` arcane + 20% slow 1 s; blooms flowers it passes. *Anim:* `holding-right-shoot` reskinned as staff flick; dart = spinning seed with petal trail; bloom = instanced flower pop with sparkle.
-- **W — Blooming Ward:** 40⚡ / 11 s / 5 u circle (2.2 u). Garden zone 3 s: allies inside heal `40 (+25% AP)`/s and cleanse slows on entry; enemy hits inside it are −10% damage. *Anim:* `interact-right` staff plant; zone = animated grass/flower growth (Nature Kit meshes scale-in), fireflies, soft god-ray.
+- **W — Blooming Ward:** 40⚡ / 11 s / 5 u circle (2.2 u). Garden zone 3 s: allies inside heal `46 (+25% AP)`/s and cleanse slows on entry; enemy hits inside it are −10% damage. *Anim:* `interact-right` staff plant; zone = animated grass/flower growth (Nature Kit meshes scale-in), fireflies, soft god-ray.
 - **R — Wildwood Embrace:** ⏱ 80 s / 6 u cone, 0.5 s cast. Vines surge: `150 (+70% AP)` arcane + root 1.4 s; every bloomed flower in the cone extends the root +0.3 s (max +0.9) and heals allies in 2 u of it. *Anim:* both-arms raise (`holding-both` hold-frame + procedural tremble); vine meshes lash out in 3 waves, leaf-storm particles, rooted enemies get thorn-cage props.
 - **Entrance:** *Fresh Cuttings* — instantly plants 2 flowers at her feet.
 - **Signature Augments:** ①**Overgrowth** (Silver): flower cap +3, flowers last 30 s. ②**Nettle Garden** (Gold): blooms also sting enemies `35 (+20% AP)` in 1.5 u. ③**Heartwood** (Prismatic): W ward follows Sylva (attached zone) and grants 10% MS to allies inside.

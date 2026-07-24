@@ -20,6 +20,10 @@ export interface NetLink {
   onDropped: ((reason: string) => void) | null;
   /** Server-side AFK cover state changed (socket transports only). */
   onAfk?: ((covered: boolean) => void) | null;
+  /** Team quick-chat line arrived (offline: the local echo of your own). */
+  onChat?: ((msg: ChatMsg) => void) | null;
+  /** Send a quick-chat phrase id (whitelisted server-side). */
+  sendChat?(id: string): void;
   /** Local player's seat id (assigned by the server online; SELF offline). */
   readonly playerId: number;
   /** Smoothed round-trip estimate in ms (0 offline). */
@@ -34,16 +38,28 @@ export interface NetLink {
   dispose(): void;
 }
 
+export interface ChatMsg {
+  player: number;
+  name: string;
+  phrase: string;
+}
+
 export class WorkerLink implements NetLink {
   private worker: Worker;
   private seq = 0;
   private disposed = false;
   onSnapshot: ((snap: Snapshot) => void) | null = null;
   onDropped: ((reason: string) => void) | null = null;
+  onChat: ((msg: ChatMsg) => void) | null = null;
   readonly playerId: number;
   readonly rttMs = 0;
   readonly roster = null;
   ackedSeq = -1;
+
+  /** Offline: bots don't banter — just echo our own line locally. */
+  sendChat(id: string): void {
+    this.onChat?.({ player: this.playerId, name: 'You', phrase: id });
+  }
 
   constructor(playerId: number) {
     this.playerId = playerId;
@@ -140,6 +156,7 @@ export class SocketLink implements NetLink {
   onDropped: ((reason: string) => void) | null = null;
   /** Server put a bot on our seat (AFK) / gave it back. */
   onAfk: ((covered: boolean) => void) | null = null;
+  onChat: ((msg: ChatMsg) => void) | null = null;
   playerId = 0;
   /** Last intent sequence the server acknowledged applying (reconciliation). */
   ackedSeq = -1;
@@ -205,6 +222,9 @@ export class SocketLink implements NetLink {
     room.onMessage('afk', (msg: { on: boolean }) => {
       this.onAfk?.(Boolean(msg?.on));
     });
+    room.onMessage('chat', (msg: ChatMsg) => {
+      this.onChat?.(msg);
+    });
     // Binary delta snapshots (TECH §6): decode against accumulated state; a
     // delta arriving before our baseline returns null and is skipped.
     const decoder = new SnapshotDecoder();
@@ -238,6 +258,10 @@ export class SocketLink implements NetLink {
     const seq = this.seq++;
     this.room.send('intents', [{ seq, player: this.playerId, intent }]);
     return seq;
+  }
+
+  sendChat(id: string): void {
+    if (!this.disposed) this.room?.send('chat', { id });
   }
 
   dispose(): void {

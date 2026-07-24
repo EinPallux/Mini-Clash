@@ -152,6 +152,10 @@ export class MatchRuntime {
       useHud.getState().dropped(reason);
     };
     this.link.onAfk = (covered) => useHud.getState().setAfk(covered);
+    this.link.onChat = (msg) => {
+      useHud.getState().addChat(msg.player, msg.name, msg.phrase);
+      playCue('ui_hover');
+    };
     // ?rig=win pre-damages enemy structures AND idles the enemy seats — offline
     // smoke hook so acceptance tests reach the win sequence in ~2 minutes
     // (harmless vs bots, and the v0.3 server ignores rig).
@@ -255,6 +259,11 @@ export class MatchRuntime {
   ping(kind: PingKind): void {
     const g = this.input.cursorGround;
     this.link.send({ t: 'ping', kind, x: g.x, z: g.z });
+  }
+
+  /** Team quick-chat phrase (T wheel). */
+  chat(id: string): void {
+    this.link.sendChat?.(id);
   }
 
   surrender(): void {

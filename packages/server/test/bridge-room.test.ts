@@ -166,6 +166,47 @@ describe('seat continuity (GAME_DESIGN §17)', () => {
   }, 20000);
 });
 
+describe('quick-chat relay (GAME_DESIGN §17)', () => {
+  it('relays whitelisted phrases to the sender team only', async () => {
+    // Two humans on opposite teams (ids 1 and 5), the rest bots.
+    const roster = ['rook', 'fathom', 'mortis', 'rattle', 'grukk', 'sylva', 'rook', 'fathom'].map(
+      (championId, i) => ({
+        id: i + 1,
+        championId,
+        team: i < 4 ? (0 as const) : (1 as const),
+        bot: i === 0 || i === 4 ? undefined : ('veteran' as const),
+        name: `C${i}`,
+      }),
+    );
+    const c1 = new JsClient(`ws://127.0.0.1:${port}`);
+    const room1 = await c1.create('bridge', { name: 'Talker', roster, seed: 44 });
+    const c2 = new JsClient(`ws://127.0.0.1:${port}`);
+    const room2 = await c2.joinById(room1.roomId, { name: 'Enemy' });
+
+    const mine: unknown[] = [];
+    const theirs: unknown[] = [];
+    room1.onMessage('chat', (m: unknown) => mine.push(m));
+    room2.onMessage('chat', (m: unknown) => theirs.push(m));
+    for (const r of [room1, room2]) {
+      r.onMessage('seat', () => {});
+      r.onMessage('snapb', () => {});
+      r.send('ready', {});
+    }
+    await new Promise((res) => setTimeout(res, 400));
+
+    room1.send('chat', { id: 'nice' });
+    room1.send('chat', { id: 'thanks' }); // rate-limited (< 700ms) — dropped
+    room1.send('chat', { id: 'gg wp free text injection' }); // not whitelisted
+    await waitFor(() => mine.length > 0);
+    await new Promise((res) => setTimeout(res, 300));
+    expect(mine).toEqual([{ player: 1, name: 'Talker', phrase: 'nice' }]);
+    expect(theirs).toEqual([]); // enemy team never hears it
+
+    await room1.leave(true);
+    await room2.leave(true);
+  }, 20000);
+});
+
 describe('link plumbing', () => {
   it('echoes rtt probes and reports the applied intent seq as ack', async () => {
     const client = new JsClient(`ws://127.0.0.1:${port}`);

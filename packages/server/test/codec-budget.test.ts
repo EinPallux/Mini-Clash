@@ -11,7 +11,8 @@ import { describe, expect, it } from 'vitest';
 const CHAMPS = ['rook', 'fathom', 'mortis', 'rattle', 'grukk', 'sylva', 'rook', 'fathom'];
 
 describe('snapshot codec bandwidth', () => {
-  it('stays under 12 KB/s per client during mid-game combat', () => {
+  // Simulates ~4 minutes of an 8-elite-bot match — well past the default 5 s.
+  it('stays under 12 KB/s per client during mid-game combat', { timeout: 30_000 }, () => {
     const sim = new Sim({
       mode: 'bridge',
       seed: 20260724,

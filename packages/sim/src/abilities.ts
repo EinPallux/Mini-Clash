@@ -440,7 +440,7 @@ export function powderBlast(w: World, owner: Entity, target: Entity): void {
   for (const u of w.enemiesOf(owner.team)) {
     if (u.kind === 'keg') continue;
     if (dist(target.x, target.z, u.x, u.z) <= p.splashRadius + u.radius) {
-      dealDamage(w, { source: owner }, u, bonus, 'physical');
+      dealDamage(w, { source: owner, label: 'passive' }, u, bonus, 'physical');
     }
   }
   w.fx('fathom.passive.blast', target.x, target.z, { source: owner.id, target: target.id });

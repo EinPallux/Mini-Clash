@@ -19,6 +19,8 @@ export interface HudChampion {
   cooldownMax: Record<Slot, number>;
   recastSlot: Slot | null;
   passive: Record<string, number>;
+  /** Death-screen recap (UI_UX §10) — top 3 damage sources, set while dead. */
+  recap: ChampionSnap['recap'];
   stats: ChampionSnap['stats'];
 }
 
@@ -64,6 +66,14 @@ export interface HudSeat {
   visible: boolean;
 }
 
+export interface ChatEntry {
+  id: number;
+  player: number;
+  name: string;
+  phrase: string;
+  at: number;
+}
+
 export interface FeedEntry {
   id: number;
   kind: 'kill' | 'tower' | 'surrender';
@@ -88,6 +98,8 @@ interface HudState {
   selfTeam: number;
   seats: HudSeat[];
   feed: FeedEntry[];
+  /** Team quick-chat lines (GAME_DESIGN §17), newest last. */
+  chat: ChatEntry[];
   shopMsg: { at: number; ok: boolean; reason?: string } | null;
   /** Set when the online transport dies — the match screen shows a clean exit. */
   droppedReason: string | null;
@@ -101,6 +113,7 @@ interface HudState {
   setFlags: (f: { noCooldowns?: boolean; infiniteEnergy?: boolean }) => void;
   applySnapshot: (snap: Snapshot, selfPlayer: number) => void;
   addFeed: (entry: Omit<FeedEntry, 'id' | 'at'>) => void;
+  addChat: (player: number, name: string, phrase: string) => void;
   dropped: (reason: string) => void;
   setAfk: (covered: boolean) => void;
   shopResult: (ok: boolean, reason?: string) => void;
@@ -119,6 +132,7 @@ export const useHud = create<HudState>()((set, get) => ({
   selfTeam: 0,
   seats: [],
   feed: [],
+  chat: [],
   shopMsg: null,
   droppedReason: null,
   afkCovered: false,
@@ -132,6 +146,10 @@ export const useHud = create<HudState>()((set, get) => ({
   setFps: (fps) => set({ fps }),
   addFeed: (entry) =>
     set((s) => ({ feed: [...s.feed.slice(-5), { ...entry, id: feedId++, at: Date.now() }] })),
+  addChat: (player, name, phrase) =>
+    set((s) => ({
+      chat: [...s.chat.slice(-3), { id: feedId++, player, name, phrase, at: Date.now() }],
+    })),
   dropped: (reason) => set({ droppedReason: reason }),
   setAfk: (covered) => set({ afkCovered: covered }),
   shopResult: (ok, reason) => set({ shopMsg: { at: Date.now(), ok, reason } }),
@@ -144,6 +162,7 @@ export const useHud = create<HudState>()((set, get) => ({
       selfTeam: 0,
       seats: [],
       feed: [],
+      chat: [],
       shopMsg: null,
       droppedReason: null,
       afkCovered: false,
@@ -197,6 +216,7 @@ export const useHud = create<HudState>()((set, get) => ({
             cooldownMax: e.cooldownMax,
             recastSlot: e.recast?.slot ?? null,
             passive: e.passive,
+            recap: e.recap,
             stats: e.stats,
           };
         }

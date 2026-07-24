@@ -157,6 +157,8 @@ export class Sim {
           items: [],
           relic: null,
           recentDamagers: new Map(),
+          dmgLog: [],
+          recap: null,
           itemState: {},
           lastCombatAt: -100,
           lastDamagedAt: -100,
@@ -633,6 +635,7 @@ export class Sim {
     e.hp = e.hpMax;
     c.energy = 100;
     c.respawnIn = 0;
+    c.recap = null; // the recap lives on the death screen only
     this.world.emit({ t: 'respawn', id: e.id });
     applySpawnEffects(this.world, e);
   }
@@ -695,7 +698,7 @@ export class Sim {
       for (const u of [...w.units()]) {
         if (u.team === e.team || u.kind === 'keg') continue;
         if (dist(e.x, e.z, u.x, u.z) <= ex.radius + u.radius) {
-          dealDamage(w, { source: owner ?? e }, u, amount, ex.type);
+          dealDamage(w, { source: owner ?? e, label: e.srcLabel }, u, amount, ex.type);
           if (ex.cc) applyCc(u, ex.cc);
         }
       }
@@ -894,6 +897,7 @@ export class Sim {
         speed: c.speed,
         buffs: e.buffs.map((b) => ({ id: b.id, tLeft: b.tLeft, stacks: b.stacks })),
         passive: { ...c.passive },
+        recap: e.dead && c.recap ? c.recap : undefined,
         dancing: c.dancing,
         stats: {
           ad: Math.round(stats.ad),

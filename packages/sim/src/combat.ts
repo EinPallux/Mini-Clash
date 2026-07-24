@@ -13,7 +13,13 @@ export interface DamageContext {
    * procs and DoTs (no re-triggering of hooks).
    */
   tag?: 'aa' | 'ability' | 'unit' | 'item' | 'burn';
+  /** Death-recap attribution: ability slot, 'aa', 'passive', 'item:<id>'… When
+   * absent it derives from the tag/source kind (UI_UX §10). */
+  label?: string;
 }
+
+/** Seconds of damage history the death recap aggregates over. */
+export const RECAP_WINDOW = 12;
 
 /** Structures must fall in order: outer → inner → Core (GAME_DESIGN §6). */
 export function structureInvulnerable(w: World, target: Entity): boolean {
@@ -118,6 +124,33 @@ export function dealDamage(
     tc.lastDamagedAt = w.time;
     tc.lastCombatAt = w.time;
     if (srcChamp) tc.recentDamagers.set(srcChamp.player, w.time);
+    // Death-recap attribution (UI_UX §10): rolling window of who hurt us how.
+    const label =
+      ctx.label ??
+      (tag === 'aa'
+        ? 'aa'
+        : ctx.source.kind === 'mini'
+          ? 'mini'
+          : ctx.source.kind === 'tower'
+            ? 'tower'
+            : ctx.source.kind === 'core'
+              ? 'core'
+              : tag === 'burn'
+                ? 'burn'
+                : tag === 'item'
+                  ? 'item'
+                  : 'ability');
+    tc.dmgLog.push({
+      at: w.time,
+      src: srcChamp?.player ?? -1,
+      championId: srcChamp?.def.id ?? null,
+      name: srcChamp?.name ?? label,
+      label,
+      amount: dealt,
+    });
+    while (tc.dmgLog.length > 0 && w.time - tc.dmgLog[0].at > RECAP_WINDOW) {
+      tc.dmgLog.shift();
+    }
   }
   if (srcChamp) {
     srcChamp.lastCombatAt = w.time;
@@ -155,7 +188,13 @@ export function dealDamage(
           source: ctx.source.id,
           target: target.id,
         });
-        dealDamage(w, { source: ctx.source, tag: 'item' }, target, bonus, 'arcane');
+        dealDamage(
+          w,
+          { source: ctx.source, tag: 'item', label: 'passive' },
+          target,
+          bonus,
+          'arcane',
+        );
       }
     }
     // Rattle — Loose Bones: the next attack consumes shard stacks for bonus damage.
@@ -170,7 +209,13 @@ export function dealDamage(
           source: ctx.source.id,
           target: target.id,
         });
-        dealDamage(w, { source: ctx.source, tag: 'item' }, target, bonus, 'physical');
+        dealDamage(
+          w,
+          { source: ctx.source, tag: 'item', label: 'passive' },
+          target,
+          bonus,
+          'physical',
+        );
       }
     }
   }
@@ -209,7 +254,13 @@ export function dealDamage(
           bonus = Math.min(bonus, fang.structureCap);
         }
         w.fx('item.dragonfang', target.x, target.z, { source: ctx.source.id, target: target.id });
-        dealDamage(w, { source: ctx.source, tag: 'item' }, target, bonus, 'physical');
+        dealDamage(
+          w,
+          { source: ctx.source, tag: 'item', label: 'item:dragonfang' },
+          target,
+          bonus,
+          'physical',
+        );
       }
     }
     if (target.kind !== 'tower' && target.kind !== 'core') {
@@ -269,7 +320,13 @@ function scheduleBurn(
       const src = world.get(sourceId);
       const tgt = world.get(targetId);
       if (!src || !tgt || tgt.dead) return;
-      dealDamage(world, { source: src, tag: 'burn' }, tgt, total / pulses, 'arcane');
+      dealDamage(
+        world,
+        { source: src, tag: 'burn', label: 'item:starcore' },
+        tgt,
+        total / pulses,
+        'arcane',
+      );
     });
   }
 }
@@ -279,6 +336,28 @@ export function kill(w: World, target: Entity, by?: Entity): void {
   target.dead = true;
   target.buffs.length = 0;
   w.emit({ t: 'death', id: target.id, x: target.x, z: target.z });
+
+  // Freeze the death recap: top 3 (source, ability) pairs of the last window.
+  const dead = target.champ;
+  if (dead) {
+    const agg = new Map<
+      string,
+      { championId: string | null; name: string; label: string; amount: number }
+    >();
+    for (const d of dead.dmgLog) {
+      if (w.time - d.at > RECAP_WINDOW) continue;
+      const key = `${d.src}|${d.label}`;
+      const cur = agg.get(key);
+      if (cur) cur.amount += d.amount;
+      else
+        agg.set(key, { championId: d.championId, name: d.name, label: d.label, amount: d.amount });
+    }
+    dead.recap = [...agg.values()]
+      .sort((a, b) => b.amount - a.amount)
+      .slice(0, 3)
+      .map((r) => ({ ...r, amount: Math.round(r.amount) }));
+    dead.dmgLog.length = 0;
+  }
 
   // Kill-watch refunds (Rattle's Marrow Harvest): any watcher of this death cashes in.
   for (const u of w.champions()) {

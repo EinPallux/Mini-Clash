@@ -78,3 +78,12 @@ export const STRINGS = {
 } as const;
 
 export type StringKey = keyof typeof STRINGS;
+
+/** Quick-chat phrases (GAME_DESIGN §17 comms) — team-scoped canned lines,
+ * relayed by the server against this whitelist. */
+export const QUICK_CHAT: Record<string, string> = {
+  nice: 'Nice!',
+  thanks: 'Thanks!',
+  help: 'Help!',
+  onit: 'On it!',
+};

@@ -37,7 +37,7 @@ export function updateProjectile(w: World, e: Entity, dt: number): void {
         if (dist(px, pz, u.x, u.z) <= pulse.radius + u.radius) {
           p.hitIds.add(u.id);
           const src = owner ?? e;
-          dealDamage(w, { source: src }, u, p.damage * pulse.damageMul, p.dtype);
+          dealDamage(w, { source: src, label: e.srcLabel }, u, p.damage * pulse.damageMul, p.dtype);
         }
       }
     }
@@ -48,7 +48,7 @@ export function updateProjectile(w: World, e: Entity, dt: number): void {
       if (u.kind === 'keg' || p.hitIds.has(u.id)) continue;
       if (dist(e.x, e.z, u.x, u.z) <= e.radius + u.radius) {
         p.hitIds.add(u.id);
-        dealDamage(w, { source: owner ?? e }, u, p.damage, p.dtype);
+        dealDamage(w, { source: owner ?? e, label: e.srcLabel }, u, p.damage, p.dtype);
         if (p.def?.cc && !u.dead) applyCc(u, p.def.cc);
         const carriedThrough = p.def?.pierceOnKill && u.dead;
         if (p.def?.pierces !== 'all' && !carriedThrough) {

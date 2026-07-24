@@ -27,6 +27,10 @@ interface TierParams {
   retreatAt: number;
   smartUlt: boolean;
   dodges: boolean;
+  /** Veteran+: focus the softest reachable target instead of the nearest. */
+  focusFire: boolean;
+  /** Veteran+: commit to closing on ranged harassers instead of eating poke. */
+  punishKiters: boolean;
 }
 
 const TIERS: Record<BotTier, TierParams> = {
@@ -38,6 +42,8 @@ const TIERS: Record<BotTier, TierParams> = {
     retreatAt: 0.25,
     smartUlt: false,
     dodges: false,
+    focusFire: false,
+    punishKiters: false,
   },
   veteran: {
     microTicks: 8,
@@ -47,6 +53,8 @@ const TIERS: Record<BotTier, TierParams> = {
     retreatAt: 0.3,
     smartUlt: false,
     dodges: false,
+    focusFire: true,
+    punishKiters: true,
   },
   elite: {
     microTicks: 6,
@@ -56,6 +64,8 @@ const TIERS: Record<BotTier, TierParams> = {
     retreatAt: 0.32,
     smartUlt: true,
     dodges: true,
+    focusFire: true,
+    punishKiters: true,
   },
 };
 
@@ -196,18 +206,53 @@ function act(w: World, e: Entity, brain: BotBrain, tp: TierParams, map: MapDef):
   let nearestD = Number.POSITIVE_INFINITY;
   let focus: Entity | undefined;
   let focusHp = Number.POSITIVE_INFINITY;
+  let focusScore = Number.POSITIVE_INFINITY;
+  let harasser: Entity | undefined;
+  let harasserD = Number.POSITIVE_INFINITY;
   for (const u of enemies) {
     const d = dist(e.x, e.z, u.x, u.z);
     if (d < nearestD) {
       nearestD = d;
       nearest = u;
     }
-    // Focus fire = lowest HP among enemies already in reach — never a deep chase.
+    // Focus fire = softest effective target already in reach — never a deep
+    // chase. Squishiness matters, not just wounds: a healthy backline gunner
+    // (low HP pool, paper armor) outranks a half-dead vanguard.
     const frac = u.hp / u.hpMax;
-    if (d < stats.range + 3.5 && frac < focusHp) {
-      focusHp = frac;
-      focus = u;
+    if (d < stats.range + 3.5) {
+      const armor = u.champ?.def.stats.armor ?? 0;
+      const score = tp.focusFire ? u.hp * (1 + armor / 100) : frac * 10_000;
+      if (score < focusScore) {
+        focusScore = score;
+        focusHp = frac;
+        focus = u;
+      }
     }
+    // Kiter watch: a longer-ranged enemy shooting us from beyond our own reach.
+    const uRange = u.champ?.def.stats.range ?? 0;
+    if (
+      tp.punishKiters &&
+      uRange > stats.range &&
+      d <= uRange + 1.2 &&
+      d > stats.range + 1 &&
+      d < 11 &&
+      d < harasserD
+    ) {
+      harasserD = d;
+      harasser = u;
+    }
+  }
+  // Only commit to closing on a kiter with local numbers — chasing a supported
+  // one is exactly the feed the punish exists to prevent.
+  if (harasser) {
+    let friends = 1;
+    let foes = 0;
+    for (const u of w.champions()) {
+      if (u.dead) continue;
+      if (u.team === e.team && u.id !== e.id && dist(e.x, e.z, u.x, u.z) < 9) friends++;
+      if (u.team !== e.team && dist(harasser.x, harasser.z, u.x, u.z) < 9) foes++;
+    }
+    if (friends < foes) harasser = undefined;
   }
 
   // Under tower fire and hurting → break away.
@@ -268,7 +313,9 @@ function act(w: World, e: Entity, brain: BotBrain, tp: TierParams, map: MapDef):
     brain.goal = 'push';
     out.push({ t: 'attackTarget', target: siege.id });
     return out;
-  } else if (nearest && nearestD <= stats.range + 3.5) {
+  } else if ((nearest && nearestD <= stats.range + 3.5) || harasser) {
+    // In weapon reach — or being poked from beyond it: close the gap, don't
+    // eat free hits on the march (the v0.2 Fathom tax).
     brain.goal = 'fight';
   } else {
     brain.goal = 'push';
@@ -322,7 +369,8 @@ function act(w: World, e: Entity, brain: BotBrain, tp: TierParams, map: MapDef):
   }
 
   if (brain.goal === 'fight' && nearest) {
-    const target = tp.smartUlt ? (focus ?? nearest) : nearest;
+    const fallback = harasser ?? nearest;
+    const target = tp.focusFire ? (focus ?? fallback) : fallback;
     out.push({ t: 'attackTarget', target: target.id });
 
     // Elite skillshot dodging: sidestep only real threats — uptime beats dancing.
@@ -355,6 +403,28 @@ function act(w: World, e: Entity, brain: BotBrain, tp: TierParams, map: MapDef):
           const packed = enemies.filter((u) => dist(target.x, target.z, u.x, u.z) < 6).length;
           if (focusHp > 0.5 && packed < 2) continue; // hold R for kills or clumps
         }
+      }
+      // Support micro (veteran+): drop heal-bearing casts on the sorest ally
+      // in range (self included) — never on the enemy's feet. Data-driven: any
+      // ability whose actions heal (Sylva's ward today) qualifies.
+      const healing = tp.focusFire
+        ? ab.actions.some((a) => a.t === 'heal' || (a.t === 'zone' && 'healPerSec' in a))
+        : false;
+      if (healing) {
+        let sore: Entity | undefined;
+        let soreFrac = 0.85;
+        for (const u of w.champions()) {
+          if (u.team !== e.team || u.dead) continue;
+          if (dist(e.x, e.z, u.x, u.z) > ab.range + 1) continue;
+          const f = u.hp / u.hpMax;
+          if (f < soreFrac) {
+            soreFrac = f;
+            sore = u;
+          }
+        }
+        if (!sore) continue; // nobody hurt — don't burn the heal
+        out.push({ t: 'cast', slot, x: sore.x, z: sore.z });
+        break;
       }
       const d = dist(e.x, e.z, target.x, target.z);
       if (d > ab.range * 0.95 + 1) continue;

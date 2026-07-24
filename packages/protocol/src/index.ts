@@ -73,6 +73,16 @@ export interface BuffSnap {
   stacks: number;
 }
 
+/** One aggregated damage source on the death screen (UI_UX §10, top 3). */
+export interface RecapEntry {
+  /** Source champion (null = minis/structures/burns without a champion). */
+  championId: string | null;
+  name: string;
+  /** 'aa' | 'q' | 'w' | 'r' | 'passive' | 'item:<id>' | 'mini' | 'tower' | 'core' | 'burn'. */
+  label: string;
+  amount: number;
+}
+
 export interface CastSnap {
   /** 'aa' = basic attack windup; 'recast' = Rook-style second stage. */
   kind: Slot | 'aa' | 'recast';
@@ -127,6 +137,8 @@ export interface ChampionSnap extends EntityBase {
   buffs: BuffSnap[];
   /** Champion-specific passive readouts (stonewall charge, powder counter). */
   passive: Record<string, number>;
+  /** What killed you — present while dead (death-screen recap, UI_UX §10). */
+  recap?: RecapEntry[];
   dancing: boolean;
   stats: { ad: number; attackSpeed: number; moveSpeed: number; armor: number; ward: number };
 }

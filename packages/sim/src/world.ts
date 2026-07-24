@@ -64,6 +64,17 @@ export interface ChampState {
   relic: { def: RelicDef; cd: number } | null;
   /** Recent champion damagers: player → world.time of last hit (assist credit). */
   recentDamagers: Map<PlayerId, number>;
+  /** Rolling damage-taken log for the death recap (12 s window, UI_UX §10). */
+  dmgLog: {
+    at: number;
+    src: number;
+    championId: string | null;
+    name: string;
+    label: string;
+    amount: number;
+  }[];
+  /** Aggregated top-3 killers, frozen at death, cleared on respawn. */
+  recap: import('@mini-clash/protocol').RecapEntry[] | null;
   /** Item passive scratch (dragonfang counter, nullwave timer…). */
   itemState: Record<string, number>;
   /** world.time of last damage dealt or taken (windrunner). */
@@ -278,6 +289,9 @@ export interface Entity {
   core?: CoreState;
   flower?: FlowerState;
   zone?: ZoneState;
+  /** Recap attribution for spawned damage-dealers (projectiles, kegs): the
+   * casting ability's slot, threaded to dealDamage when this entity hits. */
+  srcLabel?: string;
 }
 
 export interface ScheduledTask {

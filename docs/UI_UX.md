@@ -101,6 +101,7 @@ Team lineup render + per-player progress rings + rotating tips (kit tips for the
 - **In-world (WebGL, not DOM):** unit healthbars (chunked per 100 HP, damage-lag ghost), cast bars, floating damage numbers, telegraphs, off-screen event/danger arrows at screen edge.
 - **Event ticker (top-right):** next Living-Bridge event icon + countdown; flips to a full-width banner + horn at T-8 s ("⚠ STORM FRONT — take cover!").
 - **Kill notifications:** duo-portrait vs duo-portrait cards; streak text uses restraint (no 2000s announcer cheese in text form — the horn stingers carry it).
+- **Quick-chat (v0.3):** hold **C** for a 4-phrase radial (Nice! / Thanks! / Help! / On it!) mirroring the ping wheel; lines are team-scoped, server-whitelisted and rate-limited, and land as skewed toast lines under the ally frames. Emote stickers join post-1.0 per GAME_DESIGN §17.
 - Esc menu: resume · settings · surrender vote (from 8:00) · leave (vs bots).
 
 ## 9. Augment draft overlay (Power Surge)
@@ -109,7 +110,7 @@ On level 3/6/9: bottom-center dock slides up with 3 cards (game continues behind
 
 ## 10. Death screen (= the shop)
 
-Grey-out + respawn ring (timer). Left: killcam-lite damage recap (top 3 sources with ability icons — teaches counterplay; *ships in v0.3 with per-ability damage attribution — v0.2 has no recap panel*). Center: **the shop** (tier columns T1/T2/T3 + relic row; owned/affordable states; one-click buy with hammer-clink; build-suggestion chips per champion, dismissible). Right: live team status ("Fight at Golem in 0:12!" contextual hints). Buying is only possible here + pre-1:00 fountain — the screen makes death useful, not dead time.
+Grey-out + respawn ring (timer). Left: killcam-lite damage recap (top 3 sources with ability icons — teaches counterplay; *shipped in v0.3: the sim attributes every hit through the damage funnel — ability slot, attacks, passives, items, structures — over a rolling 12 s window, frozen at death*). Center: **the shop** (tier columns T1/T2/T3 + relic row; owned/affordable states; one-click buy with hammer-clink; build-suggestion chips per champion, dismissible). Right: live team status ("Fight at Golem in 0:12!" contextual hints). Buying is only possible here + pre-1:00 fountain — the screen makes death useful, not dead time.
 
 ## 11. Tab scoreboard (hold)
 

@@ -1,13 +1,13 @@
-import { CHAMPIONS, ITEMS, type ItemDef, RELICS, STRINGS } from '@mini-clash/data';
+import { CHAMPIONS, ITEMS, type ItemDef, QUICK_CHAT, RELICS, STRINGS } from '@mini-clash/data';
 import type { PingKind } from '@mini-clash/protocol';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { uiSound } from '../../game/audio';
-import { type FeedEntry, type HudSeat, useHud } from '../../game/hudStore';
+import { type FeedEntry, type HudChampion, type HudSeat, useHud } from '../../game/hudStore';
 import type { MatchRuntime } from '../../game/match';
 import { useLobby } from '../../state/lobby';
 import { useSession } from '../../state/session';
 import { paletteColors, useSettings } from '../../state/settings';
-import { ChampionCluster, DenyFlash } from './HudShared';
+import { ChampionCluster, DenyFlash, SLOT_ICONS } from './HudShared';
 
 /**
  * Bridge Brawl HUD (UI_UX §8, §10–§12): match strip, team frames, killfeed,
@@ -41,6 +41,7 @@ export function BridgeHud({ runtime }: { runtime: () => MatchRuntime | null }): 
   const fps = useHud((s) => s.fps);
   const dropped = useHud((s) => s.droppedReason);
   const afkCovered = useHud((s) => s.afkCovered);
+  const selfTeam = useHud((s) => s.selfTeam);
   const goto = useSession((s) => s.goto);
   const [rtt, setRtt] = useState(0);
   useEffect(() => {
@@ -84,10 +85,10 @@ export function BridgeHud({ runtime }: { runtime: () => MatchRuntime | null }): 
       {/* top-center: the match strip */}
       <div className="match-strip">
         <div className="side ally">
-          <span className="kills">{match.teamKills[0]}</span>
+          <span className="kills">{match.teamKills[selfTeam]}</span>
           <span className="pips">
             {[0, 1].map((i) => (
-              <span key={i} className={`pip ${i < match.towersDown[1] ? 'down' : ''}`} />
+              <span key={i} className={`pip ${i < match.towersDown[1 - selfTeam] ? 'down' : ''}`} />
             ))}
           </span>
         </div>
@@ -103,10 +104,10 @@ export function BridgeHud({ runtime }: { runtime: () => MatchRuntime | null }): 
         <div className="side enemy">
           <span className="pips">
             {[0, 1].map((i) => (
-              <span key={i} className={`pip ${i < match.towersDown[0] ? 'down' : ''}`} />
+              <span key={i} className={`pip ${i < match.towersDown[selfTeam] ? 'down' : ''}`} />
             ))}
           </span>
-          <span className="kills">{match.teamKills[1]}</span>
+          <span className="kills">{match.teamKills[1 - selfTeam]}</span>
         </div>
       </div>
 
@@ -124,6 +125,7 @@ export function BridgeHud({ runtime }: { runtime: () => MatchRuntime | null }): 
 
       <TeamFrames />
       <Killfeed />
+      <ChatFeed />
       <Minimap runtime={runtime} />
       <GoldAndItems />
 
@@ -144,7 +146,7 @@ export function BridgeHud({ runtime }: { runtime: () => MatchRuntime | null }): 
           </span>
         )}
         <span className="hud-chip" style={{ opacity: 0.8 }}>
-          <b>TAB</b> Score · <b>G</b> Ping · <b>ESC</b> Menu
+          <b>TAB</b> Score · <b>G</b> Ping · <b>C</b> Chat · <b>ESC</b> Menu
         </span>
       </div>
 
@@ -152,6 +154,7 @@ export function BridgeHud({ runtime }: { runtime: () => MatchRuntime | null }): 
       <ShopToast />
       <ChampionCluster />
       <PingWheel runtime={runtime} />
+      <ChatWheel runtime={runtime} />
       <CoachMarks dead={champ.dead} />
 
       <Scoreboard />
@@ -400,6 +403,85 @@ function effectiveCost(def: ItemDef, owned: string[]): number {
   return def.cost;
 }
 
+/** Human label + icon for one recap source (UI_UX §10 — teaches counterplay). */
+function recapLine(entry: NonNullable<HudChampion['recap']>[number]): {
+  what: string;
+  icon: string;
+} {
+  const { championId, label } = entry;
+  if (label === 'aa') return { what: 'Attacks', icon: 'sword-clash' };
+  if ((label === 'q' || label === 'w' || label === 'r') && championId) {
+    const def = CHAMPIONS[championId];
+    return {
+      what: `${label.toUpperCase()} — ${def?.abilities[label]?.name ?? '?'}`,
+      icon: SLOT_ICONS[championId]?.[label] ?? 'sword-clash',
+    };
+  }
+  if (label === 'passive' && championId) {
+    return { what: CHAMPIONS[championId]?.passive.name ?? 'Passive', icon: 'magic-swirl' };
+  }
+  if (label.startsWith('item:')) {
+    const item = ITEMS[label.slice(5)] ?? RELICS[label.slice(5)];
+    return { what: item?.name ?? 'Item', icon: item?.icon ?? 'fire-bottle' };
+  }
+  switch (label) {
+    case 'mini':
+      return { what: 'Minis', icon: 'three-friends' };
+    case 'tower':
+      return { what: 'Watchtower', icon: 'tower-fall' };
+    case 'core':
+      return { what: 'Clash Core', icon: 'crystal-growth' };
+    case 'burn':
+      return { what: 'Burn', icon: 'fire-bottle' };
+    default:
+      return { what: 'Abilities', icon: 'sword-clash' };
+  }
+}
+
+function RecapPanel({ champ }: { champ: HudChampion }): React.ReactElement | null {
+  const recap = champ.recap;
+  if (!recap || recap.length === 0) return null;
+  const top = Math.max(...recap.map((r) => r.amount), 1);
+  return (
+    <div className="ds-col recap-col">
+      <div className="section-label on-dark">What killed you</div>
+      {recap.map((r) => {
+        const line = recapLine(r);
+        return (
+          <div key={`${r.name}-${r.label}`} className="recap-row">
+            <span
+              className="fchip"
+              style={{ background: (r.championId && CHAMP_TONE[r.championId]) || '#5a4a3a' }}
+            >
+              {r.championId ? champLetter(r.championId) : '☠'}
+            </span>
+            <div className="recap-main">
+              <span className="recap-who">{r.championId ? r.name : line.what}</span>
+              {r.championId && (
+                <span className="recap-what">
+                  <span
+                    className="ic"
+                    style={{
+                      maskImage: `url(/icons/${line.icon}.svg)`,
+                      WebkitMaskImage: `url(/icons/${line.icon}.svg)`,
+                    }}
+                  />
+                  {line.what}
+                </span>
+              )}
+              <div className="recap-bar">
+                <div style={{ width: `${Math.round((r.amount / top) * 100)}%` }} />
+              </div>
+            </div>
+            <span className="recap-amt">{r.amount}</span>
+          </div>
+        );
+      })}
+      <div className="recap-hint">Damage taken in your last 12 seconds.</div>
+    </div>
+  );
+}
+
 function DeathShop({ runtime }: { runtime: () => MatchRuntime | null }): React.ReactElement | null {
   const champ = useHud((s) => s.champion);
   if (!champ) return null;
@@ -418,6 +500,7 @@ function DeathShop({ runtime }: { runtime: () => MatchRuntime | null }): React.R
         </p>
       </div>
       <div className="ds-grid">
+        <RecapPanel champ={champ} />
         {tiers.map(([label, list]) => (
           <div key={label} className="ds-col">
             <div className="section-label on-dark">{label}</div>
@@ -643,6 +726,110 @@ const WHEEL: { kind: PingKind; label: string; color: string; angle: number }[] =
   { kind: 'help', label: 'Help', color: '#6fe0a8', angle: 90 },
   { kind: 'omw', label: 'On my way', color: '#3ba7ff', angle: 180 },
 ];
+
+/* Quick-chat wheel (GAME_DESIGN §17): hold C, flick, release — team-scoped. */
+const CHAT_WHEEL: { id: string; angle: number }[] = [
+  { id: 'help', angle: -90 },
+  { id: 'nice', angle: 0 },
+  { id: 'thanks', angle: 90 },
+  { id: 'onit', angle: 180 },
+];
+
+function ChatWheel({ runtime }: { runtime: () => MatchRuntime | null }): React.ReactElement | null {
+  const [center, setCenter] = useState<{ x: number; y: number } | null>(null);
+  const [pick, setPick] = useState<string | null>(null);
+  const mouse = useRef({ x: 0, y: 0 });
+  const pickRef = useRef<string | null>(null);
+  pickRef.current = pick;
+
+  useEffect(() => {
+    const move = (e: PointerEvent): void => {
+      mouse.current = { x: e.clientX, y: e.clientY };
+    };
+    const down = (e: KeyboardEvent): void => {
+      if (e.code !== 'KeyC' || e.repeat) return;
+      setCenter({ ...mouse.current });
+      setPick(null);
+    };
+    const up = (e: KeyboardEvent): void => {
+      if (e.code !== 'KeyC') return;
+      if (pickRef.current) runtime()?.chat(pickRef.current);
+      setCenter(null);
+      setPick(null);
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('keydown', down);
+    window.addEventListener('keyup', up);
+    return () => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('keydown', down);
+      window.removeEventListener('keyup', up);
+    };
+  }, [runtime]);
+
+  useEffect(() => {
+    if (!center) return;
+    const iv = setInterval(() => {
+      const dx = mouse.current.x - center.x;
+      const dy = mouse.current.y - center.y;
+      if (Math.hypot(dx, dy) < 18) {
+        setPick(null);
+        return;
+      }
+      const deg = (Math.atan2(dy, dx) * 180) / Math.PI;
+      const best = CHAT_WHEEL.reduce((a, b) => {
+        const da = Math.min(Math.abs(deg - a.angle), 360 - Math.abs(deg - a.angle));
+        const db = Math.min(Math.abs(deg - b.angle), 360 - Math.abs(deg - b.angle));
+        return db < da ? b : a;
+      });
+      setPick(best.id);
+    }, 40);
+    return () => clearInterval(iv);
+  }, [center]);
+
+  if (!center) return null;
+  return (
+    <div className="ping-wheel chat-wheel" style={{ left: center.x, top: center.y }}>
+      {CHAT_WHEEL.map((w) => (
+        <div
+          key={w.id}
+          className={`pw-opt ${pick === w.id ? 'on' : ''}`}
+          style={{
+            transform: `rotate(${w.angle}deg) translateX(64px) rotate(${-w.angle}deg) translate(-50%, -50%)`,
+            borderColor: '#e8ecf4',
+            color: pick === w.id ? undefined : '#e8ecf4',
+          }}
+        >
+          <span className="pw-label">{QUICK_CHAT[w.id]}</span>
+        </div>
+      ))}
+      <span className="pw-center">💬</span>
+    </div>
+  );
+}
+
+/** Team chat lines above the killfeed — fade out after a few seconds. */
+function ChatFeed(): React.ReactElement | null {
+  const chat = useHud((s) => s.chat);
+  const selfPlayer = useHud((s) => s.selfPlayer);
+  const [, force] = useState(0);
+  useEffect(() => {
+    const iv = setInterval(() => force((n) => n + 1), 1000);
+    return () => clearInterval(iv);
+  }, []);
+  const now = Date.now();
+  const fresh = chat.filter((c) => now - c.at < 4500);
+  if (fresh.length === 0) return null;
+  return (
+    <div className="chat-feed">
+      {fresh.map((c) => (
+        <div key={c.id} className="chat-line">
+          <b>{c.player === selfPlayer ? 'You' : c.name}</b> {QUICK_CHAT[c.phrase] ?? c.phrase}
+        </div>
+      ))}
+    </div>
+  );
+}
 
 function PingWheel({ runtime }: { runtime: () => MatchRuntime | null }): React.ReactElement | null {
   const [center, setCenter] = useState<{ x: number; y: number } | null>(null);
