@@ -2,6 +2,8 @@ import { createServer } from 'node:http';
 import { WebSocketTransport } from '@colyseus/ws-transport';
 import { Server } from 'colyseus';
 import { lookupLobby } from './lobby-registry';
+import { log } from './log';
+import { registry } from './metrics';
 import { BridgeRoom } from './rooms/BridgeRoom';
 import { LobbyRoom } from './rooms/LobbyRoom';
 
@@ -18,6 +20,20 @@ const http = createServer((req, res) => {
   if (req.url === '/healthz') {
     res.writeHead(200, { 'content-type': 'application/json', ...cors });
     res.end(JSON.stringify({ ok: true, uptime: process.uptime() }));
+    return;
+  }
+  if (req.url === '/metrics') {
+    // Scraped by Prometheus inside the compose network; Caddy never routes it.
+    registry
+      .metrics()
+      .then((body) => {
+        res.writeHead(200, { 'content-type': registry.contentType });
+        res.end(body);
+      })
+      .catch(() => {
+        res.writeHead(500);
+        res.end();
+      });
     return;
   }
   const lobby = req.url?.match(/^\/lobby\/([A-Za-z0-9]{6})$/);
@@ -41,5 +57,5 @@ server.define('bridge', BridgeRoom);
 server.define('lobby', LobbyRoom);
 
 server.listen(port).then(() => {
-  console.info(`mini-clash server listening on :${port}`);
+  log.info({ port }, 'mini-clash server listening');
 });

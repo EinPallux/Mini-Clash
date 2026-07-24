@@ -3,6 +3,15 @@ import { SnapshotEncoder } from '@mini-clash/protocol';
 import { Sim } from '@mini-clash/sim';
 import type { Client } from 'colyseus';
 import { Room } from 'colyseus';
+import { log } from '../log';
+import {
+  clientsGauge,
+  joinsCounter,
+  leavesCounter,
+  roomsGauge,
+  snapshotBytes,
+  tickHistogram,
+} from '../metrics';
 
 /**
  * Lag simulation knobs (acceptance: playable at 150 ms + loss). TCP semantics:
@@ -77,6 +86,8 @@ export class BridgeRoom extends Room {
     const roster = validateRoster(options);
     this.match = createMatchState(roster, options);
     this.setMetadata({ mode: 'bridge', code: this.match.code });
+    roomsGauge.inc();
+    log.info({ room: this.roomId, code: this.match.code, seed: this.match.seed }, 'room created');
     const reserved = (options as { reservations?: unknown }).reservations;
     if (reserved && typeof reserved === 'object') {
       for (const [token, entry] of Object.entries(reserved as Record<string, unknown>)) {
@@ -158,6 +169,9 @@ export class BridgeRoom extends Room {
   private sendSeat(client: Client, player: number, name: string): void {
     // A (re)joined client has no snapshot context — key the next frame.
     this.encoders[this.match.teamOf(player)].forceBaseline();
+    joinsCounter.inc();
+    clientsGauge.inc();
+    log.info({ room: this.roomId, player, name }, 'seat assigned');
     client.send('seat', {
       player,
       roster: this.match.roster,
@@ -207,6 +221,7 @@ export class BridgeRoom extends Room {
     }
     this.sim = new Sim(this.match.config());
     this.simStartedAt = Date.now();
+    log.info({ room: this.roomId, awaited: this.awaited.size }, 'sim started');
     // Reserved humans that never arrived: a bot stands in until they do.
     for (const player of this.awaited) {
       this.match.coverSeat(this.sim, player);
@@ -215,13 +230,19 @@ export class BridgeRoom extends Room {
     this.setSimulationInterval(() => {
       const sim = this.sim;
       if (!sim) return;
+      const t0 = performance.now();
       sim.step(); // step() leaves events queued until we broadcast them
+      tickHistogram.observe(performance.now() - t0);
       tickIndex++;
       // 20 Hz downstream from a 30 Hz sim: send on 2 of every 3 ticks.
       if (tickIndex % 3 !== 0) this.broadcastSnapshots();
       if (tickIndex % 30 === 0) this.sweepAfk();
       if (sim.world.match?.over && !this.match.overAt) {
         this.match.overAt = Date.now();
+        log.info(
+          { room: this.roomId, winner: sim.world.match.over.winner, time: sim.world.time },
+          'match over',
+        );
         // Hold the room for the podium/summary, then fold it.
         this.clock.setTimeout(() => this.disconnect(), 90_000);
       }
@@ -246,6 +267,7 @@ export class BridgeRoom extends Room {
       if (ack !== undefined) {
         new DataView(payload.buffer, payload.byteOffset).setInt32(3, ack);
       }
+      snapshotBytes.inc(payload.length);
       delayed(() => client.send('snapb', payload));
     }
   }
@@ -283,6 +305,9 @@ export class BridgeRoom extends Room {
   override async onLeave(client: Client, consented: boolean): Promise<void> {
     const player = this.seats.get(client.sessionId);
     if (player === undefined) return;
+    leavesCounter.inc();
+    clientsGauge.dec();
+    log.info({ room: this.roomId, player, consented }, 'client left');
     const matchOver = this.sim?.world.match?.over ?? false;
     if (!consented && !matchOver) {
       // Hold the seat 90 s (GAME_DESIGN §17); the sim's bot brain covers it.
@@ -312,5 +337,7 @@ export class BridgeRoom extends Room {
   override onDispose(): void {
     if (this.startCap !== null) clearTimeout(this.startCap);
     this.sim = null;
+    roomsGauge.dec();
+    log.info({ room: this.roomId }, 'room disposed');
   }
 }

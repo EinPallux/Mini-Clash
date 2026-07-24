@@ -1,0 +1,47 @@
+# Mini Clash single-box deploy (TECH §1/§15): `DOMAIN=play.example.com docker
+# compose up -d --build` on a VPS is the whole production story through beta.
+# Staging = the same file on a second box with its own DOMAIN.
+services:
+  game:
+    build:
+      context: .
+      target: game
+    restart: unless-stopped
+    environment:
+      - PORT=2567
+    expose:
+      - "2567"
+    # TECH §11: a 1 GB box runs 10+ concurrent matches; cap so a leak can't
+    # take the edge down with it.
+    mem_limit: 768m
+
+  web:
+    build:
+      context: .
+      target: web
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      - DOMAIN=${DOMAIN:-:80}
+    depends_on:
+      - game
+    volumes:
+      - caddy-data:/data
+      - caddy-config:/config
+
+  # Status page (TECH §14) — point it at http://game:2567/healthz and publish
+  # it on a status. subdomain (or keep :3001 firewalled to the team).
+  status:
+    image: louislam/uptime-kuma:1
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    volumes:
+      - kuma-data:/app/data
+
+volumes:
+  caddy-data:
+  caddy-config:
+  kuma-data:

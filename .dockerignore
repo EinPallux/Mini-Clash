@@ -1,0 +1,8 @@
+.git
+node_modules
+**/node_modules
+**/dist
+**/.dev
+test-results
+packages/client/public/game-assets
+.github

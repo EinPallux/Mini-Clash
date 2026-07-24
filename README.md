@@ -30,7 +30,32 @@ pnpm build        # asset pipeline + production client build → packages/client
 The client's own `build` script runs the asset pipeline first (`pnpm -w
 assets:build`), so there is no host configuration that can skip it. The
 pipeline launches through esbuild (`run.mjs`), making it independent of the
-host's Node TypeScript support; any Node ≥20 works.
+host's Node TypeScript support; any Node ≥20 works. Static hosting covers
+offline/vs-bots play only — online needs the game server below.
+
+### Online stack (one VPS, Docker Compose)
+
+```bash
+DOMAIN=play.example.com docker compose up -d --build
+```
+
+Three services (see `compose.yaml`): **game** — the Colyseus server as a single
+self-contained bundle (`packages/server/build.mjs`); **web** — Caddy with
+automatic HTTPS serving the built client and reverse-proxying everything under
+`/ws` (websockets, Colyseus matchmake calls, lobby-code lookups) to the game;
+**status** — an uptime-kuma status page on `:3001` (point a monitor at
+`http://game:2567/healthz`). Leave `DOMAIN` unset for a plain-HTTP local run
+on `:80`. Staging is the same file on a second box with its own `DOMAIN`.
+
+Observability (TECH §14): the game server writes pino JSON logs to stdout
+(`docker compose logs game`) and exposes Prometheus metrics at
+`game:2567/metrics` inside the compose network — rooms, clients, tick-duration
+histogram, snapshot bytes, join/leave churn. The 200-socket soak
+(`MC_SOAK=1 pnpm exec vitest run packages/server/test/soak.test.ts`) asserts
+the TECH §11 budgets against those same series.
+
+Dev server without containers: `node packages/server/run.mjs` (port 2567), then
+open the client with `?online=1`.
 
 ## Documentation index
 
