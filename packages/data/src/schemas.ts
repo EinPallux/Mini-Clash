@@ -49,6 +49,7 @@ export const buffSchema = z.object({
   mul: z.record(statKey, z.number()).optional(),
   damageReduction: z.number().min(0).max(1).optional(),
   decayingMsBonus: z.number().optional(),
+  shield: z.number().positive().optional(),
   maxStacks: z.number().int().positive().optional(),
 });
 
@@ -208,6 +209,7 @@ export const championSchema = z.object({
     description: z.string(),
     params: z.record(z.string(), z.number()),
   }),
+  botBuild: z.object({ relic: z.string().min(1), items: z.array(z.string()).min(4) }),
   visual: z.object({
     model: z.string(),
     scale: z.number().positive(),
@@ -236,8 +238,24 @@ export const unitSchema = z.object({
   armor: z.number().min(0),
   ward: z.number().min(0),
   radius: z.number().positive(),
-  behavior: z.enum(['dummy', 'destructible']),
+  behavior: z.enum(['dummy', 'destructible', 'mini']),
   resetAfter: z.number().positive().optional(),
+  mini: z
+    .object({
+      kind: z.enum(['bruiser', 'zapper', 'ram']),
+      damage: z.number().positive(),
+      range: z.number().positive(),
+      attackInterval: z.number().positive(),
+      moveSpeed: z.number().positive(),
+      aggroRange: z.number().positive(),
+      gold: z.number().positive(),
+      xp: z.number().positive(),
+      vsStructures: z.number().positive(),
+      fromStructures: z.number().positive(),
+      vsMinis: z.number().positive(),
+      scalePerMin: z.number().min(0),
+    })
+    .optional(),
   explode: z
     .object({
       delay: z.number().positive(),
@@ -300,6 +318,39 @@ export const mapSchema = z.object({
     }),
   ),
   dummies: z.array(z.object({ unit: z.string(), x: z.number(), z: z.number() })),
+  battle: z
+    .object({
+      towers: z.array(
+        z.object({
+          team: z.union([z.literal(0), z.literal(1)]),
+          x: z.number(),
+          z: z.number(),
+          tier: z.enum(['outer', 'inner']),
+        }),
+      ),
+      cores: z.array(
+        z.object({ team: z.union([z.literal(0), z.literal(1)]), x: z.number(), z: z.number() }),
+      ),
+      gates: z.array(
+        z.object({ team: z.union([z.literal(0), z.literal(1)]), x: z.number(), z: z.number() }),
+      ),
+      lane: z.array(z.tuple([z.number(), z.number()])).min(2),
+      orbPads: z.array(z.object({ x: z.number(), z: z.number() })),
+      brush: z.array(
+        z.object({
+          x: z.number(),
+          z: z.number(),
+          w: z.number().positive(),
+          d: z.number().positive(),
+        }),
+      ),
+      barrierUntil: z.number().positive(),
+      firstWaveAt: z.number().positive(),
+      waveEvery: z.number().positive(),
+      orbEvery: z.number().positive(),
+      firstOrbAt: z.number().positive(),
+    })
+    .optional(),
   lighting: z.object({
     sunDir: z.tuple([z.number(), z.number(), z.number()]),
     sunColor: z.number(),

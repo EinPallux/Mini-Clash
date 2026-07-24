@@ -87,7 +87,15 @@ function updateHoming(w: World, e: Entity, dt: number): void {
   ) {
     const owner = w.get(p.owner);
     const src = owner ?? e;
-    const dealt = dealDamage(w, { source: src }, target, p.damage * (p.luckyMul ?? 1), p.dtype);
+    // Champion missiles are attacks (on-hit items); tower/Mini missiles are unit damage.
+    const tag = p.ownerPlayer >= 0 ? 'aa' : 'unit';
+    const dealt = dealDamage(
+      w,
+      { source: src, tag },
+      target,
+      p.damage * (p.luckyMul ?? 1),
+      p.dtype,
+    );
     const champId = owner?.champ?.def.id ?? 'generic';
     w.fx(dealt > 0 ? `${champId}.aa.hit` : 'generic.hit', target.x, target.z, {
       source: p.owner,

@@ -48,6 +48,8 @@ export interface BuffDef {
   damageReduction?: number;
   /** Movement-speed burst that decays linearly to 0 over the duration. */
   decayingMsBonus?: number;
+  /** Absorb pool granted on application (Horn of Rally, Nullwave). */
+  shield?: number;
   maxStacks?: number;
 }
 
@@ -218,6 +220,8 @@ export interface ChampionDef {
   passive: PassiveDef;
   abilities: Record<Slot, AbilityDef>;
   entrance: PassiveDef;
+  /** Bot shopping list: relic + item purchase order (components auto-discount). */
+  botBuild: { relic: string; items: string[] };
   visual: ChampionVisual;
 }
 
@@ -229,11 +233,29 @@ export interface UnitDef {
   ward: number;
   radius: number;
   /** Dummies clamp at 1 HP and reset; destructibles die. */
-  behavior: 'dummy' | 'destructible';
+  behavior: 'dummy' | 'destructible' | 'mini';
   /** Seconds of no damage before a dummy resets to full and closes its DPS window. */
   resetAfter?: number;
   /** Destructibles that explode (powder keg): fires on death OR after `delay` seconds. Scales off owner stats. */
   explode?: { delay: number; radius: number; amount: ScalingValue; type: DamageType; cc?: CcSpec };
+  /** Mini combat block (behavior 'mini'). */
+  mini?: {
+    kind: 'bruiser' | 'zapper' | 'ram';
+    damage: number;
+    range: number;
+    attackInterval: number;
+    moveSpeed: number;
+    aggroRange: number;
+    gold: number;
+    xp: number;
+    /** Damage multiplier vs structures / taken-from-structures multiplier. */
+    vsStructures: number;
+    fromStructures: number;
+    /** Damage multiplier vs other Minis (waves must grind through each other). */
+    vsMinis: number;
+    /** Per-minute stat scaling (+3%/min). */
+    scalePerMin: number;
+  };
   visual: { model?: string; prim?: 'barrel'; scale: number; tint?: number };
 }
 
@@ -265,6 +287,22 @@ export interface MapDef {
   skybox: string;
   spawns: { team: Team; x: number; z: number; facingDeg: number }[];
   dummies: { unit: string; x: number; z: number }[];
+  /** Bridge-mode battlefield (GAME_DESIGN §6). Absent on training maps. */
+  battle?: {
+    towers: { team: Team; x: number; z: number; tier: 'outer' | 'inner' }[];
+    cores: { team: Team; x: number; z: number }[];
+    gates: { team: Team; x: number; z: number }[];
+    /** Mini marching route for team 0 (team 1 walks it reversed). */
+    lane: [number, number][];
+    orbPads: { x: number; z: number }[];
+    brush: { x: number; z: number; w: number; d: number }[];
+    /** Spawn barrier drops at this many seconds (movement gate at each team's gate line). */
+    barrierUntil: number;
+    firstWaveAt: number;
+    waveEvery: number;
+    orbEvery: number;
+    firstOrbAt: number;
+  };
   lighting: {
     sunDir: [number, number, number];
     sunColor: number;

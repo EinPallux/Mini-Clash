@@ -1,4 +1,4 @@
-import { BUFFS, type BuffDef, type CcSpec } from '@mini-clash/data';
+import { BUFFS, type BuffDef, type CcSpec, ITEMS } from '@mini-clash/data';
 import type { BuffInstance, Entity } from './world';
 
 export function applyBuff(target: Entity, def: BuffDef, opts?: { blockNextHit?: boolean }): void {
@@ -7,10 +7,12 @@ export function applyBuff(target: Entity, def: BuffDef, opts?: { blockNextHit?: 
     existing.tLeft = def.duration;
     if (def.maxStacks && existing.stacks < def.maxStacks) existing.stacks++;
     if (opts?.blockNextHit) existing.blockNextHit = true;
+    if (def.shield) existing.shieldLeft = def.shield;
     return;
   }
   const inst: BuffInstance = { id: def.id, def, tLeft: def.duration, stacks: 1 };
   if (opts?.blockNextHit) inst.blockNextHit = true;
+  if (def.shield) inst.shieldLeft = def.shield;
   target.buffs.push(inst);
 }
 
@@ -23,6 +25,7 @@ export function applyBuffById(target: Entity, id: string): void {
 /** CC application. Slows become synthetic buffs; knockups set airborne time (cleanse-immune). */
 export function applyCc(target: Entity, cc: CcSpec): void {
   if (target.kind === 'wall' || target.kind === 'projectile') return;
+  if (target.kind === 'tower' || target.kind === 'core') return; // structures are CC-immune
   switch (cc.kind) {
     case 'slow': {
       const def: BuffDef = {
@@ -38,6 +41,7 @@ export function applyCc(target: Entity, cc: CcSpec): void {
       // No DR in training vs dummies; DR window arrives with the full CC system in v0.2.
       target.airborne = Math.max(target.airborne, cc.duration);
       target.airborneTotal = target.airborne;
+      onHardCc(target);
       break;
     }
     case 'knockback': {
@@ -54,7 +58,26 @@ export function applyCc(target: Entity, cc: CcSpec): void {
         mul: { moveSpeed: 0 },
       };
       applyBuff(target, def);
+      onHardCc(target);
       break;
+    }
+  }
+}
+
+/** Titan's Bastion: hard CC grants a short damage-reduction window. */
+function onHardCc(target: Entity): void {
+  const c = target.champ;
+  if (!c) return;
+  for (const id of c.items) {
+    const p = ITEMS[id]?.passive;
+    if (p?.id === 'titan') {
+      applyBuff(target, {
+        id: 'item_titan_dr',
+        name: 'Unbroken',
+        duration: p.params.duration,
+        damageReduction: p.params.dr,
+      });
+      return;
     }
   }
 }
@@ -78,4 +101,28 @@ export function consumeBlock(e: Entity): boolean {
     }
   }
   return false;
+}
+
+/** Total remaining absorb across shield buffs (HUD + snapshot). */
+export function shieldTotal(e: Entity): number {
+  let total = 0;
+  for (const b of e.buffs) total += b.shieldLeft ?? 0;
+  return total;
+}
+
+/** Drain `amount` through shield pools; returns the damage that reaches HP. */
+export function absorbShields(e: Entity, amount: number): number {
+  let left = amount;
+  for (let i = 0; i < e.buffs.length && left > 0; i++) {
+    const b = e.buffs[i];
+    if (b.shieldLeft === undefined || b.shieldLeft <= 0) continue;
+    const take = Math.min(b.shieldLeft, left);
+    b.shieldLeft -= take;
+    left -= take;
+    if (b.shieldLeft <= 0.01) {
+      e.buffs.splice(i, 1);
+      i--;
+    }
+  }
+  return left;
 }

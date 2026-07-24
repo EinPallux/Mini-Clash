@@ -1,20 +1,24 @@
-import type { AbilityDef, Slot } from '@mini-clash/data';
+import { type AbilityDef, BRIDGE, type Slot } from '@mini-clash/data';
 import { executeActions } from './actions';
+import { isHiddenFrom } from './brush';
 import { applyBuffById } from './buffs';
-import { dealDamage } from './combat';
-import { championStats, resolveScaling } from './stats';
+import { dealDamage, structureInvulnerable } from './combat';
+import { championStats, hastedCooldown, resolveScaling } from './stats';
 import { dist, norm } from './vec';
 import type { Entity, World } from './world';
 
 const AA_ACQUIRE_BONUS = 2.5;
 
-export type DenyReason = 'cooldown' | 'energy' | 'dead' | 'casting';
+export type DenyReason = 'cooldown' | 'energy' | 'dead' | 'casting' | 'level';
 
 /** Attackability: enemies always; kegs only via explicit clicks (handled at intent level). */
-export function canAttack(attacker: Entity, target: Entity): boolean {
+export function canAttack(w: World, attacker: Entity, target: Entity): boolean {
   if (target.dead) return false;
   if (target.kind === 'keg') return true;
-  return target.team !== attacker.team && (target.kind === 'champion' || target.kind === 'dummy');
+  if (target.team === attacker.team) return false;
+  if (target.kind === 'champion' || target.kind === 'dummy' || target.kind === 'mini') return true;
+  if (target.kind === 'tower' || target.kind === 'core') return !structureInvulnerable(w, target);
+  return false;
 }
 
 export function tryCast(
@@ -41,12 +45,15 @@ export function tryCast(
       ability.recast?.actions ?? [],
     );
     w.fx(`${c.def.id}.${slot}.recast`, e.x, e.z, { fx, fz, source: e.id });
-    c.cds[slot] = noCooldowns ? 0 : ability.cooldown;
+    c.cds[slot] = noCooldowns ? 0 : hastedCooldown(ability.cooldown, championStats(e).haste);
     c.recast = null;
+    c.lastActionAt = w.time;
     return null;
   }
 
   if (c.cast && c.cast.kind !== 'aa') return 'casting';
+  // Ultimates unlock at level 4 in real matches (GAME_DESIGN §10.3).
+  if (slot === 'r' && w.match?.mode === 'bridge' && c.level < BRIDGE.rUnlockLevel) return 'level';
   if (c.cds[slot] > 0.001) return 'cooldown';
   const ability = c.def.abilities[slot];
   if (!infiniteEnergy && c.energy < ability.cost) return 'energy';
@@ -106,6 +113,7 @@ export function commitAbility(
 ): void {
   const c = e.champ;
   if (!c) return;
+  c.lastActionAt = w.time;
   const [fx, fz] = norm(aimX - e.x, aimZ - e.z);
   executeActions({ w, caster: e, ability, ox: e.x, oz: e.z, aimX, aimZ, fx, fz }, ability.actions);
   w.fx(`${c.def.id}.${ability.slot}.cast`, e.x, e.z, { fx, fz, ax: aimX, az: aimZ, source: e.id });
@@ -114,7 +122,9 @@ export function commitAbility(
     // Cooldown waits until the recast resolves or its window closes.
     c.recast = { slot: ability.slot, tLeft: ability.recast.window, ability };
   } else {
-    c.cds[ability.slot] = noCooldowns ? 0 : ability.cooldown;
+    c.cds[ability.slot] = noCooldowns
+      ? 0
+      : hastedCooldown(ability.cooldown, championStats(e).haste);
   }
 
   // Apply any buffered order issued during the windup.
@@ -139,7 +149,9 @@ export function updateCasts(w: World, e: Entity, dt: number, noCooldowns: boolea
   if (c.recast) {
     c.recast.tLeft -= dt;
     if (c.recast.tLeft <= 0) {
-      c.cds[c.recast.slot] = noCooldowns ? 0 : c.recast.ability.cooldown;
+      c.cds[c.recast.slot] = noCooldowns
+        ? 0
+        : hastedCooldown(c.recast.ability.cooldown, championStats(e).haste);
       c.recast = null;
     }
   }
@@ -190,24 +202,44 @@ export function updateAutoAttack(w: World, e: Entity, _dt: number): void {
   let target: Entity | undefined;
   if (c.order?.kind === 'attackTarget') {
     const t = w.get(c.order.target);
-    if (t && canAttack(e, t)) target = t;
+    if (t && canAttack(w, e, t)) target = t;
     else {
       c.order = null;
       c.aaTarget = null;
     }
   } else if (c.order?.kind === 'attackMove') {
-    // Nearest enemy in acquisition range (kegs excluded from auto-acquire).
-    let best: Entity | undefined;
-    let bestD = Number.POSITIVE_INFINITY;
+    // Acquisition priority (GAME_DESIGN §10.2): champions > lowest-HP Mini > structures.
+    const acquireR = stats.range + AA_ACQUIRE_BONUS;
+    let champ: Entity | undefined;
+    let champD = Number.POSITIVE_INFINITY;
+    let mini: Entity | undefined;
+    let miniHp = Number.POSITIVE_INFINITY;
     for (const u of w.enemiesOf(e.team)) {
       if (u.kind === 'keg') continue;
       const d = dist(e.x, e.z, u.x, u.z) - u.radius;
-      if (d < bestD) {
-        bestD = d;
-        best = u;
+      if (d > acquireR) continue;
+      if (u.kind === 'mini') {
+        if (u.hp < miniHp) {
+          miniHp = u.hp;
+          mini = u;
+        }
+      } else if (!isHiddenFrom(w, e.team, u) && d < champD) {
+        champD = d;
+        champ = u;
       }
     }
-    if (best && bestD <= stats.range + AA_ACQUIRE_BONUS) target = best;
+    target = champ ?? mini;
+    if (!target) {
+      let structD = Number.POSITIVE_INFINITY;
+      for (const s of w.structures()) {
+        if (s.team === e.team || structureInvulnerable(w, s)) continue;
+        const d = dist(e.x, e.z, s.x, s.z) - s.radius;
+        if (d <= acquireR && d < structD) {
+          structD = d;
+          target = s;
+        }
+      }
+    }
   }
   c.aaTarget = target?.id ?? null;
   if (!target) return;
@@ -244,7 +276,8 @@ function commitAutoAttack(w: World, e: Entity, targetId: number | undefined): vo
   const stats = championStats(e);
   c.aaCd = (1 / stats.attackSpeed) * (1 - c.def.attack.windupFrac);
   const target = w.get(targetId);
-  if (!target || !canAttack(e, target)) return;
+  if (!target || !canAttack(w, e, target)) return;
+  c.lastActionAt = w.time;
 
   // Lucky Doubloon (Fathom entrance): consume for +40%.
   let luckyMul = 1;
@@ -257,7 +290,7 @@ function commitAutoAttack(w: World, e: Entity, targetId: number | undefined): vo
   if (c.def.attack.kind === 'melee') {
     const reach = stats.range + 0.6; // forgiveness vs moving targets
     if (dist(e.x, e.z, target.x, target.z) - target.radius <= reach) {
-      dealDamage(w, { source: e }, target, stats.ad * luckyMul, 'physical');
+      dealDamage(w, { source: e, tag: 'aa' }, target, stats.ad * luckyMul, 'physical');
       w.fx('generic.melee.hit', target.x, target.z, { source: e.id, target: target.id });
     }
     return;

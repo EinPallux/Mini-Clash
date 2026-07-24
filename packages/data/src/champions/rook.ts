@@ -128,6 +128,17 @@ export const ROOK: ChampionDef = {
     description: 'On arrival, block the first incoming hit entirely for 1s.',
     params: { duration: 1 },
   },
+  botBuild: {
+    relic: 'purge_bell',
+    items: [
+      'iron_plate',
+      'juggernaut_mail',
+      'titans_bastion',
+      'bulwark_scrap',
+      'hex_charm',
+      'nullwave_cloak',
+    ],
+  },
   visual: {
     model: 'arena/character-soldier',
     scale: 1,

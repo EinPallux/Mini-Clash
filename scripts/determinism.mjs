@@ -34,7 +34,21 @@ export function run() {
   ticks(20);
   send({ t: 'cast', slot: 'q', x: 8, z: 0 });
   ticks(60);
-  return stateHash(sim);
+  const trainingHash = stateHash(sim);
+
+  // Bridge mode with 8 bots: waves, towers, economy and bot brains all seeded.
+  const players = [];
+  for (let i = 0; i < 8; i++) {
+    players.push({
+      id: i + 1,
+      championId: i % 2 === 0 ? 'rook' : 'fathom',
+      team: i < 4 ? 0 : 1,
+      bot: i % 3 === 0 ? 'elite' : i % 3 === 1 ? 'veteran' : 'recruit',
+    });
+  }
+  const bridge = new Sim({ mode: 'bridge', seed: 24681357, mapId: 'shatterbridge', players });
+  for (let i = 0; i < 90 * 30; i++) bridge.tick();
+  return trainingHash + ':' + stateHash(bridge);
 }
 `;
 

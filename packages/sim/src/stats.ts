@@ -1,7 +1,7 @@
-import { RESIST_CONSTANT, type ScalingValue, type StatKey } from '@mini-clash/data';
+import { ITEMS, RESIST_CONSTANT, type ScalingValue, type StatKey } from '@mini-clash/data';
 import type { Entity } from './world';
 
-/** Resolved per-tick stat totals for a champion (base + level growth + buffs). */
+/** Resolved per-tick stat totals for a champion (base + level growth + items + buffs). */
 export interface StatTotals {
   hpMax: number;
   ad: number;
@@ -13,6 +13,32 @@ export interface StatTotals {
   haste: number;
   range: number;
   damageReduction: number;
+}
+
+const ATTACK_SPEED_CAP = 2.5;
+
+/** Aggregated additive stats from carried items. */
+export function itemAdds(items: string[]): Partial<Record<StatKey, number>> {
+  const out: Partial<Record<StatKey, number>> = {};
+  for (const id of items) {
+    const def = ITEMS[id];
+    if (!def?.add) continue;
+    for (const k of Object.keys(def.add) as StatKey[]) {
+      out[k] = (out[k] ?? 0) + (def.add[k] ?? 0);
+    }
+  }
+  return out;
+}
+
+/** Params of a carried item passive, or null. */
+export function hasItemPassive(e: Entity, passiveId: string): Record<string, number> | null {
+  const c = e.champ;
+  if (!c) return null;
+  for (const id of c.items) {
+    const p = ITEMS[id]?.passive;
+    if (p && p.id === passiveId) return p.params;
+  }
+  return null;
 }
 
 export function championStats(e: Entity): StatTotals {
@@ -32,7 +58,12 @@ export function championStats(e: Entity): StatTotals {
     range: s.range,
     damageReduction: 0,
   };
+  if (c.items.length > 0) {
+    const adds = itemAdds(c.items);
+    for (const k of Object.keys(adds) as StatKey[]) t[k] += adds[k] ?? 0;
+  }
   applyBuffs(e, t);
+  t.attackSpeed = Math.min(ATTACK_SPEED_CAP, t.attackSpeed);
   return t;
 }
 
@@ -78,6 +109,11 @@ function applyBuffs(e: Entity, t: StatTotals): void {
     }
   }
   return;
+}
+
+/** Effective cooldown after haste (haste 0.15 = 15% faster cycling). */
+export function hastedCooldown(base: number, haste: number): number {
+  return base / (1 + haste);
 }
 
 export function resolveScaling(v: ScalingValue, level: number, ad: number, ap: number): number {

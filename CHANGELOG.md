@@ -5,6 +5,21 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 Entry categories: `Added` · `Changed` · `Fixed` · `Balance` · `Content` · `Assets` · `Docs`
 
+## [Unreleased] — v0.2.0 "Shatterbridge" (in progress)
+
+### Added
+- **Bridge Brawl simulation (full match loop, sim-side):** The Shatterbridge map def (deck, rails, brush pockets, orb pads, gates, lane), Watchtowers (Mini-first aggro, instant switch onto champion-attackers, +40% ramp, backdoor protection, destroy-in-order invulnerability, nav stamps that open when a tower falls), Clash Core (defense pulse, exposure after both towers, destruction → victory freeze + `matchOver`), Mini waves every 25 s (Bruiser/Zapper/Ram with per-kind AI: lane marching over A*, aggro/leash, zapper missiles, ram siege priority, +3%/min scaling), spawn-barrier walls that drop at 0:20, health orbs on the pads (heal + energy + XP with ally splash), brush concealment (hidden enemies are omitted from snapshots — map-hack impossible; attack/cast reveals for 1.5 s).
+- **Economy:** starting 500 g, ambient XP/gold (half while dead), Mini bounties (gold split / XP full within 10 u), champion kill credit (killing blow or latest damager, 10 s assist window, streak bounties capped +300, assist pool split, takedown XP split), tower bounties (150 g global + 90 XP), levels 1–10 from the XP curve with +4% heal level-up moments, R hard-gated until level 4, death timers `5 + 1.5×level` (cap 20 s), fountain-plate fast heal.
+- **Items live in the sim:** stat aggregation into champion totals (incl. haste-scaled cooldowns and the 2.5 attacks/s cap), shield absorb pools, and all 12 passive hooks (windrunner, executioner, stormweaver, juggernaut, nullwave, lifesteal, dragonfang, starcore burn, titan, phantom, lifebloom, overclock stub) + the 4 relic actives (Blink Prism, Purge Bell, Ember Flask, Horn of Rally). Shop honors the fountain/death windows and component upgrades (T2/T3 consume + discount their base item).
+- **Bot AI (in-sim, deterministic, honest):** Recruit/Veteran/Elite tiers with per-tier reaction cadence (0.4 s → 0.2 s), skillshot aim noise + velocity lead, retreat thresholds with hysteresis, orb rotations, wave-front push discipline, structure-siege commits, elite skillshot dodging/kiting/focus-fire/ult-holding, relic usage, per-champion build orders, and Aggro/Guardian/Objective/Chaotic personalities. Bots read the same brush-concealed state as players and issue ordinary intents.
+- **Balance harness:** `scripts/botmatch.mjs` runs seeded headless bot matches in bulk and reports lengths, winners, team winrates and champion K/D/A.
+- **Protocol v0.2:** shop/relic intents, Mini/Tower/Core/Orb snapshots, match-state snapshot (clock, barrier, team kills, towers, next orb, victory), kill/towerDown/matchOver/purchase/barrierDown events; snapshots now carry gold/K/D/A/items/relic/shield/brush state per champion.
+
+### Balance
+- Watchtower HP 3000 → 2400 and Clash Core 4200 → 3600; backdoor-protection radius 8 u → 11 u; Rams every 3rd wave → every 2nd; Bruisers/Zappers deal 2.5× to enemy Minis. First harness runs showed doc-spec sieges stalling matches past 25 min (waves stockpiled, structures outlived every push window); numbers mirrored into GAME_DESIGN §13.
+- Champion takedown XP (60 × victim level) is split among killer + assisters (was effectively full-to-each in early implementation — blob kills snowballed levels).
+- New: 500 g starting gold and fountain-plate regen (9% max HP + 15 Energy/s) — documented in GAME_DESIGN §12.
+
 ## [Unreleased] — v0.1.0 "Training Grounds" (in progress)
 
 ### Changed
