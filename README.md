@@ -12,6 +12,24 @@ No install, no launcher. Open a link, invite three friends (bots fill the rest),
 
 ---
 
+## Build & deploy
+
+The playable game is a static site, but it is **not** just `vite build`: the asset
+pipeline must run first to generate `packages/client/public/game-assets/`
+(optimized models + `manifest.json`, gitignored). The client build fails fast with
+a clear error if that step was skipped.
+
+```bash
+pnpm install
+pnpm build        # asset pipeline + production client build → packages/client/dist
+```
+
+**Vercel** (or any host): the repo-root `vercel.json` sets everything —
+install `pnpm install --frozen-lockfile`, build `pnpm build`, output
+`packages/client/dist`. In the Vercel project settings, leave **Root Directory**
+at the repository root (a root of `packages/client` bypasses `vercel.json` and
+skips the asset pipeline, which 404s the game at runtime). Requires Node 22+.
+
 ## Documentation index
 
 | Document | What it covers |
