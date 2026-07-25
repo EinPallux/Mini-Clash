@@ -1,33 +1,50 @@
 import {
   BRIDGE,
   CHAMPIONS,
+  type ChampionDef,
+  DRAFT,
   type MapDef,
   SHATTERBRIDGE_MAP,
   TICK_DT,
   TRAINING_MAP,
   UNITS,
 } from '@mini-clash/data';
-import type {
-  ChampionSnap,
-  EntitySnap,
-  IntentMsg,
-  MatchConfig,
-  MatchStateSnap,
-  PlayerId,
-  Snapshot,
-  TrainerCmd,
+import {
+  type BotTier,
+  type ChampionSnap,
+  type DraftSnap,
+  type EntitySnap,
+  type IntentMsg,
+  type MatchConfig,
+  type MatchStateSnap,
+  type PlayerId,
+  type Snapshot,
+  type TrainerCmd,
+  UNKNOWN_AUGMENT,
 } from '@mini-clash/protocol';
-import { applySpawnEffects, canAttack, tryCast, updateAutoAttack, updateCasts } from './abilities';
+import {
+  applySpawnEffects,
+  canAttack,
+  tryCast,
+  trySwap,
+  updateAugments,
+  updateAutoAttack,
+  updateCasts,
+  updateChampionPassive,
+} from './abilities';
 import { healEntity, plantFlower } from './actions';
+import { augParam } from './augments';
 import { type BotBrain, makeBrain, thinkBots } from './bots';
-import { isHiddenFrom, updateBrushState } from './brush';
-import { applyBuff, applyBuffById, applyCc, shieldTotal, tickBuffs } from './buffs';
+import { isHiddenFrom, updateBrushState, updateDiscovery } from './brush';
+import { applyBuff, applyBuffById, applyCc, applyFear, shieldTotal, tickBuffs } from './buffs';
 import { dealDamage } from './combat';
+import { openDraft, pickAugment, rerollDraft, updateDrafts } from './draft';
 import { levelUpChamp, updateIncome, updateOrbs } from './economy';
 import { tryBuy, tryBuyRelic, trySell, tryUseRelic, updateItemPassives } from './items';
 import { spawnWave, updateMini } from './minis';
 import { applySeparation, updateMovement } from './movement';
 import { NavGrid } from './navgrid';
+import { spawnPet, updatePet, updatePickup } from './pets';
 import { updateProjectile } from './projectiles';
 import { Pcg32 } from './rng';
 import { championStats, hastedCooldown, resolveScaling } from './stats';
@@ -44,6 +61,20 @@ const MAPS: Record<string, MapDef> = {
   [TRAINING_MAP.id]: TRAINING_MAP,
   [SHATTERBRIDGE_MAP.id]: SHATTERBRIDGE_MAP,
 };
+
+/** Fresh passive scratch for a champion (what the sim + snapshot start with). */
+function initPassive(def: ChampionDef): Record<string, number> {
+  switch (def.passive.id) {
+    case 'stonewall':
+      return { stonewallCd: 0 };
+    case 'powder_rounds':
+      return { powderCount: 0 };
+    case 'capacitor':
+      return { charged: 0, lastAtk: -100 };
+    default:
+      return {};
+  }
+}
 
 export class Sim {
   readonly world: World;
@@ -125,6 +156,8 @@ export class Sim {
     for (const p of config.players) {
       const def = CHAMPIONS[p.championId];
       if (!def) throw new Error(`unknown champion '${p.championId}'`);
+      const benchDef = p.benchId ? CHAMPIONS[p.benchId] : undefined;
+      if (p.benchId && !benchDef) throw new Error(`unknown champion '${p.benchId}'`);
       const spawn = w.spawnPoints[p.team];
       const idx = teamCounts[p.team]++;
       const e = w.add({
@@ -156,6 +189,8 @@ export class Sim {
           items: [],
           relic: null,
           recentDamagers: new Map(),
+          dmgLog: [],
+          recap: null,
           itemState: {},
           lastCombatAt: -100,
           lastDamagedAt: -100,
@@ -177,14 +212,43 @@ export class Sim {
           aaTarget: null,
           respawnIn: 0,
           dancing: false,
-          passive: def.passive.id === 'stonewall' ? { stonewallCd: 0 } : { powderCount: 0 },
+          feared: null,
+          augments: [],
+          draft: null,
+          draftsDone: 0,
+          rerolls: DRAFT.rerolls,
+          augState: {},
+          passive: initPassive(def),
+          duo: benchDef
+            ? {
+                def: benchDef,
+                energy: 100,
+                cds: { q: 0, w: 0, r: 0 },
+                aaCd: 0,
+                passive: initPassive(benchDef),
+                swapCd: 0,
+                morphT: 0,
+              }
+            : null,
           speed: 0,
         },
       });
       this.playerEnts.set(p.id, e.id);
       this.trainer.set(p.id, { noCooldowns: false, infiniteEnergy: false });
-      if (p.bot) this.brains.set(p.id, makeBrain(config.seed, p.id, p.bot));
+      if (p.bot) {
+        // Balance A/B (ROADMAP v0.4): rig.noSwapTeam pins that team's bots to one
+        // half of their duo so the swap's contribution can be measured directly.
+        const maySwap = config.rig?.noSwapTeam !== p.team;
+        this.brains.set(p.id, makeBrain(config.seed, p.id, p.bot, maySwap));
+      }
+      if (benchDef) {
+        // Duos share one pool: the average of both HP curves (GAME_DESIGN §7.2).
+        e.hpMax = championStats(e).hpMax;
+        e.hp = e.hpMax;
+      }
       applySpawnEffects(w, e);
+      // Beastmasters arrive with their companion already at heel.
+      if (def.passive.id === 'best_friend') spawnPet(w, e, 'chomp');
     }
 
     for (const d of map.dummies) {
@@ -336,6 +400,19 @@ export class Sim {
         if (deny) w.emit({ t: 'castDenied', player: m.player, reason: deny });
         break;
       }
+      case 'swap': {
+        const deny = trySwap(w, e);
+        if (deny) w.emit({ t: 'castDenied', player: m.player, reason: deny });
+        break;
+      }
+      case 'draftPick': {
+        pickAugment(w, e, it.offer);
+        break;
+      }
+      case 'draftReroll': {
+        rerollDraft(w, e);
+        break;
+      }
       case 'useRelic': {
         tryUseRelic(w, e, it.x, it.z);
         break;
@@ -376,10 +453,22 @@ export class Sim {
           if (d.dummy) this.resetDummy(d);
         }
         break;
+      case 'openDraft': {
+        // Grounds-only affordance: try cards on without walking a level curve.
+        if (c.draft) break;
+        openDraft(w, e, Math.min(c.draftsDone, DRAFT.levels.length - 1));
+        break;
+      }
       case 'switchChampion': {
         const def = CHAMPIONS[cmd.championId];
         if (!def || def.id === c.def.id) break;
         c.def = def;
+        // A new kit is a clean slate: the old champion's signatures must not
+        // ride along, and a draft rolled for them is no longer a valid offer.
+        c.augments = [];
+        c.draft = null;
+        c.draftsDone = 0;
+        c.rerolls = DRAFT.rerolls;
         c.cds = { q: 0, w: 0, r: 0 };
         c.aaCd = 0;
         c.cast = null;
@@ -390,7 +479,8 @@ export class Sim {
         c.path = [];
         c.aaTarget = null;
         c.dancing = false;
-        c.passive = def.passive.id === 'stonewall' ? { stonewallCd: 0 } : { powderCount: 0 };
+        c.feared = null;
+        c.passive = initPassive(def);
         e.radius = def.stats.radius;
         e.buffs = [];
         const stats = championStats(e);
@@ -398,6 +488,29 @@ export class Sim {
         e.hp = stats.hpMax;
         c.energy = 100;
         applySpawnEffects(w, e);
+        break;
+      }
+      case 'setBench': {
+        // Training duo config: build/replace/clear the bench so Space can be
+        // practised against any pairing without leaving the Grounds.
+        const def = cmd.championId ? CHAMPIONS[cmd.championId] : null;
+        if (cmd.championId && !def) break;
+        if (def && def.id === c.def.id) break; // a duo is never two of the same
+        c.duo = def
+          ? {
+              def,
+              energy: 100,
+              cds: { q: 0, w: 0, r: 0 },
+              aaCd: 0,
+              passive: initPassive(def),
+              swapCd: 0,
+              morphT: 0,
+            }
+          : null;
+        // Shared pool changes shape with the pairing — refill so the panel never
+        // leaves the trainer at a fraction of a brand-new bar.
+        e.hpMax = championStats(e).hpMax;
+        e.hp = e.hpMax;
         break;
       }
     }
@@ -416,7 +529,18 @@ export class Sim {
     this.world.fx('generic.dummyreset', d.x, d.z, { target: d.id });
   }
 
+  /** Advance one tick and return the viewer-team snapshot (worker path). */
   tick(): Snapshot {
+    this.step();
+    return this.snapshot();
+  }
+
+  /**
+   * Advance the world WITHOUT building a snapshot or draining events — the
+   * server steps the sim, then builds one `snapshotFor()` view per team and
+   * drains events itself once all views exist.
+   */
+  step(): void {
     const w = this.world;
     const dt = TICK_DT;
     w.tick++;
@@ -424,7 +548,7 @@ export class Sim {
 
     if (w.match?.over) {
       // Victory freeze: the world holds its pose for the podium sequence.
-      return this.snapshot();
+      return;
     }
 
     // 0. Trim stale team pings (~5 s), then bot brains issue intents through the
@@ -478,6 +602,8 @@ export class Sim {
       else if (e.dummy) this.updateDummy(e, dt);
       else if (e.flower) this.updateFlower(e, dt);
       else if (e.zone) this.updateZone(e, dt);
+      else if (e.pet) updatePet(w, e, dt);
+      else if (e.pickup) updatePickup(w, e, dt);
     }
 
     // 6. Buffs, item passives, regen, income, respawns, brush.
@@ -485,6 +611,8 @@ export class Sim {
       tickBuffs(e, dt);
       if (e.champ && !e.dead) {
         updateItemPassives(w, e);
+        updateChampionPassive(w, e, dt);
+        updateAugments(w, e, dt);
         this.updatePollenTrail(e);
         const stats = championStats(e);
         e.hpMax = stats.hpMax;
@@ -498,6 +626,7 @@ export class Sim {
           }
         }
         updateBrushState(w, e);
+        updateDiscovery(w, e);
       }
       if (e.champ) updateIncome(w, e, dt);
       if (e.champ && e.dead) {
@@ -506,10 +635,11 @@ export class Sim {
       }
     }
 
-    // 7. Match orchestration: barrier, waves, orbs.
-    this.updateMatchFlow();
+    // 7. Open augment drafts tick down (the match never pauses for them).
+    updateDrafts(w, dt);
 
-    return this.snapshot();
+    // 8. Match orchestration: barrier, waves, orbs.
+    this.updateMatchFlow();
   }
 
   private updateMatchFlow(): void {
@@ -623,6 +753,15 @@ export class Sim {
     e.hp = e.hpMax;
     c.energy = 100;
     c.respawnIn = 0;
+    // Second Wind is once per *life*; Undying is once per match, so it stays.
+    c.augState.secondWind = 0;
+    c.feared = null;
+    c.recap = null; // the recap lives on the death screen only
+    if (c.duo) {
+      c.duo.energy = 100;
+      c.duo.swapCd = 0;
+      c.duo.morphT = 0;
+    }
     this.world.emit({ t: 'respawn', id: e.id });
     applySpawnEffects(this.world, e);
   }
@@ -658,9 +797,21 @@ export class Sim {
 
     if (e.dead) {
       // Destroyed by an attack: owner team detonates it, enemy denies it.
-      if (keg.killedByTeam === undefined || keg.killedByTeam === e.team) this.detonateKeg(e);
-      else {
+      // Decoys and markers never explode — they just leave.
+      if (!keg.decoy && (keg.killedByTeam === undefined || keg.killedByTeam === e.team)) {
+        this.detonateKeg(e);
+      } else {
         w.fx('generic.death', e.x, e.z, { target: e.id });
+        w.remove(e.id);
+      }
+      return;
+    }
+
+    // The sheet decoy just times out (no fuse, no bang).
+    if (keg.decoy) {
+      keg.fuseLeft -= dt;
+      if (keg.fuseLeft <= 0) {
+        w.fx('wisp.decoy.break', e.x, e.z, { target: e.id });
         w.remove(e.id);
       }
       return;
@@ -685,7 +836,7 @@ export class Sim {
       for (const u of [...w.units()]) {
         if (u.team === e.team || u.kind === 'keg') continue;
         if (dist(e.x, e.z, u.x, u.z) <= ex.radius + u.radius) {
-          dealDamage(w, { source: owner ?? e }, u, amount, ex.type);
+          dealDamage(w, { source: owner ?? e, label: e.srcLabel }, u, amount, ex.type);
           if (ex.cc) applyCc(u, ex.cc);
         }
       }
@@ -718,16 +869,103 @@ export class Sim {
     const w = this.world;
     z.tLeft -= dt;
     if (z.tLeft <= 0) {
-      w.remove(e.id);
+      this.expireZone(e, z);
       return;
     }
     const owner = w.get(z.owner);
+
+    if (z.variant === 'dome' || z.variant === 'pod') {
+      // The shell itself lives in projectiles.ts; here we only run the ally aura.
+      if (z.allyBuff || z.regenPct) {
+        for (const u of w.champions()) {
+          if (u.team !== e.team) continue;
+          if (dist(e.x, e.z, u.x, u.z) > z.radius + u.radius) continue;
+          if (z.allyBuff) applyBuffById(u, z.allyBuff);
+          // Habitat Module: the dome patches allies up while they shelter.
+          if (z.regenPct) healEntity(owner ?? u, u, u.hpMax * z.regenPct * dt);
+        }
+      }
+      return;
+    }
+
+    if (z.variant === 'curse') {
+      if (z.tickFx && this.world.tick % 15 === 0) w.fx(z.tickFx, e.x, e.z, { source: z.owner });
+      for (const u of [...w.enemiesOf(e.team)]) {
+        if (u.kind === 'keg') continue;
+        if (dist(e.x, e.z, u.x, u.z) > z.radius + u.radius) continue;
+        if (z.enemyDmgPerSec) {
+          dealDamage(
+            w,
+            { source: owner ?? e, label: e.srcLabel },
+            u,
+            z.enemyDmgPerSec * dt,
+            'arcane',
+          );
+        }
+        if (z.enemyBuff) applyBuffById(u, z.enemyBuff);
+        // Restricted Section: the maelstrom drags its readers toward the desk.
+        if (z.pullPerSec) {
+          const dx = e.x - u.x;
+          const dz = e.z - u.z;
+          const len = Math.hypot(dx, dz) || 1;
+          const step = Math.min(len, z.pullPerSec * dt);
+          u.x += (dx / len) * step;
+          u.z += (dz / len) * step;
+        }
+        // Minis inside stop fighting for anyone — the cursed ground confuses them.
+        if (z.disableMinis && u.mini) {
+          applyBuff(u, {
+            id: 'cc_confused',
+            name: 'Confused',
+            duration: 0.25,
+            mul: { moveSpeed: 0 },
+          });
+          u.mini.targetId = null;
+          u.mini.attacking = false;
+        }
+      }
+      return;
+    }
+
+    if (z.variant === 'trail') {
+      // Blood Waltz: Vex's own slick. Allies get carried, enemies get stuck.
+      for (const u of w.champions()) {
+        if (dist(e.x, e.z, u.x, u.z) > z.radius + u.radius) continue;
+        if (u.team === e.team) {
+          if (z.allyMs) {
+            applyBuff(u, {
+              id: 'aug_waltz_ms',
+              name: 'Blood Waltz',
+              duration: 0.4,
+              mul: { moveSpeed: 1 + z.allyMs },
+            });
+          }
+        } else if (z.enemySlow) {
+          applyCc(u, { kind: 'slow', duration: 0.4, strength: z.enemySlow });
+        }
+      }
+      return;
+    }
+
+    // Sylva's garden. Heartwood makes it walk with her.
+    if (z.follows && owner && !owner.dead) {
+      e.x = owner.x;
+      e.z = owner.z;
+    }
     for (const u of w.champions()) {
       const inside = dist(e.x, e.z, u.x, u.z) <= z.radius + u.radius;
       if (!inside) continue;
       if (u.team === e.team) {
-        healEntity(owner ?? u, u, z.healPerSec * dt);
-        if (z.cleanseSlows && !z.cleansed.has(u.id)) {
+        healEntity(owner ?? u, u, (z.healPerSec ?? 0) * dt);
+        if (z.allyMs) {
+          applyBuff(u, {
+            id: 'aug_heartwood_ms',
+            name: 'Heartwood',
+            duration: 0.4,
+            mul: { moveSpeed: 1 + z.allyMs },
+          });
+        }
+        if (z.cleanseSlows && z.cleansed && !z.cleansed.has(u.id)) {
           z.cleansed.add(u.id);
           u.buffs = u.buffs.filter((b) => !b.id.startsWith('cc_slow'));
         }
@@ -736,10 +974,38 @@ export class Sim {
           id: 'zone_dampen',
           name: 'Dampened',
           duration: 0.25,
-          damageAmp: z.enemyDamageAmp,
+          damageAmp: z.enemyDamageAmp ?? 0,
         });
       }
     }
+  }
+
+  /** Zone teardown: unstamp nav, fire the exit beat, apply expiry effects. */
+  private expireZone(e: Entity, z: NonNullable<Entity['zone']>): void {
+    const w = this.world;
+    if (z.navCells) w.nav.unstampWall(z.navCells);
+    // The midnight gong: everyone still standing in the curse is Feared away.
+    if (z.expireFear) {
+      w.fx('wisp.r.gong', e.x, e.z, { source: z.owner });
+      for (const u of w.champions()) {
+        if (u.team === e.team) continue;
+        if (dist(e.x, e.z, u.x, u.z) <= z.radius + u.radius) {
+          applyFear(u, e.x, e.z, z.expireFear);
+          w.fx('wisp.fear', u.x, u.z, { source: u.id });
+        }
+      }
+    }
+    if (z.expireSilence) {
+      for (const u of w.champions()) {
+        if (u.team === e.team) continue;
+        if (dist(e.x, e.z, u.x, u.z) <= z.radius + u.radius) {
+          applyCc(u, { kind: 'silence', duration: z.expireSilence });
+          w.fx('augment.silence', u.x, u.z, { source: u.id });
+        }
+      }
+    }
+    if (z.expireFx) w.fx(z.expireFx, e.x, e.z, { source: z.owner });
+    w.remove(e.id);
   }
 
   /** Sylva's Pollen Trail: plant a flower every N units walked. */
@@ -762,21 +1028,105 @@ export class Sim {
     c.passive.pollenAcc += step;
     if (c.passive.pollenAcc >= p.spacing) {
       c.passive.pollenAcc = 0;
-      plantFlower(this.world, e, e.x, e.z, p.max, p.life);
+      plantFlower(
+        this.world,
+        e,
+        e.x,
+        e.z,
+        augParam(e, 'sylva.flowerCap', p.max),
+        augParam(e, 'sylva.flowerLife', p.life),
+      );
     }
   }
 
+  /**
+   * Seat cover (TECH §6 reconnect): a bot brain drives a disconnected human's
+   * champion. Deterministic per (seed, player) — the brain uses the same RNG
+   * stream a from-the-start bot in that seat would.
+   */
+  coverSeat(player: PlayerId, tier: BotTier): void {
+    if (this.brains.has(player)) return;
+    this.brains.set(player, makeBrain(this.config.seed, player, tier));
+  }
+
+  /** Return a covered seat to human control. */
+  releaseSeat(player: PlayerId): void {
+    const wasBot = this.config.players.find((p) => p.id === player)?.bot;
+    if (!wasBot) this.brains.delete(player);
+  }
+
+  /** Offline convenience: the single human seat this sim is rendered for. */
+  private soleHuman(): PlayerId | undefined {
+    return this.config.players.find((p) => !p.bot)?.id;
+  }
+
   snapshot(): Snapshot {
+    const snap = this.snapshotFor(this.viewerTeam, this.soleHuman());
+    this.world.events = [];
+    return snap;
+  }
+
+  /**
+   * Team-scoped view (server: one per team per tick — brush-hidden enemies never
+   * leave the sim, so neither team can wallhack). Does NOT drain the event queue;
+   * the caller drains via `drainEvents()` after building every view it needs.
+   */
+  snapshotFor(team: 0 | 1, forPlayer?: PlayerId): Snapshot {
     const w = this.world;
     const entities: EntitySnap[] = [];
     for (const e of w.entities) {
       // Brush concealment: hidden enemies never leave the sim (map-hack impossible).
-      if (e.kind === 'champion' && isHiddenFrom(w, this.viewerTeam, e)) continue;
-      entities.push(this.snapEntity(e));
+      if (e.kind === 'champion' && isHiddenFrom(w, team, e)) continue;
+      const snap = this.snapEntity(e);
+      // Augment discovery (UI_UX §11): an enemy's cards travel as `?` until this
+      // team has actually seen them on the field. The count still crosses, so
+      // "they have three and I know one" reads correctly on the scoreboard.
+      if (snap.kind === 'champion' && e.team !== team && snap.augments.length > 0) {
+        const seen = w.discovered[team];
+        snap.augments = snap.augments.map((id) =>
+          seen.has(`${snap.player}:${id}`) ? id : UNKNOWN_AUGMENT,
+        );
+      }
+      // Your draft is yours: offers never travel to anyone else, so nobody can
+      // read what their opponent is about to pick.
+      if (snap.kind === 'champion' && e.champ?.draft) {
+        const owner = forPlayer !== undefined ? forPlayer : this.soleHuman();
+        if (e.champ.player === owner) {
+          snap.draft = {
+            index: e.champ.draft.index,
+            offers: [...e.champ.draft.offers],
+            tLeft: Math.max(0, Math.ceil(e.champ.draft.tLeft * 10) / 10),
+            rerolled: e.champ.draft.rerolled,
+          };
+        }
+      }
+      entities.push(snap);
     }
-    const events = w.events;
-    w.events = [];
-    return { tick: w.tick, time: w.time, match: this.matchSnap(), entities, events };
+    return { tick: w.tick, time: w.time, match: this.matchSnap(), entities, events: w.events };
+  }
+
+  /**
+   * This player's open draft, or null. The server sends it per client rather
+   * than inside the team-shared snapshot buffer — offers are private to the
+   * drafter, not to their team (AUGMENTS §1).
+   */
+  draftOf(player: PlayerId): DraftSnap | null {
+    for (const e of this.world.entities) {
+      const c = e.champ;
+      if (c?.player !== player || !c.draft) continue;
+      return {
+        index: c.draft.index,
+        offers: [...c.draft.offers],
+        tLeft: Math.max(0, Math.ceil(c.draft.tLeft * 10) / 10),
+        rerolled: c.draft.rerolled,
+      };
+    }
+    return null;
+  }
+
+  /** Clear the per-tick event queue after all per-team views are built. */
+  drainEvents(): void {
+    this.world.events = [];
   }
 
   private matchSnap(): MatchStateSnap {
@@ -854,7 +1204,19 @@ export class Sim {
         speed: c.speed,
         buffs: e.buffs.map((b) => ({ id: b.id, tLeft: b.tLeft, stacks: b.stacks })),
         passive: { ...c.passive },
+        recap: e.dead && c.recap ? c.recap : undefined,
+        duo: c.duo
+          ? {
+              championId: c.duo.def.id,
+              energy: Math.floor(c.duo.energy),
+              cooldowns: { ...c.duo.cds },
+              swapCd: Math.ceil(c.duo.swapCd * 10) / 10,
+              morphT: c.duo.morphT,
+            }
+          : undefined,
         dancing: c.dancing,
+        augments: [...c.augments],
+        rerolls: c.rerolls,
         stats: {
           ad: Math.round(stats.ad),
           attackSpeed: stats.attackSpeed,
@@ -931,8 +1293,32 @@ export class Sim {
     if (e.flower) {
       return { ...base, kind: 'flower', tLeft: e.flower.tLeft };
     }
+    if (e.pet) {
+      return {
+        ...base,
+        kind: 'pet',
+        unitId: e.pet.def.id,
+        busy: e.pet.errand.kind !== 'idle',
+        empowered: e.pet.empowered,
+      };
+    }
+    if (e.pickup) {
+      return {
+        ...base,
+        kind: 'pickup',
+        unitId: e.pickup.def.id,
+        tLeft: Math.max(0, e.pickup.tLeft),
+        tossPhase: e.pickup.tossPhase < 1 ? e.pickup.tossPhase : undefined,
+      };
+    }
     if (e.zone) {
-      return { ...base, kind: 'zone', tLeft: e.zone.tLeft, duration: e.zone.duration };
+      return {
+        ...base,
+        kind: 'zone',
+        variant: e.zone.variant,
+        tLeft: e.zone.tLeft,
+        duration: e.zone.duration,
+      };
     }
     if (e.wall) {
       return {

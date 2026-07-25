@@ -5,6 +5,37 @@ export const TICK_DT = 1 / TICK_RATE;
 export const ENERGY_MAX = 100;
 export const ENERGY_REGEN_PER_SEC = 4;
 
+/** Tag Swap (GAME_DESIGN §7.2). */
+export const TAG_SWAP = {
+  /** Seconds between swaps, starting when the swap fires. */
+  cooldown: 9,
+  /** Morph transition — moving and targetable, but no attacks/casts. */
+  morphS: 0.35,
+  /** Swap-in move-speed burst, decaying linearly over the duration. */
+  haste: 0.2,
+  hasteDuration: 1,
+} as const;
+
+/** Augment drafting (docs/AUGMENTS.md §1). */
+export const DRAFT = {
+  /** Reaching these levels opens a draft. */
+  levels: [3, 6, 9] as const,
+  /** Cards per offer. */
+  offers: 3,
+  /** Seconds before the utility scorer auto-picks for you. The game never pauses. */
+  seconds: 45,
+  /** Reroll tokens per match (rerolls the whole offer set). */
+  rerolls: 1,
+  /** Silver / Gold / Prismatic odds, per draft index. */
+  odds: [
+    { silver: 0.6, gold: 0.33, prismatic: 0.07 },
+    { silver: 0.5, gold: 0.38, prismatic: 0.12 },
+    { silver: 0.45, gold: 0.4, prismatic: 0.15 },
+  ],
+  /** Team behind on kills + towers rolls this much extra weight up a tier. */
+  pityBonus: 0.1,
+} as const;
+
 export const LEVEL_MAX = 10;
 /** Cumulative XP per level 1..10 (index 0 = level 1 = 0 XP). */
 export const XP_CURVE = [0, 80, 200, 360, 560, 800, 1090, 1430, 1820, 2260] as const;

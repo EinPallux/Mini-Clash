@@ -133,7 +133,7 @@ export function tryUseRelic(w: World, e: Entity, aimX: number, aimZ: number): vo
       for (const u of [...w.enemiesOf(e.team)]) {
         if (u.kind === 'keg') continue;
         if (inCone(e.x, e.z, fx, fz, cosHalf, relic.params.radius, u.x, u.z, u.radius)) {
-          dealDamage(w, { source: e, tag: 'item' }, u, amount, 'arcane');
+          dealDamage(w, { source: e, tag: 'item', label: 'item:ember_flask' }, u, amount, 'arcane');
           applyBuff(u, {
             id: 'cc_slow_ember',
             name: 'Scorched',

@@ -54,26 +54,27 @@ Backdrop: the 3D hub island (Medieval-Hexagon terrain, harbor with Pirate/Waterc
 
 ## 5. Party & Custom Lobby
 
-- **Party dock (ambient):** avatar chips; + opens invite sheet — 6-char code + copy-link (`playminiclash.example/j/ABC123`); joining puts you in the leader's dock. Party persists through matches; leader crown transfers on leave.
-- **Custom Lobby screen:** two team columns of 4 seats; each seat = player chip / **bot chip** (difficulty dropdown per bot: Recruit/Veteran/Elite) / empty. Drag chips between teams; spectator row post-1.0. Right panel: lobby code (huge), mode summary, bot-fill toggle ("fill empty seats on start"). Leader's **START** requires ≥1 human. Non-leaders see readiness toggle.
-- Edge states: leader disconnect → crown migrates + toast; joining a full/dead code → friendly error with "make your own lobby" CTA.
+- **Party dock (ambient):** avatar chips; + opens invite sheet — 6-char code + copy-link (`?join=ABC123` query link — works on any static host); joining puts you in the leader's dock. Party persists through matches; leader crown transfers on leave. *(v0.3 form: the dock shows your connected lobby — code + member chips — and rides the hub while you browse; the lobby connection survives matches for Play Again.)*
+- **Custom Lobby screen:** two team columns of 4 seats; each seat = player chip / **bot chip** (per-bot difficulty: Recruit/Veteran/Elite) / empty. Seat management is tap-first per principle #5: tap an empty seat to sit there; leaders tap bot tiers directly on the chip (drag lands with the spectator row post-1.0). Right panel: lobby code (huge), mode summary, bot-fill toggle ("fill empty seats on start"). Leader's **START** requires ≥1 human and every seated human readied. Non-leaders see a readiness toggle.
+- Edge states: leader disconnect → crown migrates + toast; joining a full/dead code → friendly error with "make your own lobby" CTA; leaving mid-select turns your seat into a Veteran bot that keeps your pick.
+- *(v0.3)* START runs the champion-select deal **server-side** — per-human deal + 2 rerolls, shared team bench with atomic swaps, auto-lock on the timer — then every human receives a private seat reservation into the match room. Enemy picks never cross the wire before load. *(v0.4: the server deals **duos** — two champions per seat, rerolls and bench swaps addressed per slot.)*
 
 ## 6. Champion Select (the Deal)
 
-45→0 s timer ring around the START slot. Flow: dramatic card-flip **deal of your duo** (two cards land as a pair, chained) → reroll/bench decisions → lock.
+60→0 s timer ring around the START slot. Flow: dramatic card-flip **deal of your duo** (two cards land as a pair, chained) → reroll/bench decisions → lock. *(Shipped in v0.4; v0.2–v0.3 dealt a single champion with a 45 s ring.)*
 
 ```
 ┌──────────────────────────────────────────────┐
 │  YOUR TEAM (4 duo cards, allies' picks live) │
 │        [YOUR DUO: ROOK ♦ FATHOM]             │
-│   [🎲 Reroll (2)]  [team bench row: swaps]   │
+│   [🎲 per-card reroll ×2] [bench row: swaps] │
 │  enemy side: hidden silhouettes until load   │
 │  bottom: duo tips ("Rook walls make Fathom   │
 │  kegs unavoidable"), palette picker, [LOCK]  │
 └──────────────────────────────────────────────┘
 ```
 
-- Reroll animates the specific card exploding into the new champion; rerolled champions slide to the team bench; tapping a bench card swaps it into a chosen slot of your duo (per-slot, LoL-bench-style).
+- Reroll animates the specific card exploding into the new champion; rerolled champions slide to the team bench; tapping a bench card swaps it into a chosen slot of your duo (per-slot, LoL-bench-style — tap a duo card to choose the slot the bench feeds). A reroll always changes the card, and a duo never holds the same champion twice. *(A 4-duo team wants 8 distinct champions; with a smaller roster the deal exhausts it before repeating.)*
 - Everyone locks or timer ends → team splash: all 8 ally champions line up and do their `spawn` pose (this render *is* the loading screen backdrop).
 
 ## 7. Loading
@@ -96,23 +97,26 @@ Team lineup render + per-player progress rings + rotating tips (kit tips for the
 └──────────────────────────────────────────────────────────────┘
 ```
 
-- **Duo panel (bottom-left):** big active portrait, small benched portrait behind it with the 9 s swap radial; Space flips them with a satisfying card-swap animation; benched champion's ready-abilities glint (decision support).
+- **Duo panel (bottom-left):** big active portrait, small benched portrait beside it ringed by the 9 s swap radial (the ring reads as a filling arc, the label flips to **SPACE** when ready); Space flips them with a squash-and-pop morph — puff, ring flash, arrival chime — and the bench portrait glints when it brings a castable ability *and* the Energy to pay for it. A thin bar on the bench portrait shows its own Energy, because swapping into an empty bar is a real cost. *(Shipped v0.4; the morph is client-predicted so it starts on the keypress — measured at 1 ms input→morph over a 544 ms round trip.)*
 - **In-world (WebGL, not DOM):** unit healthbars (chunked per 100 HP, damage-lag ghost), cast bars, floating damage numbers, telegraphs, off-screen event/danger arrows at screen edge.
 - **Event ticker (top-right):** next Living-Bridge event icon + countdown; flips to a full-width banner + horn at T-8 s ("⚠ STORM FRONT — take cover!").
-- **Kill notifications:** duo-portrait vs duo-portrait cards; streak text uses restraint (no 2000s announcer cheese in text form — the horn stingers carry it).
+- **Kill notifications:** duo-portrait vs duo-portrait cards; streak text uses restraint (no 2000s announcer cheese in text form — the horn stingers carry it). *(Shipped v0.4: the active half renders solid, the benched half tucks behind it at 55% opacity — the pair reads at a glance without doubling the card's width.)*
+- **Quick-chat (v0.3):** hold **C** for a 4-phrase radial (Nice! / Thanks! / Help! / On it!) mirroring the ping wheel; lines are team-scoped, server-whitelisted and rate-limited, and land as skewed toast lines under the ally frames. Emote stickers join post-1.0 per GAME_DESIGN §17.
 - Esc menu: resume · settings · surrender vote (from 8:00) · leave (vs bots).
 
 ## 9. Augment draft overlay (Power Surge)
 
 On level 3/6/9: bottom-center dock slides up with 3 cards (game continues behind; input priority stays with the game — cards pick via 1/2/3 or click). Cards: rarity frame (silver/gold/prismatic + prismatic gets refraction shimmer), icon, name, one-line effect. [↻ reroll ×1] chip. 45 s ring; timeout auto-picks with a "coach chose" note. Enemy picks are not revealed here — discover them on the field (visibility mandate) or via Tab.
 
+*(Shipped v0.5. The "icon" is the augment's **category glyph** — ⚔ offense · 🛡 defense · ➤ mobility · ⇄ tag-team · ⌂ siege · ★ signature — which also makes the "no two cards from the same category" offer rule readable at a glance; per-augment art arrives with the cosmetics pass. A pick collapses the dock into a confirmation slab reading ACQUIRED, or COACH CHOSE on a genuine timeout, before the card settles into a compact strip beside the ability cluster. The dock clears the health/energy bars and the ability row by construction — a headless check asserts no overlap. **The Training Grounds draft too:** levelling to 3/6/9 there opens a real draft, and the trainer panel has a "Deal augment draft" button for trying a card on any kit at any level; switching champion in the Grounds clears the loadout so a signature can never ride onto a champion it was not written for.)*
+
 ## 10. Death screen (= the shop)
 
-Grey-out + respawn ring (timer). Left: killcam-lite damage recap (top 3 sources with ability icons — teaches counterplay; *ships in v0.3 with per-ability damage attribution — v0.2 has no recap panel*). Center: **the shop** (tier columns T1/T2/T3 + relic row; owned/affordable states; one-click buy with hammer-clink; build-suggestion chips per champion, dismissible). Right: live team status ("Fight at Golem in 0:12!" contextual hints). Buying is only possible here + pre-1:00 fountain — the screen makes death useful, not dead time.
+Grey-out + respawn ring (timer). Left: killcam-lite damage recap (top 3 sources with ability icons — teaches counterplay; *shipped in v0.3: the sim attributes every hit through the damage funnel — ability slot, attacks, passives, items, structures — over a rolling 12 s window, frozen at death*). Center: **the shop** (tier columns T1/T2/T3 + relic row; owned/affordable states; one-click buy with hammer-clink; build-suggestion chips per champion, dismissible). Right: live team status ("Fight at Golem in 0:12!" contextual hints). Buying is only possible here + pre-1:00 fountain — the screen makes death useful, not dead time.
 
 ## 11. Tab scoreboard (hold)
 
-8 rows (duo portraits, level, K/D/A, gold, items, augment icons, ping bars) + structures state + event log tail. Enemy augments visible here (post-discovery: icons appear once seen on the field, else "?" — scouting matters).
+8 rows (duo portraits, level, K/D/A, gold, items, augment icons, ping bars) + structures state + event log tail. Enemy augments visible here (post-discovery: icons appear once seen on the field, else "?" — scouting matters). *(v0.4: scoreboard, summary and podium all carry the duo — a brush-concealed enemy keeps a two-slot `?` so the shape still reads as a pair. Local match history stores both halves per seat; the history **viewer** arrives with the hub in v0.7.)* *(v0.5: discovery is enforced **server-side**. The sim tracks per team which `player:augment` pairs it has actually seen — owner alive, visible, out of brush — and rewrites everything else to `?` before the snapshot leaves, so a client cannot render a card it was never sent. The count still crosses, which is the useful half: "they have three, I know one." The trio also rides kill cards and three small rarity chips over each enemy's in-world nameplate, grey while unknown.)*
 
 ## 12. End of match
 

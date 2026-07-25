@@ -39,6 +39,28 @@ jobs:
         env:
           SMOKE_CHROME: ''
 
+  soak:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: 200-socket soak (TECH §11 budgets)
+        run: pnpm exec vitest run packages/server/test/soak.test.ts
+        env:
+          MC_SOAK: '1'
+
+  deploy-stack:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build the compose images (game + web)
+        run: docker compose build
+
   build-and-smoke:
     runs-on: ubuntu-latest
     steps:
@@ -61,6 +83,22 @@ jobs:
         run: node scripts/smoke-bridge.mjs
         env:
           SMOKE_CHROME: ''
+      - name: Lag smoke (online vs server at 150ms +jitter +2% loss)
+        run: node scripts/smoke-lag.mjs
+        env:
+          SMOKE_CHROME: ''
+      - name: Lobby smoke (two browsers create/join by code into one match)
+        run: node scripts/smoke-lobby.mjs
+        env:
+          SMOKE_CHROME: ''
+      - name: Reconnect smoke (mid-fight refresh rejoin + clean server-death failure)
+        run: node scripts/smoke-reconnect.mjs
+        env:
+          SMOKE_CHROME: ''
+      - name: Draft smoke (Power Surge dock, reroll, pick, input pass-through)
+        run: node scripts/shot-draft.mjs
+        env:
+          SHOT_CHROME: ''
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -68,4 +106,8 @@ jobs:
           path: |
             test-results/smoke
             test-results/smoke-bridge
+            test-results/smoke-lag
+            test-results/smoke-lobby
+            test-results/smoke-reconnect
+            test-results/draft
           retention-days: 14

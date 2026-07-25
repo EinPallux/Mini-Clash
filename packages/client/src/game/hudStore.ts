@@ -19,6 +19,15 @@ export interface HudChampion {
   cooldownMax: Record<Slot, number>;
   recastSlot: Slot | null;
   passive: Record<string, number>;
+  /** Death-screen recap (UI_UX §10) — top 3 damage sources, set while dead. */
+  recap: ChampionSnap['recap'];
+  /** Tag Team bench + swap timers (GAME_DESIGN §7.2); absent when solo. */
+  duo: ChampionSnap['duo'];
+  /** Augments taken this match (docs/AUGMENTS.md). */
+  augments: string[];
+  /** Your open draft, if one is up. Never populated for anyone else. */
+  draft: ChampionSnap['draft'];
+  rerolls: number;
   stats: ChampionSnap['stats'];
 }
 
@@ -49,6 +58,10 @@ export interface HudSeat {
   player: number;
   team: number;
   championId: string;
+  /** Benched half of this seat's duo (absent for solo configs). */
+  benchChampionId?: string;
+  /** Augments this seat has taken (enemy ones are gated by discovery). */
+  augments: string[];
   name: string;
   bot: boolean;
   level: number;
@@ -64,12 +77,25 @@ export interface HudSeat {
   visible: boolean;
 }
 
+export interface ChatEntry {
+  id: number;
+  player: number;
+  name: string;
+  phrase: string;
+  at: number;
+}
+
 export interface FeedEntry {
   id: number;
   kind: 'kill' | 'tower' | 'surrender';
-  /** Champion ids for portrait chips (kill entries). */
+  /** Champion ids for portrait chips (kill entries) — active half. */
   killerChamp?: string;
   victimChamp?: string;
+  /** Benched halves: kill cards show the whole duo, dimmed (UI_UX §10). */
+  killerBench?: string;
+  victimBench?: string;
+  /** Killer's augments as this client knows them (`?` for undiscovered). */
+  killerAugments?: string[];
   killerName?: string;
   victimName?: string;
   /** Team of the actor (colors the entry edge). */
@@ -82,9 +108,21 @@ interface HudState {
   champion: HudChampion | null;
   dummies: HudDummy[];
   match: HudMatch | null;
+  /** Our seat id — 1 offline, server-assigned online (lobby matches vary). */
+  selfPlayer: number;
+  /** Our team — display code renders ally/enemy relative to this. */
+  selfTeam: number;
   seats: HudSeat[];
   feed: FeedEntry[];
+  /** Team quick-chat lines (GAME_DESIGN §17), newest last. */
+  chat: ChatEntry[];
   shopMsg: { at: number; ok: boolean; reason?: string } | null;
+  /** Set when the online transport dies — the match screen shows a clean exit. */
+  droppedReason: string | null;
+  /** True while the server has a bot covering our seat (AFK, GAME_DESIGN §17). */
+  afkCovered: boolean;
+  /** Your last augment pick — drives the draft's confirmation slab (UI_UX §9). */
+  draftTaken: { augmentId: string; auto: boolean; at: number } | null;
   deniedAt: number;
   deniedReason: string;
   fps: number;
@@ -93,6 +131,10 @@ interface HudState {
   setFlags: (f: { noCooldowns?: boolean; infiniteEnergy?: boolean }) => void;
   applySnapshot: (snap: Snapshot, selfPlayer: number) => void;
   addFeed: (entry: Omit<FeedEntry, 'id' | 'at'>) => void;
+  addChat: (player: number, name: string, phrase: string) => void;
+  dropped: (reason: string) => void;
+  setAfk: (covered: boolean) => void;
+  augmentTaken: (augmentId: string, auto: boolean) => void;
   shopResult: (ok: boolean, reason?: string) => void;
   denied: (reason: string) => void;
   setFps: (fps: number) => void;
@@ -105,9 +147,15 @@ export const useHud = create<HudState>()((set, get) => ({
   champion: null,
   dummies: [],
   match: null,
+  selfPlayer: 1,
+  selfTeam: 0,
   seats: [],
   feed: [],
+  chat: [],
   shopMsg: null,
+  droppedReason: null,
+  afkCovered: false,
+  draftTaken: null,
   deniedAt: 0,
   deniedReason: '',
   fps: 0,
@@ -118,15 +166,28 @@ export const useHud = create<HudState>()((set, get) => ({
   setFps: (fps) => set({ fps }),
   addFeed: (entry) =>
     set((s) => ({ feed: [...s.feed.slice(-5), { ...entry, id: feedId++, at: Date.now() }] })),
+  addChat: (player, name, phrase) =>
+    set((s) => ({
+      chat: [...s.chat.slice(-3), { id: feedId++, player, name, phrase, at: Date.now() }],
+    })),
+  dropped: (reason) => set({ droppedReason: reason }),
+  setAfk: (covered) => set({ afkCovered: covered }),
+  augmentTaken: (augmentId, auto) => set({ draftTaken: { augmentId, auto, at: Date.now() } }),
   shopResult: (ok, reason) => set({ shopMsg: { at: Date.now(), ok, reason } }),
   reset: () =>
     set({
       champion: null,
       dummies: [],
       match: null,
+      selfPlayer: 1,
+      selfTeam: 0,
       seats: [],
       feed: [],
+      chat: [],
       shopMsg: null,
+      droppedReason: null,
+      afkCovered: false,
+      draftTaken: null,
       noCooldowns: false,
       infiniteEnergy: false,
     }),
@@ -144,12 +205,14 @@ export const useHud = create<HudState>()((set, get) => ({
       suddenDeath: snap.match.suddenDeath,
     };
     let champion: HudChampion | null = null;
+    let selfTeam = get().selfTeam;
     const dummies: HudDummy[] = [];
     const present = new Map<number, ChampionSnap>();
     for (const e of snap.entities) {
       if (e.kind === 'champion') {
         present.set(e.player, e);
         if (e.player === selfPlayer) {
+          selfTeam = e.team;
           champion = {
             championId: e.championId,
             hp: Math.ceil(e.hp),
@@ -175,6 +238,11 @@ export const useHud = create<HudState>()((set, get) => ({
             cooldownMax: e.cooldownMax,
             recastSlot: e.recast?.slot ?? null,
             passive: e.passive,
+            recap: e.recap,
+            duo: e.duo,
+            augments: e.augments,
+            draft: e.draft,
+            rerolls: e.rerolls,
             stats: e.stats,
           };
         }
@@ -197,6 +265,8 @@ export const useHud = create<HudState>()((set, get) => ({
       player: e.player,
       team: e.team,
       championId: e.championId,
+      benchChampionId: e.duo?.championId,
+      augments: e.augments,
       name: e.name,
       bot: e.bot,
       level: e.level,
@@ -229,7 +299,7 @@ export const useHud = create<HudState>()((set, get) => ({
       ) {
         return s;
       }
-      return { champion, dummies, match, seats };
+      return { champion, dummies, match, seats, selfPlayer, selfTeam };
     });
   },
 }));

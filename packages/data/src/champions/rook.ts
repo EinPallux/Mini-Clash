@@ -8,7 +8,7 @@ export const ROOK: ChampionDef = {
   role: 'vanguard',
   difficulty: 1,
   stats: {
-    hp: 1080,
+    hp: 1050,
     hpPerLevel: 120,
     regenPctPerSec: 0.006,
     ad: 58,
@@ -29,7 +29,7 @@ export const ROOK: ChampionDef = {
     name: 'Stonewall',
     description:
       'Every {icd}s, Rook’s next incoming hit is reduced by {base} (+{perLevel} per level).',
-    params: { icd: 8, base: 40, perLevel: 8 },
+    params: { icd: 9.5, base: 40, perLevel: 8 },
   },
   abilities: {
     q: {

@@ -57,6 +57,60 @@ export class HealthBar {
   }
 }
 
+/**
+ * Augment pips riding a champion's nameplate (UI_UX §11, AUGMENTS §1).
+ * Rarity-coloured chips; an enemy card you have not discovered yet reads grey.
+ * Three quads at most, so this is cheap enough to sit on all eight nameplates.
+ */
+const PIP_COLOR: Record<string, number> = {
+  silver: 0xc6d2e0,
+  gold: 0xffc23c,
+  prismatic: 0xff6fd8,
+  unknown: 0x5a6272,
+};
+
+export class AugmentPips3D {
+  readonly group = new THREE.Group();
+  private pips: THREE.Mesh[] = [];
+  private key = '';
+
+  /** `rarities` uses 'unknown' for cards this viewer has not discovered. */
+  set(rarities: string[]): void {
+    const key = rarities.join(',');
+    if (key === this.key) return;
+    this.key = key;
+    for (const m of this.pips) {
+      this.group.remove(m);
+      m.geometry.dispose();
+      (m.material as THREE.Material).dispose();
+    }
+    this.pips = [];
+    const w = 0.16;
+    const gap = 0.05;
+    const total = rarities.length * w + Math.max(0, rarities.length - 1) * gap;
+    rarities.forEach((r, i) => {
+      const mesh = new THREE.Mesh(
+        new THREE.PlaneGeometry(w, w),
+        new THREE.MeshBasicMaterial({
+          color: PIP_COLOR[r] ?? PIP_COLOR.unknown,
+          transparent: true,
+          opacity: r === 'unknown' ? 0.55 : 0.95,
+          depthTest: false,
+        }),
+      );
+      mesh.position.x = -total / 2 + w / 2 + i * (w + gap);
+      mesh.renderOrder = 91;
+      this.pips.push(mesh);
+      this.group.add(mesh);
+    });
+  }
+
+  update(camera: THREE.Camera): void {
+    if (this.pips.length === 0) return;
+    this.group.quaternion.copy(camera.getWorldQuaternion(new THREE.Quaternion()));
+  }
+}
+
 /* ----------------------------- Damage numbers ---------------------------- */
 
 interface FloatText {

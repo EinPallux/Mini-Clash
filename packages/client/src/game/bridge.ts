@@ -21,7 +21,7 @@ const BARRIER_H = 3.2;
 
 export class BridgeSet {
   private walls: BarrierWall[] = [];
-  private fountains: { mesh: THREE.Mesh; mat: THREE.MeshBasicMaterial }[] = [];
+  private fountains: { mesh: THREE.Mesh; mat: THREE.MeshBasicMaterial; team: number }[] = [];
   private t = 0;
   private mood = 0; // 0 normal → 1 overtime → 2 sudden death
   private moodNow = 0;
@@ -86,7 +86,17 @@ export class BridgeSet {
       mesh.position.set(spawn.x, 0.04, spawn.z);
       mesh.renderOrder = 30;
       this.scene.add(mesh);
-      this.fountains.push({ mesh, mat });
+      this.fountains.push({ mesh, mat, team: spawn.team });
+    }
+  }
+
+  /** Re-tint gates + fountain plates relative to our seat's team (online the
+   * server may put us on team 1 — "ally color" always means OUR side). */
+  setSelfTeam(self: 0 | 1): void {
+    const colors = paletteColors(useSettings.getState().palette);
+    for (const w of this.walls) w.mat.color.set(w.team === self ? colors.ally : colors.enemy);
+    for (const f of this.fountains) {
+      f.mat.color.set(f.team === self ? colors.ally : colors.enemy);
     }
   }
 

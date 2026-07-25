@@ -10,6 +10,25 @@ export function updateMovement(w: World, e: Entity, dt: number): void {
   }
   c.speed = 0;
   if (c.leap || e.airborne > 0) return;
+
+  // Feared (Wisp R): flee straight away from the source, controls ignored.
+  if (c.feared) {
+    const stats = championStats(e);
+    const [dx, dz] = norm(e.x - c.feared.fromX, e.z - c.feared.fromZ);
+    const stepDist = stats.moveSpeed * dt;
+    const nx = e.x + dx * stepDist;
+    const nz = e.z + dz * stepDist;
+    if (!w.nav.isBlockedAt(nx, nz)) {
+      e.x = nx;
+      e.z = nz;
+    }
+    e.fx = dx;
+    e.fz = dz;
+    c.speed = stats.moveSpeed;
+    c.path = [];
+    return;
+  }
+
   if (c.cast) return; // windups lock movement (both abilities and attack swings)
 
   const order = c.order;
@@ -80,17 +99,22 @@ export function updateMovement(w: World, e: Entity, dt: number): void {
   }
 }
 
+/** Ectoplasm (Wisp): no unit collision, ever — she phases and nothing separates off her. */
+function phases(e: Entity): boolean {
+  return e.champ?.def.passive.id === 'ectoplasm';
+}
+
 /** Soft push-out so champions/Minis don't stack inside units (dummies/kegs are anchors). */
 export function applySeparation(w: World, dt: number): void {
   const movers: Entity[] = [];
   for (const u of w.units()) {
-    if (u.dead) continue;
+    if (u.dead || phases(u)) continue;
     if (u.kind === 'champion' && !u.champ?.leap) movers.push(u);
     else if (u.kind === 'mini') movers.push(u);
   }
   for (const m of movers) {
     for (const other of w.units()) {
-      if (other.id === m.id || other.dead) continue;
+      if (other.id === m.id || other.dead || phases(other)) continue;
       const overlap = m.radius + other.radius - dist(m.x, m.z, other.x, other.z);
       if (overlap > 0.01) {
         const [dx, dz] = norm(m.x - other.x, m.z - other.z);

@@ -34,7 +34,11 @@ export class AnimGraph {
       action.timeScale = def.speed ?? 1;
       this.actions.set(state, action);
     }
-    this.mixer.addEventListener('finished', () => {
+    this.mixer.addEventListener('finished', (e) => {
+      // Fade the finished clip out. clampWhenFinished holds its last pose at full
+      // weight forever otherwise — most visibly, the death clip's lying pose kept
+      // blending into every animation after respawn.
+      e.action.fadeOut(0.12);
       this.oneShot = null;
     });
   }
@@ -59,6 +63,9 @@ export class AnimGraph {
     if (!action) return;
     const prev = this.current ? this.actions.get(this.current) : null;
     prev?.fadeOut(0.08);
+    // A still-running one-shot (interrupted cast, death overriding an attack) must
+    // fade too, or its clamped pose keeps polluting the blend.
+    if (this.oneShot && this.oneShot !== state) this.actions.get(this.oneShot)?.fadeOut(0.08);
     this.current = null;
     action.reset();
     const clipDur = action.getClip().duration;

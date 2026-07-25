@@ -2,6 +2,7 @@ import { CHAMPION_LIST, STRINGS } from '@mini-clash/data';
 import { uiSound } from '../../game/audio';
 import { useHud } from '../../game/hudStore';
 import type { MatchRuntime } from '../../game/match';
+import { DraftOverlay } from './DraftOverlay';
 import { ChampionCluster, DenyFlash } from './HudShared';
 
 export function TrainingHud({
@@ -43,6 +44,37 @@ export function TrainingHud({
       {/* top-right: trainer panel + dummy DPS */}
       <div className="hud-topright">
         <div className="trainer-panel">
+          {/* Duo config (GAME_DESIGN §7.2): pick a bench and practise the swap
+              against any pairing without leaving the Grounds. */}
+          <h4>{STRINGS.trainerDuo}</h4>
+          <div className="duo-config">
+            <button
+              type="button"
+              className={`hud-chip ${champ.duo ? '' : 'on'}`}
+              onClick={() => {
+                uiSound('ui_click');
+                runtime()?.setBench(null);
+              }}
+            >
+              {STRINGS.trainerSolo}
+            </button>
+            {CHAMPION_LIST.filter((c) => c.id !== champ.championId).map((c) => (
+              <button
+                type="button"
+                key={c.id}
+                className={`hud-chip ${champ.duo?.championId === c.id ? 'on' : ''}`}
+                onClick={() => {
+                  uiSound('ui_click');
+                  runtime()?.setBench(c.id);
+                }}
+              >
+                {c.name}
+              </button>
+            ))}
+          </div>
+          <p className="duo-config-hint">
+            {champ.duo ? STRINGS.trainerDuoHint : STRINGS.trainerSoloHint}
+          </p>
           <h4>{STRINGS.cheats}</h4>
           <div className="set-row">
             <span>{STRINGS.cheatCooldowns}</span>
@@ -92,6 +124,21 @@ export function TrainingHud({
               {STRINGS.cheatResetDummies}
             </button>
           </div>
+          {/* Power Surge on demand: try a card on any kit at any level, rather
+              than walking the 3/6/9 curve every time (AUGMENTS §1). */}
+          <div className="row">
+            <button
+              type="button"
+              className="btn"
+              disabled={!!champ.draft}
+              onClick={() => {
+                uiSound('ui_click');
+                runtime()?.openDraft();
+              }}
+            >
+              {STRINGS.cheatDraft}
+            </button>
+          </div>
         </div>
         {dummies.map((d) => (
           <div className="dummy-chip" key={d.id}>
@@ -103,6 +150,7 @@ export function TrainingHud({
 
       <DenyFlash />
       <ChampionCluster />
+      <DraftOverlay runtime={runtime} />
 
       <div className="keyhint">
         <span className="cap">ESC</span>

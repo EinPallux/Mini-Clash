@@ -39,7 +39,11 @@ export function spawnWave(w: World, battle: Battle, waveIndex: number): void {
   w.fx('wave.spawn', 0, 0, {});
 }
 
-function spawnMini(w: World, unitId: string, team: Team, x: number, z: number): void {
+/**
+ * Spawn one Mini. Exported so Midnight Society can raise its ghost escort out
+ * of the same code path the wave system uses — a summoned Mini is a real Mini.
+ */
+export function spawnMini(w: World, unitId: string, team: Team, x: number, z: number): void {
   const def = UNITS[unitId];
   const mini = def?.mini;
   if (!def || !mini) throw new Error(`unknown mini '${unitId}'`);
@@ -179,6 +183,22 @@ function acquire(
   e: Entity,
   spec: NonNullable<MiniState['def']['mini']>,
 ): Entity | undefined {
+  // Taunting props win target priority outright: Wisp's sheet decoy, and
+  // Rattle's skull once Skeleton Key has reinforced it.
+  let decoy: Entity | undefined;
+  let dDecoy = spec.aggroRange;
+  for (const u of w.units()) {
+    if (u.team === e.team || !u.keg) continue;
+    const taunt = u.keg.decoy ? spec.aggroRange : (u.keg.tauntRadius ?? 0);
+    if (taunt <= 0) continue;
+    const d = dist(e.x, e.z, u.x, u.z) - u.radius;
+    if (d <= Math.min(dDecoy, taunt)) {
+      dDecoy = d;
+      decoy = u;
+    }
+  }
+  if (decoy) return decoy;
+
   const ram = spec.kind === 'ram';
   let bestMini: Entity | undefined;
   let bestChamp: Entity | undefined;

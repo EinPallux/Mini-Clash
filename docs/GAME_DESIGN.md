@@ -168,7 +168,9 @@ No crit, no dodge/miss — damage variance comes from skill expression (skillsho
 Per champion: **Passive**, **Q**, **W** (basic; Energy + CD), **R** ultimate (unlocks at level 4; CD only). No manual skill-points — abilities scale automatically with level; the *draft* choices are Augments. Ability categories: skillshot projectile, cone/line sweep, area (telegraphed circle), dash/blink, zone/summon, self/aura buff. Launch kits avoid ally-click targeting entirely (keeps controls to move + 4 buttons; ally support happens via areas and cones).
 
 ### 10.3 Crowd control
-Stun, Root, Slow, Knock-up, Fear, Taunt. Hard CC (everything except Slow/Root) obeys diminishing returns: a target hard-CC'd within the last 5 s takes 50% duration from subsequent hard CC. Knock-ups are cleanse-immune. Purge Bell relic and select augments grant cleanse/tenacity.
+Stun, Root, Slow, Knock-up, Fear, Taunt, **Silence**. Hard CC (everything except Slow/Root/Silence) obeys diminishing returns: a target hard-CC'd within the last 5 s takes 50% duration from subsequent hard CC. Knock-ups are cleanse-immune. Purge Bell relic and select augments grant cleanse/tenacity.
+
+**Silence** locks abilities and swaps but leaves your feet free — you can walk out of the thing that silenced you, you just cannot answer it. *(Added in v0.5 for Mortis' Restricted Section signature; reusing a stun there would have been a strictly stronger effect wearing the wrong word.)*
 
 ### 10.4 Projectiles, telegraphs, honesty rules
 - Every avoidable effect has a telegraph: enemy = red fill-up shape, ally = blue outline (see ART_DIRECTION §VFX language).
@@ -260,10 +262,10 @@ Pads at the 30 u / 90 u marks spawn an orb every 45 s (first 1:30). Touch: heal 
 
 | Input | Action |
 |---|---|
-| Right-click / hold | Move (click-to-move, pathfound) |
+| Right-click / hold | Move (click-to-move, pathfound); on an enemy: attack it |
 | A + click / A | Attack-move |
 | Q / W / R | Abilities (smart-cast with range indicator on hold — default; classic cast toggle in settings) |
-| **Space** | **Tag Swap** |
+| **Space** | **Tag Swap** (rebindable in Settings → Controls) |
 | E | Relic active |
 | S | Stop |
 | Tab (hold) | Scoreboard overlay |
@@ -286,6 +288,8 @@ Bots are a first-class feature (full lobbies must be fun solo). Three tiers + pe
 | **Elite** | Focus-fire discipline, skillshot prediction with human-like error, Entrance weaving, energy cycling, event timing plays, peel assignments, bait-and-swap. Reaction times floor-capped (180 ms) — never aimbot-perfect. |
 
 Personalities (Aggro / Guardian / Objective / Chaotic) bias utility weights so bot teams don't move as one organism. Bots take over disconnected/AFK players seamlessly at the player's last tier-appropriate level.
+
+*(v0.4 — swap behavior shipped as specced. Elites hold a ready ultimate rather than trading it away mid-fight, which suppresses some of their swaps; v0.4 measured that as Elites swapping less often than Veterans, but adding v0.5's augments flipped the ordering without either brain changing, so **swap frequency is context noise, not a competence signal** — treat only the head-to-head value as meaningful. The value is measured directly by `scripts/swap-ab.mjs`, which pits identical duo deals against each other with one side pinned to a single half: the swapping side won 92.5% over 40 Elite matches. That margin says the swap is close to mandatory at the current roster — a design property to keep an eye on, since a player who never presses Space is giving up roughly half their live ability access.)*
 
 ## 17. Social & session rules (in-match)
 

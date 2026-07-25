@@ -23,6 +23,86 @@ export const SOUND_CUES: Record<string, SynthCue> = {
     layers: [{ wave: 'sine', freq: 960, freqEnd: 720, attack: 0.001, decay: 0.09, volume: 0.13 }],
   },
 
+  /* Power Surge draft (AUGMENTS §1) — the hand fans out, and a prismatic sings. */
+  draft_open: {
+    id: 'draft_open',
+    layers: [
+      // Three cards riffling onto the dock, one per offer.
+      { wave: 'noise', freq: 1, attack: 0.001, decay: 0.07, volume: 0.13, lowpass: 6200 },
+      {
+        wave: 'noise',
+        freq: 1,
+        attack: 0.001,
+        decay: 0.07,
+        volume: 0.12,
+        lowpass: 5600,
+        delay: 0.07,
+      },
+      {
+        wave: 'noise',
+        freq: 1,
+        attack: 0.001,
+        decay: 0.08,
+        volume: 0.11,
+        lowpass: 5000,
+        delay: 0.14,
+      },
+      // A rising triad under them so the set announces itself.
+      { wave: 'triangle', freq: 587, attack: 0.003, decay: 0.16, volume: 0.16 },
+      { wave: 'triangle', freq: 740, attack: 0.003, decay: 0.16, volume: 0.15, delay: 0.07 },
+      { wave: 'triangle', freq: 988, attack: 0.003, decay: 0.26, volume: 0.16, delay: 0.14 },
+      { wave: 'sine', freq: 294, freqEnd: 392, attack: 0.02, decay: 0.34, volume: 0.1 },
+    ],
+  },
+  /** A prismatic is in the hand: the chase-card sting (bigger, longer, shimmering). */
+  draft_prismatic: {
+    id: 'draft_prismatic',
+    layers: [
+      { wave: 'noise', freq: 1, attack: 0.001, decay: 0.09, volume: 0.12, lowpass: 6400 },
+      {
+        wave: 'sine',
+        freq: 392,
+        freqEnd: 1568,
+        attack: 0.02,
+        decay: 0.42,
+        volume: 0.16,
+        slide: 'exp',
+      },
+      // Bell stack — a major add-9 so it reads as "rare", not "level up".
+      { wave: 'sine', freq: 784, attack: 0.004, decay: 0.6, volume: 0.16, delay: 0.1 },
+      { wave: 'sine', freq: 988, attack: 0.004, decay: 0.62, volume: 0.13, delay: 0.14 },
+      { wave: 'sine', freq: 1175, attack: 0.004, decay: 0.66, volume: 0.12, delay: 0.18 },
+      { wave: 'sine', freq: 1760, attack: 0.004, decay: 0.7, volume: 0.09, delay: 0.22 },
+      // Top sparkle, panned in time rather than space (mono bank).
+      { wave: 'triangle', freq: 2349, attack: 0.002, decay: 0.2, volume: 0.07, delay: 0.34 },
+      { wave: 'triangle', freq: 3136, attack: 0.002, decay: 0.24, volume: 0.06, delay: 0.44 },
+    ],
+  },
+  /** The card lands on you: a stamp with a bright confirming ping (silver/gold). */
+  augment_take: {
+    id: 'augment_take',
+    layers: [
+      { wave: 'square', freq: 300, freqEnd: 190, attack: 0.001, decay: 0.09, volume: 0.2 },
+      { wave: 'noise', freq: 1, attack: 0.001, decay: 0.06, volume: 0.1, lowpass: 3600 },
+      { wave: 'triangle', freq: 1046, freqEnd: 1568, attack: 0.002, decay: 0.2, volume: 0.16 },
+      { wave: 'sine', freq: 2093, attack: 0.002, decay: 0.16, volume: 0.07, delay: 0.08 },
+    ],
+  },
+  /** Taking a prismatic: the stamp blooms into a chord instead of a ping. */
+  augment_prismatic: {
+    id: 'augment_prismatic',
+    layers: [
+      { wave: 'square', freq: 300, freqEnd: 170, attack: 0.001, decay: 0.11, volume: 0.2 },
+      { wave: 'sine', freq: 131, freqEnd: 98, attack: 0.01, decay: 0.7, volume: 0.2 },
+      { wave: 'sine', freq: 523, attack: 0.004, decay: 0.6, volume: 0.16, delay: 0.05 },
+      { wave: 'sine', freq: 659, attack: 0.004, decay: 0.62, volume: 0.14, delay: 0.09 },
+      { wave: 'sine', freq: 784, attack: 0.004, decay: 0.64, volume: 0.13, delay: 0.13 },
+      { wave: 'sine', freq: 1046, attack: 0.004, decay: 0.7, volume: 0.12, delay: 0.17 },
+      { wave: 'triangle', freq: 2093, attack: 0.002, decay: 0.3, volume: 0.08, delay: 0.28 },
+      { wave: 'noise', freq: 1, attack: 0.02, decay: 0.5, volume: 0.06, lowpass: 7200, delay: 0.1 },
+    ],
+  },
+
   rook_q_swing: {
     id: 'rook_q_swing',
     layers: [
@@ -159,6 +239,23 @@ export const SOUND_CUES: Record<string, SynthCue> = {
     layers: [
       { wave: 'sine', freq: 290, freqEnd: 880, attack: 0.01, decay: 0.42, volume: 0.2 },
       { wave: 'triangle', freq: 1180, attack: 0.001, decay: 0.22, volume: 0.12, delay: 0.26 },
+    ],
+  },
+  /** Tag Swap: a quick card-flip whoosh with a bright arrival chime. */
+  duo_swap: {
+    id: 'duo_swap',
+    layers: [
+      { wave: 'sine', freq: 620, freqEnd: 240, attack: 0.005, decay: 0.16, volume: 0.2 },
+      {
+        wave: 'triangle',
+        freq: 340,
+        freqEnd: 1240,
+        attack: 0.005,
+        decay: 0.3,
+        volume: 0.18,
+        delay: 0.14,
+      },
+      { wave: 'sine', freq: 1560, attack: 0.001, decay: 0.16, volume: 0.1, delay: 0.3 },
     ],
   },
   block_clang: {
@@ -411,6 +508,354 @@ export const SOUND_CUES: Record<string, SynthCue> = {
         volume: 0.08,
         delay: 0.06,
       },
+    ],
+  },
+
+  /* Boltz — electric zaps + orbital thump */
+  boltz_aa: {
+    id: 'boltz_aa',
+    layers: [
+      { wave: 'square', freq: 1400, freqEnd: 820, attack: 0.001, decay: 0.06, volume: 0.13 },
+      { wave: 'noise', freq: 1, attack: 0.001, decay: 0.04, volume: 0.06, lowpass: 5200 },
+    ],
+  },
+  boltz_zap: {
+    id: 'boltz_zap',
+    layers: [
+      { wave: 'square', freq: 1800, freqEnd: 600, attack: 0.001, decay: 0.14, volume: 0.16 },
+      { wave: 'sawtooth', freq: 620, freqEnd: 240, attack: 0.001, decay: 0.12, volume: 0.12 },
+      { wave: 'noise', freq: 1, attack: 0.001, decay: 0.08, volume: 0.1, lowpass: 3600 },
+    ],
+  },
+  boltz_zap_hit: {
+    id: 'boltz_zap_hit',
+    layers: [
+      { wave: 'square', freq: 900, freqEnd: 1500, attack: 0.001, decay: 0.05, volume: 0.11 },
+      { wave: 'noise', freq: 1, attack: 0.001, decay: 0.04, volume: 0.07, lowpass: 4800 },
+    ],
+  },
+  boltz_charge: {
+    id: 'boltz_charge',
+    layers: [
+      {
+        wave: 'sine',
+        freq: 320,
+        freqEnd: 1240,
+        attack: 0.03,
+        decay: 0.2,
+        volume: 0.13,
+        slide: 'exp',
+      },
+    ],
+  },
+  boltz_dome_up: {
+    id: 'boltz_dome_up',
+    layers: [
+      {
+        wave: 'sine',
+        freq: 260,
+        freqEnd: 620,
+        attack: 0.02,
+        decay: 0.3,
+        volume: 0.16,
+        slide: 'lin',
+      },
+      { wave: 'triangle', freq: 780, attack: 0.02, decay: 0.28, volume: 0.08, delay: 0.08 },
+    ],
+  },
+  boltz_dome_pop: {
+    id: 'boltz_dome_pop',
+    layers: [
+      { wave: 'square', freq: 1300, freqEnd: 1900, attack: 0.001, decay: 0.05, volume: 0.1 },
+      { wave: 'noise', freq: 1, attack: 0.001, decay: 0.04, volume: 0.06, lowpass: 5600 },
+    ],
+  },
+  boltz_pod_warn: {
+    id: 'boltz_pod_warn',
+    layers: [
+      { wave: 'sawtooth', freq: 440, freqEnd: 220, attack: 0.04, decay: 0.5, volume: 0.12 },
+      { wave: 'square', freq: 220, freqEnd: 180, attack: 0.06, decay: 0.4, volume: 0.08 },
+    ],
+  },
+  boltz_pod_land: {
+    id: 'boltz_pod_land',
+    layers: [
+      { wave: 'noise', freq: 1, attack: 0.001, decay: 0.55, volume: 0.42, lowpass: 380 },
+      { wave: 'sine', freq: 88, freqEnd: 40, attack: 0.001, decay: 0.5, volume: 0.4 },
+      { wave: 'square', freq: 130, freqEnd: 55, attack: 0.001, decay: 0.22, volume: 0.2 },
+    ],
+  },
+  boltz_pod_launch: {
+    id: 'boltz_pod_launch',
+    layers: [
+      {
+        wave: 'sawtooth',
+        freq: 180,
+        freqEnd: 520,
+        attack: 0.03,
+        decay: 0.5,
+        volume: 0.16,
+        slide: 'lin',
+      },
+      { wave: 'noise', freq: 1, attack: 0.02, decay: 0.5, volume: 0.16, lowpass: 900 },
+    ],
+  },
+  boltz_hop: {
+    id: 'boltz_hop',
+    layers: [
+      {
+        wave: 'sine',
+        freq: 380,
+        freqEnd: 720,
+        attack: 0.005,
+        decay: 0.16,
+        volume: 0.12,
+        slide: 'exp',
+      },
+      { wave: 'noise', freq: 1, attack: 0.005, decay: 0.12, volume: 0.06, lowpass: 2400 },
+    ],
+  },
+
+  /* Wisp — airy hauntings */
+  wisp_aa: {
+    id: 'wisp_aa',
+    layers: [
+      { wave: 'sine', freq: 620, freqEnd: 880, attack: 0.004, decay: 0.1, volume: 0.1 },
+      { wave: 'noise', freq: 1, attack: 0.004, decay: 0.06, volume: 0.04, lowpass: 3200 },
+    ],
+  },
+  wisp_aa_hit: {
+    id: 'wisp_aa_hit',
+    layers: [
+      { wave: 'triangle', freq: 740, freqEnd: 420, attack: 0.002, decay: 0.09, volume: 0.1 },
+    ],
+  },
+  wisp_chill: {
+    id: 'wisp_chill',
+    layers: [
+      {
+        wave: 'sine',
+        freq: 900,
+        freqEnd: 480,
+        attack: 0.01,
+        decay: 0.24,
+        volume: 0.1,
+        slide: 'exp',
+      },
+      { wave: 'noise', freq: 1, attack: 0.02, decay: 0.2, volume: 0.05, lowpass: 2200 },
+    ],
+  },
+  wisp_boo_charge: {
+    id: 'wisp_boo_charge',
+    layers: [{ wave: 'sine', freq: 260, freqEnd: 520, attack: 0.03, decay: 0.14, volume: 0.1 }],
+  },
+  wisp_boo: {
+    id: 'wisp_boo',
+    layers: [
+      {
+        wave: 'sawtooth',
+        freq: 520,
+        freqEnd: 160,
+        attack: 0.005,
+        decay: 0.22,
+        volume: 0.16,
+        slide: 'exp',
+      },
+      { wave: 'sine', freq: 300, freqEnd: 120, attack: 0.005, decay: 0.2, volume: 0.12 },
+      { wave: 'noise', freq: 1, attack: 0.005, decay: 0.12, volume: 0.06, lowpass: 1800 },
+    ],
+  },
+  wisp_slip: {
+    id: 'wisp_slip',
+    layers: [
+      {
+        wave: 'triangle',
+        freq: 900,
+        freqEnd: 300,
+        attack: 0.002,
+        decay: 0.18,
+        volume: 0.12,
+        slide: 'exp',
+      },
+      { wave: 'noise', freq: 1, attack: 0.002, decay: 0.1, volume: 0.05, lowpass: 3600 },
+    ],
+  },
+  wisp_curse_start: {
+    id: 'wisp_curse_start',
+    layers: [
+      { wave: 'sawtooth', freq: 130, freqEnd: 90, attack: 0.05, decay: 0.5, volume: 0.14 },
+      { wave: 'sine', freq: 196, attack: 0.05, decay: 0.5, volume: 0.1, delay: 0.05 },
+    ],
+  },
+  wisp_curse: {
+    id: 'wisp_curse',
+    layers: [
+      { wave: 'sawtooth', freq: 98, freqEnd: 74, attack: 0.06, decay: 0.7, volume: 0.16 },
+      { wave: 'sine', freq: 147, attack: 0.06, decay: 0.6, volume: 0.1 },
+      { wave: 'noise', freq: 1, attack: 0.06, decay: 0.5, volume: 0.08, lowpass: 600 },
+    ],
+  },
+  wisp_curse_tick: {
+    id: 'wisp_curse_tick',
+    layers: [
+      { wave: 'sine', freq: 420, freqEnd: 300, attack: 0.004, decay: 0.12, volume: 0.08 },
+      { wave: 'noise', freq: 1, attack: 0.004, decay: 0.08, volume: 0.04, lowpass: 1400 },
+    ],
+  },
+  wisp_gong: {
+    id: 'wisp_gong',
+    layers: [
+      { wave: 'sine', freq: 110, freqEnd: 82, attack: 0.002, decay: 0.9, volume: 0.3 },
+      { wave: 'triangle', freq: 220, attack: 0.002, decay: 0.7, volume: 0.12 },
+      { wave: 'noise', freq: 1, attack: 0.002, decay: 0.4, volume: 0.1, lowpass: 900 },
+    ],
+  },
+
+  /* Piper — yips, whistles and a lot of hooves */
+  piper_nip: {
+    id: 'piper_nip',
+    layers: [
+      { wave: 'square', freq: 980, freqEnd: 640, attack: 0.001, decay: 0.05, volume: 0.1 },
+      { wave: 'noise', freq: 1, attack: 0.001, decay: 0.04, volume: 0.06, lowpass: 4200 },
+    ],
+  },
+  piper_yip: {
+    id: 'piper_yip',
+    layers: [
+      { wave: 'triangle', freq: 720, freqEnd: 1180, attack: 0.004, decay: 0.09, volume: 0.14 },
+      {
+        wave: 'triangle',
+        freq: 980,
+        freqEnd: 640,
+        attack: 0.004,
+        decay: 0.08,
+        volume: 0.1,
+        delay: 0.08,
+      },
+    ],
+  },
+  piper_chomp: {
+    id: 'piper_chomp',
+    layers: [
+      { wave: 'square', freq: 260, freqEnd: 120, attack: 0.001, decay: 0.11, volume: 0.18 },
+      { wave: 'noise', freq: 1, attack: 0.001, decay: 0.08, volume: 0.12, lowpass: 1800 },
+    ],
+  },
+  piper_crunch: {
+    id: 'piper_crunch',
+    layers: [
+      { wave: 'noise', freq: 1, attack: 0.001, decay: 0.12, volume: 0.16, lowpass: 2600 },
+      { wave: 'triangle', freq: 520, freqEnd: 880, attack: 0.004, decay: 0.14, volume: 0.12 },
+    ],
+  },
+  piper_whistle_short: {
+    id: 'piper_whistle_short',
+    layers: [{ wave: 'sine', freq: 1180, freqEnd: 1560, attack: 0.005, decay: 0.12, volume: 0.12 }],
+  },
+  piper_whistle: {
+    id: 'piper_whistle',
+    layers: [
+      {
+        wave: 'sine',
+        freq: 880,
+        freqEnd: 1760,
+        attack: 0.02,
+        decay: 0.35,
+        volume: 0.18,
+        slide: 'exp',
+      },
+      { wave: 'sine', freq: 1320, attack: 0.02, decay: 0.2, volume: 0.08, delay: 0.2 },
+    ],
+  },
+  piper_fetch: {
+    id: 'piper_fetch',
+    layers: [
+      { wave: 'triangle', freq: 620, freqEnd: 980, attack: 0.004, decay: 0.12, volume: 0.12 },
+      { wave: 'noise', freq: 1, attack: 0.004, decay: 0.1, volume: 0.07, lowpass: 3200 },
+    ],
+  },
+  piper_snack_grab: {
+    id: 'piper_snack_grab',
+    layers: [
+      { wave: 'sine', freq: 740, freqEnd: 1180, attack: 0.002, decay: 0.1, volume: 0.12 },
+      { wave: 'square', freq: 1480, attack: 0.002, decay: 0.06, volume: 0.06, delay: 0.06 },
+    ],
+  },
+  piper_toss: {
+    id: 'piper_toss',
+    layers: [
+      { wave: 'triangle', freq: 340, freqEnd: 620, attack: 0.005, decay: 0.16, volume: 0.13 },
+    ],
+  },
+  piper_rumble: {
+    id: 'piper_rumble',
+    layers: [
+      { wave: 'noise', freq: 1, attack: 0.08, decay: 0.6, volume: 0.2, lowpass: 260 },
+      { wave: 'sine', freq: 62, freqEnd: 48, attack: 0.06, decay: 0.6, volume: 0.2 },
+    ],
+  },
+  piper_stampede: {
+    id: 'piper_stampede',
+    layers: [
+      { wave: 'noise', freq: 1, attack: 0.005, decay: 0.45, volume: 0.36, lowpass: 420 },
+      { wave: 'sine', freq: 78, freqEnd: 40, attack: 0.004, decay: 0.4, volume: 0.3 },
+      { wave: 'square', freq: 140, freqEnd: 70, attack: 0.002, decay: 0.2, volume: 0.14 },
+    ],
+  },
+
+  /* Vex — velvet, blood and bats */
+  vex_lash_wind: {
+    id: 'vex_lash_wind',
+    layers: [{ wave: 'noise', freq: 1, attack: 0.02, decay: 0.1, volume: 0.09, lowpass: 2200 }],
+  },
+  vex_lash: {
+    id: 'vex_lash',
+    layers: [
+      { wave: 'noise', freq: 1, attack: 0.001, decay: 0.14, volume: 0.2, lowpass: 3000 },
+      {
+        wave: 'sawtooth',
+        freq: 420,
+        freqEnd: 130,
+        attack: 0.001,
+        decay: 0.12,
+        volume: 0.16,
+        slide: 'exp',
+      },
+    ],
+  },
+  vex_lunge: {
+    id: 'vex_lunge',
+    layers: [{ wave: 'noise', freq: 1, attack: 0.002, decay: 0.09, volume: 0.12, lowpass: 2600 }],
+  },
+  vex_bats: {
+    id: 'vex_bats',
+    layers: [
+      { wave: 'noise', freq: 1, attack: 0.01, decay: 0.3, volume: 0.16, lowpass: 5200 },
+      { wave: 'square', freq: 2400, freqEnd: 1600, attack: 0.005, decay: 0.14, volume: 0.06 },
+      {
+        wave: 'square',
+        freq: 1900,
+        freqEnd: 2600,
+        attack: 0.005,
+        decay: 0.12,
+        volume: 0.05,
+        delay: 0.07,
+      },
+    ],
+  },
+  vex_goblet: {
+    id: 'vex_goblet',
+    layers: [
+      { wave: 'sine', freq: 1320, freqEnd: 1180, attack: 0.001, decay: 0.4, volume: 0.14 },
+      { wave: 'triangle', freq: 2640, attack: 0.001, decay: 0.22, volume: 0.06 },
+    ],
+  },
+  vex_banquet: {
+    id: 'vex_banquet',
+    layers: [
+      { wave: 'sawtooth', freq: 110, freqEnd: 82, attack: 0.04, decay: 0.7, volume: 0.18 },
+      { wave: 'sine', freq: 165, attack: 0.04, decay: 0.6, volume: 0.12 },
+      { wave: 'triangle', freq: 330, attack: 0.06, decay: 0.5, volume: 0.08, delay: 0.12 },
     ],
   },
 

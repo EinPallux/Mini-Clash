@@ -1,4 +1,5 @@
 import { BUFFS, type BuffDef, type CcSpec, ITEMS } from '@mini-clash/data';
+import { slowResist } from './augments';
 import type { BuffInstance, Entity } from './world';
 
 export function applyBuff(target: Entity, def: BuffDef, opts?: { blockNextHit?: boolean }): void {
@@ -28,11 +29,14 @@ export function applyCc(target: Entity, cc: CcSpec): void {
   if (target.kind === 'tower' || target.kind === 'core') return; // structures are CC-immune
   switch (cc.kind) {
     case 'slow': {
+      // Juggernaut Frame blunts slows before they ever become a buff.
+      const strength = (cc.strength ?? 0.2) * (1 - slowResist(target));
+      if (strength <= 0.001) break;
       const def: BuffDef = {
-        id: `cc_slow_${Math.round((cc.strength ?? 0.2) * 100)}`,
+        id: `cc_slow_${Math.round(strength * 100)}`,
         name: 'Slowed',
         duration: cc.duration,
-        mul: { moveSpeed: 1 - (cc.strength ?? 0.2) },
+        mul: { moveSpeed: 1 - strength },
       };
       applyBuff(target, def);
       break;
@@ -49,6 +53,11 @@ export function applyCc(target: Entity, cc: CcSpec): void {
       // handled by the caller (needs direction context).
       break;
     }
+    case 'silence': {
+      // Hands locked, feet free — you can run, you just cannot answer.
+      applyBuff(target, { id: 'cc_silence', name: 'Silenced', duration: cc.duration });
+      break;
+    }
     case 'root':
     case 'stun': {
       const def: BuffDef = {
@@ -62,11 +71,25 @@ export function applyCc(target: Entity, cc: CcSpec): void {
       break;
     }
     case 'fear': {
-      // Minis scatter (their AI reads this); champions are fear-immune for now.
-      applyBuff(target, { id: 'cc_fear', name: 'Feared', duration: cc.duration });
+      // Minis scatter (their AI reads this). Champion fear needs a flee origin —
+      // it comes through applyFear(); a bare cc_fear on a champion is a no-op marker.
+      if (target.kind === 'mini') {
+        applyBuff(target, { id: 'cc_fear', name: 'Feared', duration: cc.duration });
+      }
       break;
     }
   }
+}
+
+/** Champion fear (Wisp R): flee away from a point, controls locked (hard CC). */
+export function applyFear(target: Entity, fromX: number, fromZ: number, duration: number): void {
+  const c = target.champ;
+  if (!c || target.dead) return;
+  c.feared = { tLeft: duration, fromX, fromZ };
+  c.cast = null; // hard CC interrupts a windup/channel
+  c.recast = null;
+  applyBuff(target, { id: 'cc_fear', name: 'Feared', duration });
+  onHardCc(target);
 }
 
 /** Titan's Bastion: hard CC grants a short damage-reduction window. */
@@ -106,6 +129,11 @@ export function consumeBlock(e: Entity): boolean {
     }
   }
   return false;
+}
+
+/** Untargetable window (Wisp's Cold Spot morph): can't be picked as a new target. */
+export function isUntargetable(e: Entity): boolean {
+  return e.buffs.some((b) => b.id === 'wisp_untargetable');
 }
 
 /** Total remaining absorb across shield buffs (HUD + snapshot). */

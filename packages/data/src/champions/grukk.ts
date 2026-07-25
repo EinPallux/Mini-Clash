@@ -11,7 +11,7 @@ export const GRUKK: ChampionDef = {
     hp: 940,
     hpPerLevel: 112.2,
     regenPctPerSec: 0.005,
-    ad: 67,
+    ad: 65,
     adPerLevel: 6.6,
     attackSpeed: 0.78,
     attackSpeedPerLevel: 0.013,

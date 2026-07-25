@@ -1099,6 +1099,24 @@ input[type="range"] {
   font-size: 0.92rem;
   color: var(--gold);
 }
+/* Training duo config: a wrapping chip grid + its one-line hint. */
+.duo-config {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 6px;
+  max-width: 250px;
+}
+.duo-config .hud-chip {
+  font-size: 0.62rem;
+  padding: 3px 6px;
+}
+.duo-config-hint {
+  margin: 0 0 10px;
+  font-size: 0.64rem;
+  opacity: 0.6;
+  letter-spacing: 0.02em;
+}
 .trainer-panel .set-row {
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   padding: 0.25rem 0;
@@ -1337,7 +1355,7 @@ input[type="range"] {
 }
 .select-stage {
   display: flex;
-  gap: 3.4rem;
+  gap: 2rem;
   align-items: flex-start;
   margin-top: 2.2rem;
   flex-wrap: wrap;
@@ -1367,6 +1385,10 @@ input[type="range"] {
 .deal-card.big {
   width: 150px;
   height: 208px;
+}
+.duo-slot .deal-card.big {
+  width: 128px;
+  height: 178px;
 }
 .deal-card .inner {
   position: absolute;
@@ -1757,6 +1779,26 @@ input[type="range"] {
   color: #fff;
   border: 1px solid rgba(255, 255, 255, 0.3);
 }
+/* Duo portrait pair (kill cards, scoreboard, summary): the active half reads
+   solid and the benched half tucks behind it, dimmed and slightly smaller —
+   one glance says "this is a pair, and that one is out front". */
+.duo-chip {
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+}
+.duo-chip .fchip.bench {
+  width: 14px;
+  height: 14px;
+  font-size: 0.6rem;
+  opacity: 0.55;
+  margin-left: -5px;
+  border-color: rgba(255, 255, 255, 0.18);
+}
+.duo-chip .fchip.bench:first-child {
+  margin-left: 0;
+  margin-right: -5px;
+}
 @keyframes feedin {
   from {
     opacity: 0;
@@ -1997,7 +2039,7 @@ input[type="range"] {
 }
 .sb-row {
   display: grid;
-  grid-template-columns: 24px minmax(96px, 1fr) 26px 64px 96px 70px;
+  grid-template-columns: 24px minmax(96px, 1fr) 26px 64px 96px 66px 70px;
   gap: 6px;
   align-items: center;
   padding: 4px 8px;
@@ -2016,6 +2058,14 @@ input[type="range"] {
 .sb-hidden {
   opacity: 0.5;
   font-size: 0.68rem;
+}
+/* "Rook + Wisp" under the player name on the summary sheet. */
+.sb-duo {
+  display: block;
+  font-style: normal;
+  font-size: 0.66rem;
+  opacity: 0.6;
+  letter-spacing: 0.02em;
 }
 .sb-lv {
   opacity: 0.75;
@@ -2201,6 +2251,13 @@ input[type="range"] {
   display: grid;
   place-items: center;
 }
+.podium-card .podium-bench {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  opacity: 0.75;
+  margin-bottom: 2px;
+}
 .podium-card .who {
   font-weight: 700;
   text-transform: uppercase;
@@ -2222,5 +2279,1049 @@ input[type="range"] {
   margin-top: 10px;
 }
 .summary-table .sb-row {
-  grid-template-columns: 24px 1fr 26px 70px;
+  grid-template-columns: 24px 1fr 26px 70px 66px;
+}
+
+/* ------------------------------ Custom lobby ------------------------------ */
+
+.lobby-count {
+  font-family: var(--font-display, inherit);
+  font-style: italic;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.lobby-stage {
+  flex: 1;
+  display: flex;
+  gap: 26px;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 10px 28px 20px;
+  min-height: 0;
+}
+
+.lobby-teams {
+  display: flex;
+  gap: 18px;
+}
+
+.lobby-team {
+  width: 250px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.05);
+  border-top: 3px solid var(--ally);
+  transform: skewX(-3deg);
+}
+.lobby-team > * {
+  transform: skewX(3deg);
+}
+.lobby-team.t1 {
+  border-top-color: var(--enemy, #ff5a6b);
+}
+
+.lobby-seat {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 52px;
+  padding: 7px 10px;
+  background: rgba(0, 0, 0, 0.35);
+  border-left: 3px solid rgba(255, 255, 255, 0.16);
+  color: #e8ecf4;
+}
+.lobby-seat.human {
+  border-left-color: var(--ally);
+}
+.lobby-seat.human.you {
+  outline: 2px solid var(--gold);
+  outline-offset: -2px;
+}
+.lobby-seat.bot {
+  border-left-color: rgba(255, 255, 255, 0.35);
+}
+.lobby-seat.empty {
+  justify-content: space-between;
+  border-left-style: dashed;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.ls-avatar {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  font-weight: 900;
+  color: #10141d;
+  background: linear-gradient(180deg, #ffd35a, var(--gold));
+  flex: none;
+}
+.ls-avatar.bot {
+  background: rgba(255, 255, 255, 0.25);
+  color: #e8ecf4;
+}
+
+.ls-name {
+  flex: 1;
+  min-width: 0;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ls-crown {
+  color: var(--gold);
+  margin-right: 4px;
+}
+.ls-you {
+  opacity: 0.6;
+  font-weight: 500;
+}
+
+.ls-ready {
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  padding: 3px 6px;
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.55);
+  flex: none;
+}
+.ls-ready.on {
+  background: rgba(84, 220, 130, 0.18);
+  color: #6fe0a8;
+}
+
+.ls-tier-row {
+  display: flex;
+  gap: 3px;
+  flex: none;
+}
+.ls-tier {
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  font-size: 0.7rem;
+  font-weight: 800;
+  color: rgba(255, 255, 255, 0.6);
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid transparent;
+  cursor: pointer;
+}
+.ls-tier.sel {
+  background: var(--gold);
+  color: #10141d;
+}
+.ls-tier.remove:hover {
+  background: rgba(255, 90, 107, 0.4);
+  color: #fff;
+}
+
+.ls-sit {
+  flex: 1;
+  text-align: left;
+  padding: 8px 4px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.5);
+  cursor: pointer;
+  background: none;
+}
+.ls-sit:hover {
+  color: #fff;
+}
+.ls-addbot {
+  flex: none;
+  padding: 6px 10px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.75);
+  cursor: pointer;
+}
+.ls-addbot:hover {
+  background: rgba(255, 255, 255, 0.2);
+  color: #fff;
+}
+
+.lobby-panel {
+  width: 300px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.lobby-code {
+  font-size: 2.6rem;
+  font-weight: 900;
+  font-style: italic;
+  letter-spacing: 0.22em;
+  color: var(--gold);
+  text-align: center;
+  padding: 6px 0 2px;
+  user-select: all;
+}
+.lobby-sep {
+  height: 1px;
+  background: rgba(255, 255, 255, 0.12);
+  margin: 4px 0;
+}
+.lobby-mode {
+  font-size: 0.9rem;
+  opacity: 0.85;
+}
+.lobby-fill {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  user-select: none;
+}
+.lobby-fill input {
+  accent-color: var(--gold);
+  width: 16px;
+  height: 16px;
+}
+.lobby-start {
+  width: 100%;
+  padding: 14px 0;
+  font-size: 1.05rem;
+}
+.lobby-blocked {
+  font-size: 0.78rem;
+  color: #ffb35c;
+  text-align: center;
+}
+
+.lobby-toast {
+  position: absolute;
+  top: 74px;
+  left: 50%;
+  transform: translateX(-50%) skewX(-6deg);
+  background: var(--gold);
+  color: #10141d;
+  font-weight: 800;
+  padding: 10px 22px;
+  animation: toast-in 0.25s ease-out;
+  z-index: 40;
+}
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    translate: 0 -8px;
+  }
+}
+
+/* Party dock (ambient, hub) */
+.party-dock {
+  position: absolute;
+  left: 24px;
+  bottom: 52px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 16px;
+  background: #171c28;
+  border-left: 4px solid var(--gold);
+  color: #e8ecf4;
+  cursor: pointer;
+  transform: skewX(-6deg);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+  z-index: 30;
+}
+.party-dock > * {
+  transform: skewX(6deg);
+}
+.party-dock:hover {
+  background: #1e2534;
+}
+.pd-code {
+  font-weight: 900;
+  font-style: italic;
+  letter-spacing: 0.14em;
+  color: var(--gold);
+}
+.pd-chip {
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  font-size: 0.75rem;
+  font-weight: 800;
+  color: #10141d;
+  background: linear-gradient(180deg, #ffd35a, var(--gold));
+}
+.pd-label {
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  opacity: 0.65;
+}
+
+/* Friends / join modal */
+.friends-modal {
+  width: 380px;
+  gap: 12px;
+}
+.fm-sub {
+  opacity: 0.75;
+  font-size: 0.88rem;
+}
+.fm-or {
+  text-align: center;
+  font-size: 0.72rem;
+  letter-spacing: 0.1em;
+  opacity: 0.5;
+}
+.fm-code {
+  flex: 1;
+  min-width: 0;
+  padding: 12px 14px;
+  font-size: 1.3rem;
+  font-weight: 900;
+  font-style: italic;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: var(--gold);
+}
+.fm-code:focus {
+  outline: 2px solid var(--gold);
+}
+.fm-error {
+  font-size: 0.82rem;
+  color: #ff8a95;
+  background: rgba(255, 90, 107, 0.12);
+  border-left: 3px solid #ff5a6b;
+  padding: 8px 10px;
+}
+
+/* Select: lock badge on ally cards */
+.dc-locked {
+  position: absolute;
+  top: 8px;
+  right: -6px;
+  background: #6fe0a8;
+  color: #0c2417;
+  font-size: 0.58rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  padding: 3px 8px;
+  transform: skewX(-8deg);
+}
+
+.btn.danger {
+  background: rgba(255, 90, 107, 0.16);
+  color: #ff8a95;
+}
+.btn.danger:hover {
+  background: rgba(255, 90, 107, 0.3);
+  color: #fff;
+}
+
+/* AFK takeover banner (GAME_DESIGN §17) */
+.afk-banner {
+  position: absolute;
+  top: 64px;
+  left: 50%;
+  transform: translateX(-50%) skewX(-6deg);
+  background: rgba(255, 179, 92, 0.94);
+  color: #241505;
+  font-size: 0.86rem;
+  font-weight: 700;
+  padding: 9px 20px;
+  z-index: 26;
+  animation: bannerpulse 1.6s ease-in-out infinite;
+}
+.afk-banner > span {
+  font-weight: 900;
+  letter-spacing: 0.06em;
+}
+
+/* Death-screen damage recap (UI_UX §10) */
+.recap-col {
+  min-width: 210px;
+  max-width: 240px;
+}
+.recap-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 7px 8px;
+  background: rgba(0, 0, 0, 0.35);
+  border-left: 3px solid rgba(255, 90, 107, 0.55);
+  margin-bottom: 6px;
+}
+.recap-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.recap-who {
+  font-weight: 800;
+  font-size: 0.82rem;
+  color: #e8ecf4;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.recap-what {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.72rem;
+  color: #cdd5e4;
+}
+.recap-what .ic {
+  width: 13px;
+  height: 13px;
+  background: #ffb35c;
+  mask-size: contain;
+  mask-repeat: no-repeat;
+  -webkit-mask-size: contain;
+  -webkit-mask-repeat: no-repeat;
+  flex: none;
+}
+.recap-bar {
+  height: 4px;
+  background: rgba(255, 255, 255, 0.1);
+  margin-top: 3px;
+}
+.recap-bar > div {
+  height: 100%;
+  background: linear-gradient(90deg, #ff5a6b, #ffb35c);
+}
+.recap-amt {
+  font-weight: 900;
+  font-size: 0.86rem;
+  color: #ff8a95;
+  flex: none;
+}
+.recap-hint {
+  font-size: 0.68rem;
+  opacity: 0.5;
+  margin-top: 2px;
+}
+
+/* Quick-chat (GAME_DESIGN §17) */
+.chat-feed {
+  position: absolute;
+  left: 16px;
+  top: 128px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  z-index: 18;
+  pointer-events: none;
+}
+.chat-line {
+  align-self: flex-start;
+  background: rgba(13, 17, 26, 0.88);
+  color: #e8ecf4;
+  font-size: 0.8rem;
+  padding: 5px 12px;
+  border-left: 3px solid var(--gold);
+  transform: skewX(-6deg);
+  animation: toast-in 0.2s ease-out;
+}
+.chat-line > b {
+  color: var(--gold);
+  margin-right: 5px;
+}
+.chat-wheel .pw-center {
+  font-size: 1rem;
+}
+
+/* ------------------------- Duo dealing (v0.4 select) ---------------------- */
+
+.duo-pair {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+}
+.duo-pair.mine {
+  padding: 0 14px 0 0;
+  margin-right: 10px;
+  border-right: 2px solid rgba(255, 255, 255, 0.12);
+}
+.duo-pair.ally {
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+}
+.ally-cards {
+  display: flex;
+  gap: 4px;
+}
+.ally-name {
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: rgba(255, 255, 255, 0.72);
+}
+.ally-name b {
+  color: #6fe0a8;
+}
+/* Enemy silhouettes carry a duo marker — their pair stays hidden. */
+.duo-hint {
+  position: absolute;
+  bottom: 10px;
+  left: 0;
+  right: 0;
+  text-align: center;
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.3);
+}
+/* The chain glyph joining your pair — sells "one duo, two champions". */
+.duo-link {
+  position: absolute;
+  left: 50%;
+  bottom: -18px;
+  transform: translateX(-50%);
+  color: var(--gold);
+  font-size: 1.1rem;
+  text-shadow: 0 0 10px rgba(255, 199, 46, 0.6);
+  pointer-events: none;
+}
+.duo-pair.mine .duo-link {
+  left: calc(50% - 8px);
+}
+
+.duo-slot {
+  position: relative;
+  padding: 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+  line-height: 0;
+}
+.duo-slot::after {
+  content: "";
+  position: absolute;
+  inset: -5px;
+  border: 2px solid transparent;
+  pointer-events: none;
+  transition: border-color 0.12s ease-out;
+}
+.duo-slot.picked::after {
+  border-color: var(--gold);
+}
+
+.slot-reroll {
+  position: absolute;
+  right: -8px;
+  top: -8px;
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  font-size: 0.9rem;
+  background: #171c28;
+  border: 2px solid var(--gold);
+  color: #fff;
+  cursor: pointer;
+  z-index: 2;
+}
+.slot-reroll:hover {
+  background: var(--gold);
+}
+
+.deal-card.small {
+  width: 78px;
+  height: 108px;
+}
+.deal-card.small .dc-letter {
+  font-size: 2rem;
+}
+.deal-card.small .dc-nm {
+  font-size: 0.6rem;
+}
+
+.reroll-count {
+  font-size: 0.82rem;
+  color: rgba(255, 255, 255, 0.8);
+}
+.reroll-count.spent {
+  opacity: 0.45;
+}
+.reroll-count b {
+  color: var(--gold);
+}
+
+.select-side.enemy .deal-card.back-only {
+  width: 84px;
+  height: 116px;
+}
+.select-side.enemy .select-row {
+  gap: 10px;
+}
+
+/* Loading-veil duo pairs: the benched half rides small behind the active one. */
+.load-card .ltr-bench {
+  font-size: 0.55em;
+  opacity: 0.7;
+  margin-left: 2px;
+  vertical-align: super;
+}
+
+/* --------------------- Duo panel (UI_UX §8, Tag Swap) --------------------- */
+
+.duo-panel {
+  position: relative;
+  width: 62px;
+  height: 62px;
+  flex: none;
+  align-self: flex-end;
+  margin-right: -6px;
+  margin-bottom: 4px;
+}
+.duo-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  mask: radial-gradient(circle, transparent 62%, #000 63%);
+  -webkit-mask: radial-gradient(circle, transparent 62%, #000 63%);
+  pointer-events: none;
+}
+.duo-bench {
+  position: absolute;
+  inset: 7px;
+  display: grid;
+  place-items: center;
+  font-family: var(--font-display, inherit);
+  font-style: italic;
+  font-weight: 900;
+  font-size: 1.5rem;
+  color: rgba(255, 255, 255, 0.82);
+  filter: grayscale(0.55) brightness(0.75);
+  transition:
+    filter 0.18s ease-out,
+    transform 0.18s ease-out;
+}
+.duo-panel.ready .duo-bench {
+  filter: none;
+}
+.duo-panel.glint .duo-bench {
+  transform: scale(1.04);
+  box-shadow: 0 0 14px rgba(255, 199, 46, 0.75);
+}
+.duo-key {
+  position: absolute;
+  left: 50%;
+  bottom: -13px;
+  transform: translateX(-50%);
+  font-size: 0.55rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  color: rgba(255, 255, 255, 0.75);
+  background: rgba(13, 17, 26, 0.9);
+  padding: 1px 5px;
+  white-space: nowrap;
+}
+.duo-panel.ready .duo-key {
+  color: var(--gold);
+}
+/* The bench's own Energy bar — swapping into an empty bar is a real cost. */
+.duo-energy {
+  position: absolute;
+  right: -6px;
+  top: 8px;
+  bottom: 8px;
+  width: 4px;
+  background: rgba(255, 255, 255, 0.12);
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+}
+.duo-energy > span {
+  display: block;
+  width: 100%;
+  background: var(--gold);
+  opacity: 0.85;
+}
+
+/* ---------------------------- Power Surge draft ---------------------------- */
+/* Docked bottom-centre, above the ability cluster but never covering it — the
+   match keeps playing behind this (UI_UX §9). Pointer events stay on the cards
+   themselves so the deck underneath is still clickable. */
+.draft-dock {
+  position: absolute;
+  left: 50%;
+  /* Clears the health/energy bars and the ability cluster: the dock must never
+     cover the numbers you are making the decision with (UI_UX §9). */
+  bottom: 152px;
+  transform: translateX(-50%);
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  pointer-events: none;
+  animation: draftin 0.28s cubic-bezier(0.2, 1.4, 0.4, 1);
+}
+@keyframes draftin {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(26px);
+  }
+}
+.draft-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(10, 13, 24, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  padding: 4px 12px;
+  clip-path: polygon(8px 0, 100% 0, calc(100% - 8px) 100%, 0 100%);
+}
+.draft-title {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  color: #ffc72e;
+  font-size: 0.9rem;
+}
+.draft-sub {
+  font-size: 0.68rem;
+  color: rgba(255, 255, 255, 0.62);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+}
+/* The 45 s ring (UI_UX §9): a conic sweep that empties clockwise. Reads as a
+   clock at a glance, and turns hot under 10 s without needing a second element. */
+.draft-ring {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: conic-gradient(#ffc72e calc(var(--frac) * 360deg), rgba(255, 255, 255, 0.12) 0);
+  transition: background 0.25s linear;
+}
+.draft-ring::after {
+  content: "";
+  position: absolute;
+  inset: 3px;
+  border-radius: 50%;
+  background: rgba(10, 13, 24, 0.95);
+}
+.draft-ring b {
+  position: relative;
+  z-index: 1;
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+}
+.draft-ring.urgent {
+  background: conic-gradient(#ff5a3c calc(var(--frac) * 360deg), rgba(255, 255, 255, 0.12) 0);
+  animation: draftpulse 0.9s ease-in-out infinite;
+}
+.draft-ring.urgent b {
+  color: #ff8a5c;
+}
+@keyframes draftpulse {
+  50% {
+    transform: scale(1.1);
+  }
+}
+
+.draft-cards {
+  display: flex;
+  gap: 10px;
+  pointer-events: auto;
+}
+.draft-card {
+  position: relative;
+  width: 216px;
+  min-height: 150px;
+  padding: 26px 12px 12px;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  color: #fff;
+  cursor: pointer;
+  background: linear-gradient(160deg, rgba(30, 36, 56, 0.97), rgba(14, 18, 30, 0.97));
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  /* Sharp, skewed corner — the hero-shooter card language, not a rounded pill. */
+  clip-path: polygon(
+    0 0,
+    calc(100% - 14px) 0,
+    100% 14px,
+    100% 100%,
+    14px 100%,
+    0 calc(100% - 14px)
+  );
+  transition:
+    transform 0.12s ease,
+    filter 0.12s ease;
+}
+.draft-card:hover:not(:disabled) {
+  transform: translateY(-4px);
+  filter: brightness(1.12);
+}
+.draft-card:focus-visible {
+  outline: 2px solid #ffc72e;
+  outline-offset: 2px;
+}
+.draft-card.silver {
+  border-color: rgba(200, 210, 230, 0.5);
+  box-shadow: inset 0 2px 0 rgba(200, 210, 230, 0.45);
+}
+.draft-card.gold {
+  border-color: rgba(255, 199, 46, 0.65);
+  box-shadow: inset 0 2px 0 rgba(255, 199, 46, 0.6);
+}
+/* Prismatic: the chase card. A slow rainbow sweep across the whole surface. */
+.draft-card.prismatic {
+  border-color: rgba(255, 255, 255, 0.7);
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, 0.75),
+    0 0 18px rgba(180, 120, 255, 0.35);
+}
+.draft-card.prismatic::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    115deg,
+    rgba(255, 90, 140, 0.22),
+    rgba(255, 199, 46, 0.22),
+    rgba(110, 230, 180, 0.22),
+    rgba(120, 160, 255, 0.22),
+    rgba(200, 120, 255, 0.22)
+  );
+  background-size: 300% 100%;
+  animation: prismshimmer 3.2s linear infinite;
+  mix-blend-mode: screen;
+}
+@keyframes prismshimmer {
+  to {
+    background-position: 300% 0;
+  }
+}
+.draft-card.taken {
+  transform: translateY(-8px) scale(1.02);
+  filter: brightness(1.3);
+}
+.draft-card.dimmed {
+  opacity: 0.35;
+  filter: grayscale(0.6);
+}
+.draft-card:disabled {
+  cursor: default;
+}
+.draft-key {
+  position: absolute;
+  top: 6px;
+  left: 8px;
+  display: inline-grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 0.72rem;
+  background: rgba(255, 255, 255, 0.14);
+}
+.draft-rarity {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  font-size: 0.6rem;
+  letter-spacing: 0.1em;
+  opacity: 0.75;
+}
+/* Category glyph — the "no two cards from the same category" rule made visible. */
+.draft-rarity i {
+  font-style: normal;
+  font-size: 0.72rem;
+  opacity: 0.9;
+}
+.draft-owner {
+  font-size: 0.62rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #ffc72e;
+}
+.draft-name {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-weight: 800;
+  font-size: 1.02rem;
+  line-height: 1.1;
+}
+.draft-desc {
+  font-size: 0.74rem;
+  line-height: 1.3;
+  opacity: 0.9;
+}
+.draft-visual {
+  margin-top: auto;
+  font-size: 0.66rem;
+  line-height: 1.25;
+  opacity: 0.55;
+  font-style: italic;
+}
+.draft-foot {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  pointer-events: auto;
+}
+.draft-reroll {
+  font-size: 0.72rem;
+  padding: 4px 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.draft-reroll .cap {
+  font-size: 0.6rem;
+  padding: 0 4px;
+  background: rgba(255, 255, 255, 0.14);
+}
+.draft-reroll:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.draft-hint {
+  font-size: 0.66rem;
+  opacity: 0.5;
+}
+
+/* Confirmation slab: what you (or the coach, on a timeout) just took. Replaces
+   the dock for ~2.6 s, then the card lives on in the strip (UI_UX §9). */
+.draft-slab {
+  position: absolute;
+  left: 50%;
+  bottom: 176px;
+  transform: translateX(-50%);
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 300px;
+  max-width: 460px;
+  padding: 10px 26px 14px;
+  text-align: center;
+  pointer-events: none;
+  background: rgba(10, 13, 24, 0.92);
+  border: 1px solid rgba(200, 210, 230, 0.5);
+  clip-path: polygon(12px 0, 100% 0, calc(100% - 12px) 100%, 0 100%);
+  animation:
+    slabin 0.3s cubic-bezier(0.2, 1.4, 0.4, 1),
+    slabout 0.5s ease-in 2.1s forwards;
+}
+@keyframes slabin {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) scale(0.9);
+  }
+}
+@keyframes slabout {
+  to {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-14px);
+  }
+}
+.draft-slab.gold {
+  border-color: rgba(255, 199, 46, 0.7);
+  box-shadow: 0 0 22px rgba(255, 199, 46, 0.22);
+}
+.draft-slab.prismatic {
+  border-color: rgba(255, 255, 255, 0.85);
+  box-shadow: 0 0 28px rgba(180, 120, 255, 0.4);
+}
+.draft-slab-kicker {
+  font-size: 0.62rem;
+  letter-spacing: 0.18em;
+  color: rgba(255, 255, 255, 0.8);
+}
+.draft-slab-name {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-weight: 800;
+  font-size: 1.15rem;
+  line-height: 1.1;
+  color: #ffc72e;
+}
+.draft-slab.prismatic .draft-slab-name {
+  background: linear-gradient(100deg, #ff6fd8, #ffc72e, #6ee6ff);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.draft-slab-desc {
+  font-size: 0.72rem;
+  line-height: 1.35;
+  color: rgba(255, 255, 255, 0.82);
+  max-width: 400px;
+}
+
+/* Taken augments, beside the ability cluster. */
+.augment-strip {
+  position: absolute;
+  left: 0;
+  bottom: 86px;
+  display: flex;
+  gap: 4px;
+}
+.aug-pip {
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  font-size: 0.76rem;
+  line-height: 1;
+  color: #fff;
+  background: rgba(20, 26, 42, 0.95);
+  border: 1px solid rgba(200, 210, 230, 0.5);
+  cursor: help;
+}
+.aug-pip.gold {
+  border-color: rgba(255, 199, 46, 0.75);
+  color: #ffc72e;
+}
+.aug-pip.prismatic {
+  border-color: rgba(255, 255, 255, 0.8);
+  background: linear-gradient(135deg, #6a3fa0, #a03f7a, #3f6aa0);
+}
+/* Not scouted yet: the slot is there, the identity is not (UI_UX §11). */
+.aug-pip.unknown {
+  border-color: rgba(200, 210, 230, 0.25);
+  color: rgba(255, 255, 255, 0.45);
+  background: rgba(20, 26, 42, 0.7);
+}
+
+/* Augment trios on the scoreboard, the summary and kill cards. */
+.sb-augs,
+.feed-augs {
+  display: inline-flex;
+  gap: 3px;
+  align-items: center;
+}
+.sb-augs .aug-pip,
+.feed-augs .aug-pip {
+  width: 17px;
+  height: 17px;
+  font-size: 0.62rem;
+}
+.feed-augs {
+  margin-left: 4px;
 }

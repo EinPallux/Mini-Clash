@@ -1,7 +1,17 @@
-import { ITEMS, type MapDef, RELICS } from '@mini-clash/data';
+import {
+  AUGMENTS,
+  BRIDGE,
+  type ChampionDef,
+  DRAFT,
+  ITEMS,
+  type MapDef,
+  RELICS,
+  type Slot,
+} from '@mini-clash/data';
 import type { BotTier, Intent, IntentMsg, PlayerId } from '@mini-clash/protocol';
 import { isHiddenFrom } from './brush';
 import { structureInvulnerable } from './combat';
+import { scoreOffer } from './draft';
 import { buyCost } from './items';
 import { Pcg32 } from './rng';
 import { championStats } from './stats';
@@ -27,6 +37,18 @@ interface TierParams {
   retreatAt: number;
   smartUlt: boolean;
   dodges: boolean;
+  /** Veteran+: focus the softest reachable target instead of the nearest. */
+  focusFire: boolean;
+  /** Veteran+: commit to closing on ranged harassers instead of eating poke. */
+  punishKiters: boolean;
+  /**
+   * Tag Swap competence (GAME_DESIGN §7.2). 'none' = never swaps (recruits play
+   * one half, which is exactly how a beginner plays); 'basic' = cycles the bench
+   * for Energy and cooldowns and burns the swap-in haste to escape; 'smart' adds
+   * range counter-pivots and entrance weaving, and refuses to trade away a ready
+   * ultimate mid-fight.
+   */
+  swaps: 'none' | 'basic' | 'smart';
 }
 
 const TIERS: Record<BotTier, TierParams> = {
@@ -38,6 +60,9 @@ const TIERS: Record<BotTier, TierParams> = {
     retreatAt: 0.25,
     smartUlt: false,
     dodges: false,
+    focusFire: false,
+    punishKiters: false,
+    swaps: 'none',
   },
   veteran: {
     microTicks: 8,
@@ -47,6 +72,9 @@ const TIERS: Record<BotTier, TierParams> = {
     retreatAt: 0.3,
     smartUlt: false,
     dodges: false,
+    focusFire: true,
+    punishKiters: true,
+    swaps: 'basic',
   },
   elite: {
     microTicks: 6,
@@ -56,6 +84,9 @@ const TIERS: Record<BotTier, TierParams> = {
     retreatAt: 0.32,
     smartUlt: true,
     dodges: true,
+    focusFire: true,
+    punishKiters: true,
+    swaps: 'smart',
   },
 };
 
@@ -74,9 +105,11 @@ export interface BotBrain {
   pingX: number;
   pingZ: number;
   lastPingTick: number;
+  /** Balance A/B knob: false pins this bot to one half of its duo. */
+  maySwap: boolean;
 }
 
-export function makeBrain(seed: number, player: PlayerId, tier: BotTier): BotBrain {
+export function makeBrain(seed: number, player: PlayerId, tier: BotTier, maySwap = true): BotBrain {
   const rng = new Pcg32(seed, 0x8000 + player);
   const personality = (['aggro', 'guardian', 'objective', 'chaotic'] as const)[rng.int(4)];
   return {
@@ -93,7 +126,96 @@ export function makeBrain(seed: number, player: PlayerId, tier: BotTier): BotBra
     pingX: 0,
     pingZ: 0,
     lastPingTick: -1,
+    maySwap,
   };
+}
+
+/** How many of this kit's abilities are castable right now (off cooldown + affordable)? */
+function readyAbilities(
+  def: ChampionDef,
+  cds: Record<Slot, number>,
+  energy: number,
+  level: number,
+): number {
+  let n = 0;
+  for (const slot of ['q', 'w', 'r'] as const) {
+    const ab = def.abilities[slot];
+    if (slot === 'r' && level < BRIDGE.rUnlockLevel) continue;
+    if (cds[slot] <= 0.001 && energy >= ab.cost) n++;
+  }
+  return n;
+}
+
+/** Entrances worth swapping *into* when a fight is already touching us. */
+const COMBAT_ENTRANCES = new Set([
+  'shieldwall', // eats the next hit outright
+  'reshelved', // dust nova damage
+  'booth_rules', // slow aura
+  'cold_spot', // chill nova + untargetable morph
+  'lucky_doubloon', // +40% on the next shot
+  'ossuary_flourish', // free Q
+]);
+
+/**
+ * Tag Swap decision (GAME_DESIGN §7.2). The bench keeps recovering while it sits,
+ * so the swap is fundamentally a resource play: spend a depleted half, bring in a
+ * loaded one. Higher tiers additionally pivot on range and weave entrances.
+ */
+function wantsSwap(
+  e: Entity,
+  brain: BotBrain,
+  tp: TierParams,
+  ctx: { hpFrac: number; nearest: Entity | undefined; nearestD: number; activeRange: number },
+): boolean {
+  const c = e.champ;
+  const duo = c?.duo;
+  if (!c || !duo || tp.swaps === 'none' || !brain.maySwap) return false;
+  // The sim would reject these anyway; checking here keeps the intent stream clean.
+  if (duo.swapCd > 0.001 || duo.morphT > 0 || c.feared) return false;
+  if ((c.cast && c.cast.kind !== 'aa') || c.leap) return false;
+  if (e.airborne > 0 || e.buffs.some((b) => b.id === 'cc_stun')) return false;
+
+  const mineReady = readyAbilities(c.def, c.cds, c.energy, c.level);
+  const benchReady = readyAbilities(duo.def, duo.cds, duo.energy, c.level);
+  const engaged = ctx.nearest !== undefined && ctx.nearestD < ctx.activeRange + 4;
+
+  // Never trade away a ready ultimate in a live fight (smart tiers only — this is
+  // exactly the discipline that separates Elite from Veteran).
+  if (tp.swaps === 'smart' && engaged && c.level >= BRIDGE.rUnlockLevel) {
+    const rUp = c.cds.r <= 0.001 && c.energy >= c.def.abilities.r.cost;
+    if (rUp && !(c.energy < 20 && duo.energy > 70)) return false;
+  }
+
+  // 1. Energy cycling: our half is spent, the bench is loaded.
+  if (c.energy < 25 && duo.energy > 60) return true;
+
+  // 2. Cooldown access: nothing to press, the bench has options.
+  if (mineReady === 0 && benchReady >= 2) return true;
+
+  // 3. Escape tempo: the swap-in haste is a free disengage (basic tiers included).
+  if (brain.goal === 'retreat' && ctx.hpFrac < 0.45 && benchReady >= 1) return true;
+
+  if (tp.swaps !== 'smart') return false;
+
+  // 4. Range counter-pivot: bring in the half that fits the engagement distance.
+  const benchRange = duo.def.stats.range;
+  if (engaged && ctx.nearest) {
+    const wantLong = ctx.nearestD > ctx.activeRange + 1.5 && benchRange > ctx.activeRange + 1.5;
+    const wantShort =
+      ctx.nearestD < 2.5 && ctx.activeRange > 4.5 && benchRange < ctx.activeRange - 1.5;
+    if ((wantLong || wantShort) && benchReady >= 1) return true;
+  }
+
+  // 5. Entrance weaving: the arriving half's entrance is itself a combat play.
+  if (
+    engaged &&
+    ctx.nearestD < 4 &&
+    COMBAT_ENTRANCES.has(duo.def.entrance.id) &&
+    benchReady >= mineReady
+  ) {
+    return true;
+  }
+  return false;
 }
 
 function personalityMul(
@@ -173,6 +295,27 @@ function act(w: World, e: Entity, brain: BotBrain, tp: TierParams, map: MapDef):
   const c = e.champ;
   const battle = map.battle;
   if (!c || !battle || !w.match) return [];
+
+  // Drafting (AUGMENTS.md §2). Bots don't sit on an open draft for 45 s — they
+  // take a beat to "read" the cards, then commit. Elites weigh combo lines
+  // harder because scoreOffer's kit-affinity terms dominate their choice.
+  if (c.draft) {
+    const thinkFor = tp.swaps === 'smart' ? 1.5 : tp.swaps === 'basic' ? 2.5 : 4;
+    if (DRAFT.seconds - c.draft.tLeft >= thinkFor) {
+      let bestIdx = 0;
+      let best = Number.NEGATIVE_INFINITY;
+      for (let i = 0; i < c.draft.offers.length; i++) {
+        const def = AUGMENTS[c.draft.offers[i]];
+        if (!def) continue;
+        const s = scoreOffer(w, e, def, brain.rng);
+        if (s > best) {
+          best = s;
+          bestIdx = i;
+        }
+      }
+      return [{ t: 'draftPick', offer: bestIdx as 0 | 1 | 2 }];
+    }
+  }
   const out: Intent[] = [];
   const rng = brain.rng;
   const pm = personalityMul(brain.personality, rng);
@@ -196,18 +339,53 @@ function act(w: World, e: Entity, brain: BotBrain, tp: TierParams, map: MapDef):
   let nearestD = Number.POSITIVE_INFINITY;
   let focus: Entity | undefined;
   let focusHp = Number.POSITIVE_INFINITY;
+  let focusScore = Number.POSITIVE_INFINITY;
+  let harasser: Entity | undefined;
+  let harasserD = Number.POSITIVE_INFINITY;
   for (const u of enemies) {
     const d = dist(e.x, e.z, u.x, u.z);
     if (d < nearestD) {
       nearestD = d;
       nearest = u;
     }
-    // Focus fire = lowest HP among enemies already in reach — never a deep chase.
+    // Focus fire = softest effective target already in reach — never a deep
+    // chase. Squishiness matters, not just wounds: a healthy backline gunner
+    // (low HP pool, paper armor) outranks a half-dead vanguard.
     const frac = u.hp / u.hpMax;
-    if (d < stats.range + 3.5 && frac < focusHp) {
-      focusHp = frac;
-      focus = u;
+    if (d < stats.range + 3.5) {
+      const armor = u.champ?.def.stats.armor ?? 0;
+      const score = tp.focusFire ? u.hp * (1 + armor / 100) : frac * 10_000;
+      if (score < focusScore) {
+        focusScore = score;
+        focusHp = frac;
+        focus = u;
+      }
     }
+    // Kiter watch: a longer-ranged enemy shooting us from beyond our own reach.
+    const uRange = u.champ?.def.stats.range ?? 0;
+    if (
+      tp.punishKiters &&
+      uRange > stats.range &&
+      d <= uRange + 1.2 &&
+      d > stats.range + 1 &&
+      d < 11 &&
+      d < harasserD
+    ) {
+      harasserD = d;
+      harasser = u;
+    }
+  }
+  // Only commit to closing on a kiter with local numbers — chasing a supported
+  // one is exactly the feed the punish exists to prevent.
+  if (harasser) {
+    let friends = 1;
+    let foes = 0;
+    for (const u of w.champions()) {
+      if (u.dead) continue;
+      if (u.team === e.team && u.id !== e.id && dist(e.x, e.z, u.x, u.z) < 9) friends++;
+      if (u.team !== e.team && dist(harasser.x, harasser.z, u.x, u.z) < 9) foes++;
+    }
+    if (friends < foes) harasser = undefined;
   }
 
   // Under tower fire and hurting → break away.
@@ -268,7 +446,9 @@ function act(w: World, e: Entity, brain: BotBrain, tp: TierParams, map: MapDef):
     brain.goal = 'push';
     out.push({ t: 'attackTarget', target: siege.id });
     return out;
-  } else if (nearest && nearestD <= stats.range + 3.5) {
+  } else if ((nearest && nearestD <= stats.range + 3.5) || harasser) {
+    // In weapon reach — or being poked from beyond it: close the gap, don't
+    // eat free hits on the march (the v0.2 Fathom tax).
     brain.goal = 'fight';
   } else {
     brain.goal = 'push';
@@ -288,6 +468,20 @@ function act(w: World, e: Entity, brain: BotBrain, tp: TierParams, map: MapDef):
         out.push({ t: 'attackMove', x: orb.x, z: orb.z });
       }
     }
+  }
+
+  // --- Tag Swap -------------------------------------------------------------
+  // Decided after the goal is known (retreat wants the swap-in haste) but before
+  // the goal executes: the 0.35 s morph would swallow a cast issued this pass.
+  if (wantsSwap(e, brain, tp, { hpFrac, nearest, nearestD, activeRange: stats.range })) {
+    out.push({ t: 'swap' });
+    // Keep walking — movement survives the morph, and a retreating bot must not
+    // stand still through it.
+    if (brain.goal === 'retreat') out.push({ t: 'move', x: home.x, z: home.z });
+    else if (brain.goal === 'push') {
+      out.push({ t: 'attackMove', x: enemyCore.x, z: enemyCore.z });
+    }
+    return out;
   }
 
   // --- Execute --------------------------------------------------------------
@@ -322,7 +516,8 @@ function act(w: World, e: Entity, brain: BotBrain, tp: TierParams, map: MapDef):
   }
 
   if (brain.goal === 'fight' && nearest) {
-    const target = tp.smartUlt ? (focus ?? nearest) : nearest;
+    const fallback = harasser ?? nearest;
+    const target = tp.focusFire ? (focus ?? fallback) : fallback;
     out.push({ t: 'attackTarget', target: target.id });
 
     // Elite skillshot dodging: sidestep only real threats — uptime beats dancing.
@@ -355,6 +550,28 @@ function act(w: World, e: Entity, brain: BotBrain, tp: TierParams, map: MapDef):
           const packed = enemies.filter((u) => dist(target.x, target.z, u.x, u.z) < 6).length;
           if (focusHp > 0.5 && packed < 2) continue; // hold R for kills or clumps
         }
+      }
+      // Support micro (veteran+): drop heal-bearing casts on the sorest ally
+      // in range (self included) — never on the enemy's feet. Data-driven: any
+      // ability whose actions heal (Sylva's ward today) qualifies.
+      const healing = tp.focusFire
+        ? ab.actions.some((a) => a.t === 'heal' || (a.t === 'zone' && 'healPerSec' in a))
+        : false;
+      if (healing) {
+        let sore: Entity | undefined;
+        let soreFrac = 0.85;
+        for (const u of w.champions()) {
+          if (u.team !== e.team || u.dead) continue;
+          if (dist(e.x, e.z, u.x, u.z) > ab.range + 1) continue;
+          const f = u.hp / u.hpMax;
+          if (f < soreFrac) {
+            soreFrac = f;
+            sore = u;
+          }
+        }
+        if (!sore) continue; // nobody hurt — don't burn the heal
+        out.push({ t: 'cast', slot, x: sore.x, z: sore.z });
+        break;
       }
       const d = dist(e.x, e.z, target.x, target.z);
       if (d > ab.range * 0.95 + 1) continue;

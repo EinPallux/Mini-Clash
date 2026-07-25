@@ -1,4 +1,5 @@
 import { ITEMS, RESIST_CONSTANT, type ScalingValue, type StatKey } from '@mini-clash/data';
+import { applyAugmentStats } from './augments';
 import type { Entity } from './world';
 
 /** Resolved per-tick stat totals for a champion (base + level growth + items + buffs). */
@@ -48,8 +49,13 @@ export function championStats(e: Entity): StatTotals {
   if (!c) throw new Error('not a champion');
   const s = c.def.stats;
   const lv = c.level - 1;
+  // Tag Team shares one HP pool: the average of both champions' HP curves
+  // (GAME_DESIGN §7.2) — symmetric, so swapping never changes hpMax.
+  const bs = c.duo?.def.stats;
   const t: StatTotals = {
-    hpMax: s.hp + s.hpPerLevel * lv,
+    hpMax: bs
+      ? (s.hp + s.hpPerLevel * lv + (bs.hp + bs.hpPerLevel * lv)) / 2
+      : s.hp + s.hpPerLevel * lv,
     ad: s.ad + s.adPerLevel * lv,
     ap: 0,
     attackSpeed: s.attackSpeed + s.attackSpeedPerLevel * lv,
@@ -65,6 +71,9 @@ export function championStats(e: Entity): StatTotals {
     const adds = itemAdds(c.items);
     for (const k of Object.keys(adds) as StatKey[]) t[k] += adds[k] ?? 0;
   }
+  // Augments land before buffs so a +10% AD card multiplies base+items, not
+  // a temporary combat buff on top of them.
+  if (c.augments.length > 0) applyAugmentStats(e, t as unknown as Record<StatKey, number>);
   applyBuffs(e, t);
   t.attackSpeed = Math.min(ATTACK_SPEED_CAP, t.attackSpeed);
   return t;

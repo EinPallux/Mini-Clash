@@ -1,12 +1,22 @@
-import { CHAMPIONS, ITEMS, type ItemDef, RELICS, STRINGS } from '@mini-clash/data';
+import {
+  AUGMENTS,
+  CHAMPIONS,
+  ITEMS,
+  type ItemDef,
+  QUICK_CHAT,
+  RELICS,
+  STRINGS,
+} from '@mini-clash/data';
 import type { PingKind } from '@mini-clash/protocol';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { uiSound } from '../../game/audio';
-import { type FeedEntry, type HudSeat, useHud } from '../../game/hudStore';
+import { type FeedEntry, type HudChampion, type HudSeat, useHud } from '../../game/hudStore';
 import type { MatchRuntime } from '../../game/match';
+import { useLobby } from '../../state/lobby';
 import { useSession } from '../../state/session';
 import { paletteColors, useSettings } from '../../state/settings';
-import { ChampionCluster, DenyFlash } from './HudShared';
+import { CATEGORY_GLYPH, DraftOverlay } from './DraftOverlay';
+import { ChampionCluster, DenyFlash, SLOT_ICONS } from './HudShared';
 
 /**
  * Bridge Brawl HUD (UI_UX §8, §10–§12): match strip, team frames, killfeed,
@@ -22,6 +32,10 @@ const CHAMP_TONE: Record<string, string> = {
   rattle: '#8a2f3c',
   grukk: '#4a7a3a',
   sylva: '#c47a3a',
+  boltz: '#59b7e8',
+  wisp: '#7fa8c8',
+  piper: '#e8944a',
+  vex: '#b0304a',
 };
 
 function fmtClock(t: number): string {
@@ -38,6 +52,42 @@ export function BridgeHud({ runtime }: { runtime: () => MatchRuntime | null }): 
   const champ = useHud((s) => s.champion);
   const match = useHud((s) => s.match);
   const fps = useHud((s) => s.fps);
+  const dropped = useHud((s) => s.droppedReason);
+  const afkCovered = useHud((s) => s.afkCovered);
+  const selfTeam = useHud((s) => s.selfTeam);
+  const goto = useSession((s) => s.goto);
+  const [rtt, setRtt] = useState(0);
+  useEffect(() => {
+    const iv = setInterval(() => setRtt(Math.round(runtime()?.rttMs ?? 0)), 1000);
+    return () => clearInterval(iv);
+  }, [runtime]);
+
+  if (dropped) {
+    // Clean failure contract: the room died — say so plainly and go home.
+    return (
+      <div className="hud">
+        <div className="loading-veil backdrop-dark" style={{ background: 'rgba(8, 8, 14, 0.92)' }}>
+          <div className="screen" style={{ position: 'static' }}>
+            <h1 className="wordmark" style={{ fontSize: '2.6rem' }}>
+              Match lost to the void
+            </h1>
+            <p style={{ opacity: 0.75, marginTop: 6 }}>{dropped}</p>
+            <button
+              type="button"
+              className="btn primary"
+              style={{ marginTop: 18 }}
+              onClick={() => {
+                uiSound('ui_back');
+                goto('hub');
+              }}
+            >
+              {STRINGS.back}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (!champ || !match) return <div className="hud" />;
 
@@ -48,10 +98,10 @@ export function BridgeHud({ runtime }: { runtime: () => MatchRuntime | null }): 
       {/* top-center: the match strip */}
       <div className="match-strip">
         <div className="side ally">
-          <span className="kills">{match.teamKills[0]}</span>
+          <span className="kills">{match.teamKills[selfTeam]}</span>
           <span className="pips">
             {[0, 1].map((i) => (
-              <span key={i} className={`pip ${i < match.towersDown[1] ? 'down' : ''}`} />
+              <span key={i} className={`pip ${i < match.towersDown[1 - selfTeam] ? 'down' : ''}`} />
             ))}
           </span>
         </div>
@@ -67,10 +117,10 @@ export function BridgeHud({ runtime }: { runtime: () => MatchRuntime | null }): 
         <div className="side enemy">
           <span className="pips">
             {[0, 1].map((i) => (
-              <span key={i} className={`pip ${i < match.towersDown[0] ? 'down' : ''}`} />
+              <span key={i} className={`pip ${i < match.towersDown[selfTeam] ? 'down' : ''}`} />
             ))}
           </span>
-          <span className="kills">{match.teamKills[1]}</span>
+          <span className="kills">{match.teamKills[1 - selfTeam]}</span>
         </div>
       </div>
 
@@ -80,8 +130,15 @@ export function BridgeHud({ runtime }: { runtime: () => MatchRuntime | null }): 
         </div>
       )}
 
+      {afkCovered && !match.over && (
+        <div className="afk-banner">
+          <span>A BOT HOLDS YOUR SEAT</span> — move or cast to take back control
+        </div>
+      )}
+
       <TeamFrames />
       <Killfeed />
+      <ChatFeed />
       <Minimap runtime={runtime} />
       <GoldAndItems />
 
@@ -89,8 +146,20 @@ export function BridgeHud({ runtime }: { runtime: () => MatchRuntime | null }): 
         <span className="hud-chip" style={{ opacity: 0.65 }}>
           {fps} fps
         </span>
+        {rtt > 0 && (
+          <span
+            className="hud-chip"
+            style={{
+              opacity: 0.8,
+              color: rtt > 120 ? '#ff8a5c' : rtt > 60 ? '#ffc72e' : '#8ade6a',
+            }}
+            title="Round-trip to the game server"
+          >
+            {rtt} ms
+          </span>
+        )}
         <span className="hud-chip" style={{ opacity: 0.8 }}>
-          <b>TAB</b> Score · <b>G</b> Ping · <b>ESC</b> Menu
+          <b>TAB</b> Score · <b>G</b> Ping · <b>C</b> Chat · <b>ESC</b> Menu
         </span>
       </div>
 
@@ -98,9 +167,13 @@ export function BridgeHud({ runtime }: { runtime: () => MatchRuntime | null }): 
       <ShopToast />
       <ChampionCluster />
       <PingWheel runtime={runtime} />
+      <ChatWheel runtime={runtime} />
       <CoachMarks dead={champ.dead} />
 
       <Scoreboard />
+
+      {/* Power Surge draft — docked, never pauses the match (UI_UX §9) */}
+      <DraftOverlay runtime={runtime} />
 
       {/* death screen = the shop */}
       {champ.dead && !match.over && <DeathShop runtime={runtime} />}
@@ -112,13 +185,21 @@ export function BridgeHud({ runtime }: { runtime: () => MatchRuntime | null }): 
 
 /* ------------------------------ Team frames ------------------------------- */
 
-function SeatChip({ seat, self }: { seat: HudSeat; self: boolean }): React.ReactElement {
+function SeatChip({
+  seat,
+  self,
+  ally,
+}: {
+  seat: HudSeat;
+  self: boolean;
+  ally: boolean;
+}): React.ReactElement {
   return (
     <div
       className={`seat ${seat.dead ? 'dead' : ''} ${seat.visible ? '' : 'hidden-seat'} ${self ? 'self' : ''}`}
     >
       <div className="chip" style={{ background: CHAMP_TONE[seat.championId] ?? '#555' }}>
-        {seat.visible || seat.team === 0 ? champLetter(seat.championId) : '?'}
+        {seat.visible || ally ? champLetter(seat.championId) : '?'}
         <span className="lv">{seat.level}</span>
         {seat.dead && <span className="skull">☠ {seat.respawnIn}</span>}
       </div>
@@ -131,18 +212,20 @@ function SeatChip({ seat, self }: { seat: HudSeat; self: boolean }): React.React
 
 function TeamFrames(): React.ReactElement {
   const seats = useHud((s) => s.seats);
-  const allies = seats.filter((s) => s.team === 0);
-  const enemies = seats.filter((s) => s.team === 1);
+  const selfPlayer = useHud((s) => s.selfPlayer);
+  const selfTeam = useHud((s) => s.selfTeam);
+  const allies = seats.filter((s) => s.team === selfTeam);
+  const enemies = seats.filter((s) => s.team !== selfTeam);
   return (
     <>
       <div className="team-frames left">
         {allies.map((s) => (
-          <SeatChip key={s.player} seat={s} self={s.player === 1} />
+          <SeatChip key={s.player} seat={s} self={s.player === selfPlayer} ally />
         ))}
       </div>
       <div className="team-frames right">
         {enemies.map((s) => (
-          <SeatChip key={s.player} seat={s} self={false} />
+          <SeatChip key={s.player} seat={s} self={false} ally={false} />
         ))}
       </div>
     </>
@@ -151,28 +234,55 @@ function TeamFrames(): React.ReactElement {
 
 /* -------------------------------- Killfeed -------------------------------- */
 
+/** Portrait chip pair: active half solid, benched half dimmed behind it. */
+export function DuoChip({
+  active,
+  bench,
+  flip,
+}: {
+  active: string;
+  bench?: string;
+  flip?: boolean;
+}): React.ReactElement {
+  const chips = [
+    <span key="a" className="fchip" style={{ background: CHAMP_TONE[active] ?? '#555' }}>
+      {champLetter(active)}
+    </span>,
+    bench ? (
+      <span
+        key="b"
+        className="fchip bench"
+        style={{ background: CHAMP_TONE[bench] ?? '#555' }}
+        title="benched"
+      >
+        {champLetter(bench)}
+      </span>
+    ) : null,
+  ];
+  return <span className="duo-chip">{flip ? [chips[1], chips[0]] : chips}</span>;
+}
+
 function FeedRow({ e }: { e: FeedEntry }): React.ReactElement {
+  const selfTeam = useHud((s) => s.selfTeam);
   if (e.kind === 'kill') {
     return (
-      <div className={`feed-row ${e.team === 0 ? 'ally' : 'enemy'}`}>
-        {e.killerChamp && (
-          <span className="fchip" style={{ background: CHAMP_TONE[e.killerChamp] ?? '#555' }}>
-            {champLetter(e.killerChamp)}
+      <div className={`feed-row ${e.team === selfTeam ? 'ally' : 'enemy'}`}>
+        {e.killerChamp && <DuoChip active={e.killerChamp} bench={e.killerBench} />}
+        <b>{e.killerName}</b>
+        {/* What killed you is also *how* — the trio rides the card (UI_UX §10). */}
+        {e.killerAugments && e.killerAugments.length > 0 && (
+          <span className="feed-augs">
+            <AugmentPips ids={e.killerAugments} />
           </span>
         )}
-        <b>{e.killerName}</b>
         <span className="x">⚔</span>
         <b>{e.victimName}</b>
-        {e.victimChamp && (
-          <span className="fchip" style={{ background: CHAMP_TONE[e.victimChamp] ?? '#555' }}>
-            {champLetter(e.victimChamp)}
-          </span>
-        )}
+        {e.victimChamp && <DuoChip active={e.victimChamp} bench={e.victimBench} flip />}
       </div>
     );
   }
   return (
-    <div className={`feed-row ${e.team === 0 ? 'ally' : 'enemy'}`}>
+    <div className={`feed-row ${e.team === selfTeam ? 'ally' : 'enemy'}`}>
       <span className="x">{e.kind === 'tower' ? '🏰' : '🏳'}</span>
       <b>{e.text}</b>
     </div>
@@ -208,7 +318,7 @@ function Minimap({ runtime }: { runtime: () => MatchRuntime | null }): React.Rea
       if (!cv || !rt) return;
       const g = cv.getContext('2d');
       if (!g) return;
-      const { width, deckHalf, marks } = rt.minimap();
+      const { width, deckHalf, marks, selfTeam } = rt.minimap();
       const W = cv.width;
       const H = cv.height;
       const colors = paletteColors(useSettings.getState().palette);
@@ -219,10 +329,15 @@ function Minimap({ runtime }: { runtime: () => MatchRuntime | null }): React.Rea
       const deckY = H * 0.2;
       const deckH = H * 0.6;
       g.fillRect(2, deckY, W - 4, deckH);
-      const px = (x: number): number => 2 + ((x + width / 2) / width) * (W - 4);
+      // Team 1 sees the strip mirrored — your base is always on the left.
+      const flip = selfTeam === 1;
+      const px = (x: number): number => {
+        const v = 2 + ((x + width / 2) / width) * (W - 4);
+        return flip ? W - v : v;
+      };
       const pz = (z: number): number => deckY + ((z + deckHalf) / (deckHalf * 2)) * deckH;
       for (const m of marks) {
-        const teamColor = m.team === 0 ? colors.ally : colors.enemy;
+        const teamColor = m.team === selfTeam ? colors.ally : colors.enemy;
         if (m.kind === 'tower') {
           g.fillStyle = m.dead ? 'rgba(255,255,255,0.18)' : hex(teamColor);
           g.fillRect(px(m.x) - 3, pz(m.z) - 4, 6, 8);
@@ -330,6 +445,85 @@ function effectiveCost(def: ItemDef, owned: string[]): number {
   return def.cost;
 }
 
+/** Human label + icon for one recap source (UI_UX §10 — teaches counterplay). */
+function recapLine(entry: NonNullable<HudChampion['recap']>[number]): {
+  what: string;
+  icon: string;
+} {
+  const { championId, label } = entry;
+  if (label === 'aa') return { what: 'Attacks', icon: 'sword-clash' };
+  if ((label === 'q' || label === 'w' || label === 'r') && championId) {
+    const def = CHAMPIONS[championId];
+    return {
+      what: `${label.toUpperCase()} — ${def?.abilities[label]?.name ?? '?'}`,
+      icon: SLOT_ICONS[championId]?.[label] ?? 'sword-clash',
+    };
+  }
+  if (label === 'passive' && championId) {
+    return { what: CHAMPIONS[championId]?.passive.name ?? 'Passive', icon: 'magic-swirl' };
+  }
+  if (label.startsWith('item:')) {
+    const item = ITEMS[label.slice(5)] ?? RELICS[label.slice(5)];
+    return { what: item?.name ?? 'Item', icon: item?.icon ?? 'fire-bottle' };
+  }
+  switch (label) {
+    case 'mini':
+      return { what: 'Minis', icon: 'three-friends' };
+    case 'tower':
+      return { what: 'Watchtower', icon: 'tower-fall' };
+    case 'core':
+      return { what: 'Clash Core', icon: 'crystal-growth' };
+    case 'burn':
+      return { what: 'Burn', icon: 'fire-bottle' };
+    default:
+      return { what: 'Abilities', icon: 'sword-clash' };
+  }
+}
+
+function RecapPanel({ champ }: { champ: HudChampion }): React.ReactElement | null {
+  const recap = champ.recap;
+  if (!recap || recap.length === 0) return null;
+  const top = Math.max(...recap.map((r) => r.amount), 1);
+  return (
+    <div className="ds-col recap-col">
+      <div className="section-label on-dark">What killed you</div>
+      {recap.map((r) => {
+        const line = recapLine(r);
+        return (
+          <div key={`${r.name}-${r.label}`} className="recap-row">
+            <span
+              className="fchip"
+              style={{ background: (r.championId && CHAMP_TONE[r.championId]) || '#5a4a3a' }}
+            >
+              {r.championId ? champLetter(r.championId) : '☠'}
+            </span>
+            <div className="recap-main">
+              <span className="recap-who">{r.championId ? r.name : line.what}</span>
+              {r.championId && (
+                <span className="recap-what">
+                  <span
+                    className="ic"
+                    style={{
+                      maskImage: `url(/icons/${line.icon}.svg)`,
+                      WebkitMaskImage: `url(/icons/${line.icon}.svg)`,
+                    }}
+                  />
+                  {line.what}
+                </span>
+              )}
+              <div className="recap-bar">
+                <div style={{ width: `${Math.round((r.amount / top) * 100)}%` }} />
+              </div>
+            </div>
+            <span className="recap-amt">{r.amount}</span>
+          </div>
+        );
+      })}
+      <div className="recap-hint">Damage taken in your last 12 seconds.</div>
+    </div>
+  );
+}
+
 function DeathShop({ runtime }: { runtime: () => MatchRuntime | null }): React.ReactElement | null {
   const champ = useHud((s) => s.champion);
   if (!champ) return null;
@@ -348,6 +542,7 @@ function DeathShop({ runtime }: { runtime: () => MatchRuntime | null }): React.R
         </p>
       </div>
       <div className="ds-grid">
+        <RecapPanel champ={champ} />
         {tiers.map(([label, list]) => (
           <div key={label} className="ds-col">
             <div className="section-label on-dark">{label}</div>
@@ -499,6 +694,8 @@ function Scoreboard(): React.ReactElement | null {
   const [open, setOpen] = useState(false);
   const seats = useHud((s) => s.seats);
   const match = useHud((s) => s.match);
+  const selfPlayer = useHud((s) => s.selfPlayer);
+  const selfTeam = useHud((s) => s.selfTeam);
   useEffect(() => {
     const down = (e: KeyboardEvent): void => {
       if (e.code === 'Tab') {
@@ -519,10 +716,10 @@ function Scoreboard(): React.ReactElement | null {
   if (!open || !match) return null;
   return (
     <div className="scoreboard">
-      {[0, 1].map((team) => (
-        <div key={team} className={`sb-team ${team === 0 ? 'ally' : 'enemy'}`}>
+      {[selfTeam, 1 - selfTeam].map((team) => (
+        <div key={team} className={`sb-team ${team === selfTeam ? 'ally' : 'enemy'}`}>
           <div className="sb-head">
-            <span>{team === 0 ? STRINGS.selectYourTeam : STRINGS.selectEnemyTeam}</span>
+            <span>{team === selfTeam ? STRINGS.selectYourTeam : STRINGS.selectEnemyTeam}</span>
             <span className="sb-score">
               {match.teamKills[team]} ⚔ · {match.towersDown[1 - team]} 🏰
             </span>
@@ -530,12 +727,23 @@ function Scoreboard(): React.ReactElement | null {
           {seats
             .filter((s) => s.team === team)
             .map((s) => (
-              <div key={s.player} className={`sb-row ${s.player === 1 ? 'self' : ''}`}>
-                <span className="fchip" style={{ background: CHAMP_TONE[s.championId] ?? '#555' }}>
-                  {s.visible || team === 0 ? champLetter(s.championId) : '?'}
-                </span>
+              <div key={s.player} className={`sb-row ${s.player === selfPlayer ? 'self' : ''}`}>
+                {s.visible || team === selfTeam ? (
+                  <DuoChip active={s.championId} bench={s.benchChampionId} />
+                ) : (
+                  <span className="duo-chip">
+                    <span className="fchip" style={{ background: '#555' }}>
+                      ?
+                    </span>
+                    {s.benchChampionId && (
+                      <span className="fchip bench" style={{ background: '#555' }}>
+                        ?
+                      </span>
+                    )}
+                  </span>
+                )}
                 <span className="sb-name">
-                  {s.player === 1 ? 'You' : s.name}
+                  {s.player === selfPlayer ? 'You' : s.name}
                   {!s.visible && <i className="sb-hidden"> hidden</i>}
                 </span>
                 <span className="sb-lv">{s.level}</span>
@@ -554,12 +762,50 @@ function Scoreboard(): React.ReactElement | null {
                     />
                   ))}
                 </span>
+                <span className="sb-augs">
+                  <AugmentPips ids={s.augments} />
+                </span>
                 <span className="sb-gold">⬢ {s.gold.toLocaleString()}</span>
               </div>
             ))}
         </div>
       ))}
     </div>
+  );
+}
+
+/**
+ * Augment pips for any seat. An enemy card you have not seen on the field
+ * arrives as `?` from the server (UI_UX §11) — the count is public, the
+ * identity is what scouting buys.
+ */
+function AugmentPips({ ids }: { ids: string[] }): React.ReactElement | null {
+  if (ids.length === 0) return null;
+  return (
+    <>
+      {ids.map((id, i) => {
+        const a = AUGMENTS[id];
+        if (!a) {
+          return (
+            // biome-ignore lint/suspicious/noArrayIndexKey: placeholders are identical by design
+            <span key={`unknown-${i}`} className="aug-pip unknown" title="Not seen yet">
+              ?
+            </span>
+          );
+        }
+        return (
+          <span
+            key={id}
+            className={`aug-pip ${a.rarity}`}
+            title={`${a.name} — ${a.description}`}
+            role="img"
+            aria-label={a.name}
+          >
+            {CATEGORY_GLYPH[a.category]}
+          </span>
+        );
+      })}
+    </>
   );
 }
 
@@ -571,6 +817,110 @@ const WHEEL: { kind: PingKind; label: string; color: string; angle: number }[] =
   { kind: 'help', label: 'Help', color: '#6fe0a8', angle: 90 },
   { kind: 'omw', label: 'On my way', color: '#3ba7ff', angle: 180 },
 ];
+
+/* Quick-chat wheel (GAME_DESIGN §17): hold C, flick, release — team-scoped. */
+const CHAT_WHEEL: { id: string; angle: number }[] = [
+  { id: 'help', angle: -90 },
+  { id: 'nice', angle: 0 },
+  { id: 'thanks', angle: 90 },
+  { id: 'onit', angle: 180 },
+];
+
+function ChatWheel({ runtime }: { runtime: () => MatchRuntime | null }): React.ReactElement | null {
+  const [center, setCenter] = useState<{ x: number; y: number } | null>(null);
+  const [pick, setPick] = useState<string | null>(null);
+  const mouse = useRef({ x: 0, y: 0 });
+  const pickRef = useRef<string | null>(null);
+  pickRef.current = pick;
+
+  useEffect(() => {
+    const move = (e: PointerEvent): void => {
+      mouse.current = { x: e.clientX, y: e.clientY };
+    };
+    const down = (e: KeyboardEvent): void => {
+      if (e.code !== 'KeyC' || e.repeat) return;
+      setCenter({ ...mouse.current });
+      setPick(null);
+    };
+    const up = (e: KeyboardEvent): void => {
+      if (e.code !== 'KeyC') return;
+      if (pickRef.current) runtime()?.chat(pickRef.current);
+      setCenter(null);
+      setPick(null);
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('keydown', down);
+    window.addEventListener('keyup', up);
+    return () => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('keydown', down);
+      window.removeEventListener('keyup', up);
+    };
+  }, [runtime]);
+
+  useEffect(() => {
+    if (!center) return;
+    const iv = setInterval(() => {
+      const dx = mouse.current.x - center.x;
+      const dy = mouse.current.y - center.y;
+      if (Math.hypot(dx, dy) < 18) {
+        setPick(null);
+        return;
+      }
+      const deg = (Math.atan2(dy, dx) * 180) / Math.PI;
+      const best = CHAT_WHEEL.reduce((a, b) => {
+        const da = Math.min(Math.abs(deg - a.angle), 360 - Math.abs(deg - a.angle));
+        const db = Math.min(Math.abs(deg - b.angle), 360 - Math.abs(deg - b.angle));
+        return db < da ? b : a;
+      });
+      setPick(best.id);
+    }, 40);
+    return () => clearInterval(iv);
+  }, [center]);
+
+  if (!center) return null;
+  return (
+    <div className="ping-wheel chat-wheel" style={{ left: center.x, top: center.y }}>
+      {CHAT_WHEEL.map((w) => (
+        <div
+          key={w.id}
+          className={`pw-opt ${pick === w.id ? 'on' : ''}`}
+          style={{
+            transform: `rotate(${w.angle}deg) translateX(64px) rotate(${-w.angle}deg) translate(-50%, -50%)`,
+            borderColor: '#e8ecf4',
+            color: pick === w.id ? undefined : '#e8ecf4',
+          }}
+        >
+          <span className="pw-label">{QUICK_CHAT[w.id]}</span>
+        </div>
+      ))}
+      <span className="pw-center">💬</span>
+    </div>
+  );
+}
+
+/** Team chat lines above the killfeed — fade out after a few seconds. */
+function ChatFeed(): React.ReactElement | null {
+  const chat = useHud((s) => s.chat);
+  const selfPlayer = useHud((s) => s.selfPlayer);
+  const [, force] = useState(0);
+  useEffect(() => {
+    const iv = setInterval(() => force((n) => n + 1), 1000);
+    return () => clearInterval(iv);
+  }, []);
+  const now = Date.now();
+  const fresh = chat.filter((c) => now - c.at < 4500);
+  if (fresh.length === 0) return null;
+  return (
+    <div className="chat-feed">
+      {fresh.map((c) => (
+        <div key={c.id} className="chat-line">
+          <b>{c.player === selfPlayer ? 'You' : c.name}</b> {QUICK_CHAT[c.phrase] ?? c.phrase}
+        </div>
+      ))}
+    </div>
+  );
+}
 
 function PingWheel({ runtime }: { runtime: () => MatchRuntime | null }): React.ReactElement | null {
   const [center, setCenter] = useState<{ x: number; y: number } | null>(null);
@@ -705,7 +1055,21 @@ interface HistoryEntry {
   duration: number;
   kills: [number, number];
   myChampion: string;
-  seats: { championId: string; name: string; team: number; k: number; d: number; a: number }[];
+  /** Benched half of your duo (absent for pre-v0.4 entries and solo configs). */
+  myBench?: string;
+  /** Your augment trio (docs/AUGMENTS.md) — absent for pre-v0.5 entries. */
+  myAugments?: string[];
+  seats: {
+    championId: string;
+    benchId?: string;
+    name: string;
+    team: number;
+    k: number;
+    d: number;
+    a: number;
+    /** Enemy entries keep their `?` placeholders: history records what you saw. */
+    augments?: string[];
+  }[];
 }
 
 function writeHistory(entry: HistoryEntry): void {
@@ -724,10 +1088,12 @@ function EndSequence(): React.ReactElement | null {
   const match = useHud((s) => s.match);
   const seats = useHud((s) => s.seats);
   const champ = useHud((s) => s.champion);
+  const selfPlayer = useHud((s) => s.selfPlayer);
+  const selfTeam = useHud((s) => s.selfTeam);
   const [phase, setPhase] = useState<'slab' | 'podium' | 'summary'>('slab');
   const wrote = useRef(false);
 
-  const won = match?.winner === 0;
+  const won = match?.winner === selfTeam;
 
   useEffect(() => {
     const t = setTimeout(() => setPhase('podium'), 2400);
@@ -743,16 +1109,20 @@ function EndSequence(): React.ReactElement | null {
       duration: match.time,
       kills: match.teamKills,
       myChampion: champ.championId,
+      myBench: champ.duo?.championId,
+      myAugments: champ.augments,
       seats: seats.map((s) => ({
         championId: s.championId,
-        name: s.player === 1 ? 'You' : s.name,
+        benchId: s.benchChampionId,
+        name: s.player === selfPlayer ? 'You' : s.name,
         team: s.team,
         k: s.kills,
         d: s.deaths,
         a: s.assists,
+        augments: s.augments,
       })),
     });
-  }, [match, champ, seats, won]);
+  }, [match, champ, seats, won, selfPlayer]);
 
   // MVP score: kills weigh triple, assists ×1.5, deaths subtract; level breaks ties.
   const podium = useMemo(() => {
@@ -787,7 +1157,12 @@ function EndSequence(): React.ReactElement | null {
             >
               {i === 0 && <span className="crown">{STRINGS.mvp}</span>}
               <span className="big">{champLetter(s.championId)}</span>
-              <span className="who">{s.player === 1 ? 'You' : s.name}</span>
+              {s.benchChampionId && (
+                <span className="podium-bench">
+                  {CHAMPIONS[s.championId]?.name} + {CHAMPIONS[s.benchChampionId]?.name}
+                </span>
+              )}
+              <span className="who">{s.player === selfPlayer ? 'You' : s.name}</span>
               <span className="kda">
                 {s.kills} / {s.deaths} / {s.assists}
               </span>
@@ -817,25 +1192,30 @@ function EndSequence(): React.ReactElement | null {
         {match.teamKills[0]} — {match.teamKills[1]} · {fmtClock(match.time)}
       </p>
       <div className="summary-table">
-        {[0, 1].map((team) => (
-          <div key={team} className={`sb-team ${team === 0 ? 'ally' : 'enemy'}`}>
+        {[selfTeam, 1 - selfTeam].map((team) => (
+          <div key={team} className={`sb-team ${team === selfTeam ? 'ally' : 'enemy'}`}>
             <div className="sb-head">
-              <span>{team === 0 ? STRINGS.selectYourTeam : STRINGS.selectEnemyTeam}</span>
+              <span>{team === selfTeam ? STRINGS.selectYourTeam : STRINGS.selectEnemyTeam}</span>
             </div>
             {seats
               .filter((s) => s.team === team)
               .map((s) => (
-                <div key={s.player} className={`sb-row ${s.player === 1 ? 'self' : ''}`}>
-                  <span
-                    className="fchip"
-                    style={{ background: CHAMP_TONE[s.championId] ?? '#555' }}
-                  >
-                    {champLetter(s.championId)}
+                <div key={s.player} className={`sb-row ${s.player === selfPlayer ? 'self' : ''}`}>
+                  <DuoChip active={s.championId} bench={s.benchChampionId} />
+                  <span className="sb-name">
+                    {s.player === selfPlayer ? 'You' : s.name}
+                    {s.benchChampionId && (
+                      <i className="sb-duo">
+                        {CHAMPIONS[s.championId]?.name} + {CHAMPIONS[s.benchChampionId]?.name}
+                      </i>
+                    )}
                   </span>
-                  <span className="sb-name">{s.player === 1 ? 'You' : s.name}</span>
                   <span className="sb-lv">{s.level}</span>
                   <span className="sb-kda">
                     {s.kills}/{s.deaths}/{s.assists}
+                  </span>
+                  <span className="sb-augs">
+                    <AugmentPips ids={s.augments} />
                   </span>
                 </div>
               ))}
@@ -848,7 +1228,13 @@ function EndSequence(): React.ReactElement | null {
           className="btn primary"
           onClick={() => {
             uiSound('ui_click');
-            goto('select');
+            // Lobby matches re-queue through the lobby (same party, new deal).
+            if (useLobby.getState().status === 'in') {
+              useSession.getState().setMatchJoin(null);
+              goto('lobby');
+            } else {
+              goto('select');
+            }
           }}
         >
           {STRINGS.playAgain}
@@ -858,6 +1244,7 @@ function EndSequence(): React.ReactElement | null {
           className="btn"
           onClick={() => {
             uiSound('ui_back');
+            useSession.getState().setMatchJoin(null);
             goto('hub');
           }}
         >

@@ -2,12 +2,13 @@ import type { Slot } from '@mini-clash/data';
 import type { Intent } from '@mini-clash/protocol';
 import * as THREE from 'three';
 import { useSettings } from '../state/settings';
-import { playCue, unlockAudio } from './audio';
+import { unlockAudio } from './audio';
 import type { FollowCamera } from './camera';
 
 /**
- * Input (GAME_DESIGN §15): right-click move, left-click targets, smart-cast on
- * key-release with hold-indicator, A attack-move, S stop, T dance.
+ * Input (GAME_DESIGN §15): right-click moves — or attacks when over an enemy —
+ * left-click targets, smart-cast on key-release with hold-indicator, A attack-move,
+ * S stop, T dance, Space tag-swap.
  */
 
 export interface InputCallbacks {
@@ -63,7 +64,6 @@ export class InputManager {
     if (ping || now - this.lastMovePing > 350) {
       this.lastMovePing = now;
       this.cb.moveMarker(this.cursorGround.x, this.cursorGround.z, 'move');
-      if (ping) playCue('move_ping', { bus: 'ui', volume: 0.6 });
     }
   }
 
@@ -75,6 +75,15 @@ export class InputManager {
       if (e.altKey && this.cb.quickPing) {
         this.camera.screenToGround(this.ndc.x, this.ndc.y, this.cursorGround);
         this.cb.quickPing();
+        return;
+      }
+      // Right-click on an enemy = attack it (standard MOBA click scheme);
+      // empty ground = move order.
+      const target = this.cb.pickEntity(this.ndc.x, this.ndc.y);
+      if (target !== null) {
+        this.camera.screenToGround(this.ndc.x, this.ndc.y, this.cursorGround);
+        this.cb.send({ t: 'attackTarget', target });
+        this.cb.moveMarker(this.cursorGround.x, this.cursorGround.z, 'attack');
         return;
       }
       this.moveHeld = true;
@@ -135,6 +144,11 @@ export class InputManager {
         break;
       case kb.dance:
         this.cb.send({ t: 'dance' });
+        break;
+      case kb.swap:
+        // Tag Swap (GAME_DESIGN §7.2). Space would also scroll the page.
+        e.preventDefault();
+        this.cb.send({ t: 'swap' });
         break;
     }
   };

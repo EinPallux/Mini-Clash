@@ -35,15 +35,15 @@ Duo randomness means any two roles can pair — every kit must be self-sufficien
 
 | Champion | HP | AD | AS | MS | Range | Armor/Ward |
 |---|---|---|---|---|---|---|
-| Rook | 1080 → 2160 | 58 → 104 | 0.72 | 3.5 | 1.8 | 32/30 → 62/58 |
-| Fathom | 615 → 1285 | 58 → 124 | 0.80 | 3.45 | 6.0 | 22/20 → 44/40 |
-| Mortis | 650 → 1270 | 50 → 82 | 0.70 | 3.5 | 6.8 | 20/24 → 40/48 |
-| Rattle | 740 → 1430 | 64 → 132 | 0.95 | 3.8 | 1.8 | 28/20 → 51/40 |
-| Grukk | 940 → 1950 | 67 → 126 | 0.78 | 3.6 | 2.2 | 30/26 → 58/52 |
-| Sylva | 680 → 1320 | 52 → 88 | 0.80 | 3.6 | 6.0 | 21/25 → 42/49 |
+| Rook | 1050 → 2130 | 58 → 104 | 0.72 | 3.5 | 1.8 | 32/30 → 62/58 |
+| Fathom | 615 → 1285 | 56 → 122 | 0.80 | 3.45 | 5.7 | 22/20 → 44/40 |
+| Mortis | 650 → 1270 | 50 → 82 | 0.70 | 3.5 | 6.8 | 24/24 → 44/48 |
+| Rattle | 765 → 1455 | 64 → 132 | 0.95 | 3.8 | 1.8 | 31/20 → 54/40 |
+| Grukk | 940 → 1950 | 65 → 124 | 0.78 | 3.6 | 2.2 | 30/26 → 58/52 |
+| Sylva | 705 → 1345 | 52 → 88 | 0.80 | 3.6 | 6.0 | 24/25 → 45/49 |
 | Boltz | 650 → 1330 | 60 → 122 | 0.92 | 3.6 | 6.0 | 22/22 → 44/44 |
-| Wisp | 590 → 1200 | 48 → 78 | 0.75 | 3.7 | 6.5 | 19/26 → 38/51 |
-| Piper | 640 → 1300 | 54 → 96 | 0.82 | 3.6 | 5.5 | 22/24 → 44/47 |
+| Wisp | 625 → 1260 | 48 → 78 | 0.75 | 3.7 | 6.5 | 21/27 → 41/52 |
+| Piper | 690 → 1365 | 54 → 96 | 0.82 | 3.6 | 5.5 | 24/24 → 47/47 |
 | Vex | 900 → 1870 | 61 → 118 | 0.85 | 3.7 | 2.0 | 29/27 → 56/53 |
 | Snowble | 1120 → 2240 | 55 → 98 | 0.68 | 3.4 | 2.0 | 34/32 → 65/61 |
 | Patch | 680 → 1380 | 56 → 100 | 0.85 | 3.5 | 5.5 | 24/24 → 47/47 |
@@ -59,7 +59,7 @@ Duo randomness means any two roles can pair — every kit must be self-sufficien
 A stoic living statue of the old bridge-keepers' order; fights like a piece of architecture that got opinions.
 
 - **Model:** `Kenney_MiniArena/character-soldier.glb` (stone-grey + team-color tabard palette). Props: `Kenney_Minidungeon/shield-rectangle.glb` (left hand), `Kenney_MiniArena/weapon-sword.glb` (right).
-- **Passive — Stonewall:** every 8 s, Rook's next incoming hit is reduced by `40 (+8×level)`. Blocked hits chip a visible stone-shard off his shield (regrows — readable timer).
+- **Passive — Stonewall:** every 9.5 s, Rook's next incoming hit is reduced by `40 (+8×level)`. Blocked hits chip a visible stone-shard off his shield (regrows — readable timer).
 - **Q — Bash & Batter:** 25⚡ / 7 s / 2.6 u arc. Shield slam: `70 (+65% AD)` physical + 25% slow 1.5 s; **recast within 3 s:** sword backswing `55 (+50% AD)`. *Anim:* `attack-melee-left` (shield arm) into `attack-melee-right`, 15% overspeed, stone-dust cone VFX + screen-nudge on hit.
 - **W — Rampart:** 35⚡ / 14 s / place at 3 u. Raises a 3-u stone wall (blocks movement, not projectiles) for 2.5 s; allies passing gain 15% MS. *Anim:* `interact-right` ground-punch; wall erupts as animated Castle-kit crenellation chunks with dust burst; crumbles on expiry.
 - **R — Keep's Wrath:** ⏱ 70 s / self 4 u. Rook leaps (0.6 s) and lands as a fortress: `160 (+90% AD)` physical, knock-up 1 s in 2.5 u, then gains 25% DR aura for allies within 4 u for 3 s. *Anim:* `jump` → slam frame-hold, camera shake M, radial crack decal, banner-flags sprout from his shoulders (flag props) for the aura duration.
@@ -131,7 +131,7 @@ Keeper of the bridge's improbable garden; kind to allies, horticulturally ruthle
 - **Model:** `Kenney_CuteCharacters/character-female-d.glb` (leaf-green + bloom palette). Prop: gnarled staff (`KayKit_RPGToolsBits`), flower crown (color variant).
 - **Passive — Pollen Trail:** Sylva plants a flower every 6 u walked (max 5, 20 s). Her abilities that touch a flower bloom it: nearby allies heal `20 (+15% AP)`. The map slowly becomes her garden — spatial-play support.
 - **Q — Thorn Dart:** 25⚡ / 5 s / 6.5 u skillshot. `70 (+55% AP)` arcane + 20% slow 1 s; blooms flowers it passes. *Anim:* `holding-right-shoot` reskinned as staff flick; dart = spinning seed with petal trail; bloom = instanced flower pop with sparkle.
-- **W — Blooming Ward:** 40⚡ / 11 s / 5 u circle (2.2 u). Garden zone 3 s: allies inside heal `40 (+25% AP)`/s and cleanse slows on entry; enemy hits inside it are −10% damage. *Anim:* `interact-right` staff plant; zone = animated grass/flower growth (Nature Kit meshes scale-in), fireflies, soft god-ray.
+- **W — Blooming Ward:** 40⚡ / 11 s / 5 u circle (2.2 u). Garden zone 3 s: allies inside heal `46 (+25% AP)`/s and cleanse slows on entry; enemy hits inside it are −10% damage. *Anim:* `interact-right` staff plant; zone = animated grass/flower growth (Nature Kit meshes scale-in), fireflies, soft god-ray.
 - **R — Wildwood Embrace:** ⏱ 80 s / 6 u cone, 0.5 s cast. Vines surge: `150 (+70% AP)` arcane + root 1.4 s; every bloomed flower in the cone extends the root +0.3 s (max +0.9) and heals allies in 2 u of it. *Anim:* both-arms raise (`holding-both` hold-frame + procedural tremble); vine meshes lash out in 3 waves, leaf-storm particles, rooted enemies get thorn-cage props.
 - **Entrance:** *Fresh Cuttings* — instantly plants 2 flowers at her feet.
 - **Signature Augments:** ①**Overgrowth** (Silver): flower cap +3, flowers last 30 s. ②**Nettle Garden** (Gold): blooms also sting enemies `35 (+20% AP)` in 1.5 u. ③**Heartwood** (Prismatic): W ward follows Sylva (attached zone) and grants 10% MS to allies inside.
@@ -142,9 +142,9 @@ Keeper of the bridge's improbable garden; kind to allies, horticulturally ruthle
 **Gunner/Specialist · v0.4 · difficulty ●●○**
 A decommissioned survey astronaut who refuses to accept the mission ended; the bridge is "anomalous terrain, requires zapping."
 
-- **Model:** `Kenney_SpaceKit/astronautA.glb` (team-visor palette). Prop: raygun assembled from `Kenney_SpaceKit` parts.
-- **Passive — Capacitor:** after 3 s without attacking, next basic deals +`25 (+30% AD)` arcane and chains to 1 extra target (visor + gun charge-glow telegraph).
-- **Q — Arc Zapper:** 30⚡ / 6 s / 6 u line. Instant tesla beam (0.15 s cast): `70 (+55% AD)` arcane, +30% vs shields; refunds 10⚡ on champion hit. *Anim:* `holding-right-shoot` snap-fire; jagged beam shader (animated noise), impact sparks + brief target electrify-outline.
+- **Model:** `Kenney_CuteCharacters/character-male-c.glb` in astronaut dress — visor palette + a procedural bubble helmet (the SpaceKit `astronautA` mesh ships unrigged, so he *wears* the suit instead of being it; see ASSET_CATALOG §4). Prop: `Kenney_SpaceKit/weapon_gun.glb` raygun (right hand).
+- **Passive — Capacitor:** after 3 s without attacking, next basic deals +`18 (+25% AD)` arcane and chains to 1 extra target within 3.5 u (visor charge-glow telegraph).
+- **Q — Arc Zapper:** 30⚡ / 6 s / 6 u line. Instant tesla beam (0.15 s cast): `60 (+48% AD)` arcane, +30% vs shielded targets; refunds 10⚡ on champion hit. Hitscan is priced below a comparable skillshot — it never misses. *Anim:* `holding-right-shoot` snap-fire; jagged beam shader (animated noise), impact sparks + brief target electrify-outline.
 - **W — Bubble Dome:** 35⚡ / 13 s / place 4 u. Projects a 2.5 u energy dome 2.5 s: blocks **enemy projectiles** at the shell (satisfying zap-pops); allies inside gain +10% AS firing out. *Anim:* `interact-left` wrist-tap; dome = fresnel hex-shield shader inflating with wobble, each blocked shot ripples it.
 - **R — Orbital Droppod:** ⏱ 85 s / 7 u target, 1.2 s delay. Calls a droppod (`Kenney_SpaceKit` rocket/pod) from orbit: `170 (+80% AD)` in 2.5 u + knock-up 0.8 s at center. The pod **stays** 4 s as a bunker (Boltz or allies stand behind it — blocks movement & projectiles), then launches away. *Anim:* Boltz aims a beacon (`pick-up` reversed), sky-streak warning line + growing shadow decal, impact shake L, landing burn ring; pod re-ignites and exits with smoke column.
 - **Entrance:** *EVA Hop* — jetpack micro-hop (0.4 s, clears 1 u, ignores unit collision — flavor mobility, not a wall-hop).
@@ -157,10 +157,10 @@ A decommissioned survey astronaut who refuses to accept the mission ended; the b
 A small ghost who haunts the bridge not out of malice but because the view is nice and leaving is hard.
 
 - **Model:** `Kenney_GraveyardKit/character-ghost.glb` (translucent shader, soft emissive rim; hover bob procedural — no walk cycle needed: locomotion is float with lean).
-- **Passive — Ectoplasm:** Wisp phases through units (no unit collision, ever). Passing through an enemy chills them: 10% slow 1 s + marks them "Chilled" 3 s.
-- **Q — Boo!:** 25⚡ / 5 s / 6.5 u skillshot. Spook-bolt `75 (+60% AP)` arcane; vs Chilled targets +25% and briefly **Fears Minis** 1 s. *Anim:* inflate-face lunge (scale-pop + `emote-no` head snap); bolt = wailing face sprite-sheet with ribbon tail; hit = "BOO" glyph burst.
+- **Passive — Ectoplasm:** Wisp phases through units (no unit collision, ever). Passing through an enemy chills them: 13% slow 1 s + marks them "Chilled" 3 s.
+- **Q — Boo!:** 25⚡ / 5 s / 6.5 u skillshot. Spook-bolt `84 (+60% AP)` arcane; vs Chilled targets +25% and briefly **Fears Minis** 1 s. *Anim:* inflate-face lunge (scale-pop + `emote-no` head snap); bolt = wailing face sprite-sheet with ribbon tail; hit = "BOO" glyph burst.
 - **W — Sheet Slip:** 35⚡ / 10 s / 3.5 u blink. Drops her sheet (decoy: stands still, taunts Minis, 1 HP-until-hit twice) and blinks invisible for 1 s (breaks on cast/attack). *Anim:* sheet prop collapses realistically (cloth-sim-lite bones); reappear = sheet whooshes back on with sparkle.
-- **R — Haunting Hour:** ⏱ 80 s / 5 u circle (3 u), 0.6 s cast. Curses the ground 4 s: enemies inside are Chilled continuously, take `45 (+30% AP)`/s, and Minis inside fight for **no one** (stand confused). At expiry, all champions still inside are Feared 1.2 s away from the center. *Anim:* Wisp spins up into the air trailing spirits; zone = desaturation + floating gravestone shadows (Graveyard props as translucent ghosts), clock-tick SFX building to the midnight gong.
+- **R — Haunting Hour:** ⏱ 80 s / 5 u circle (3 u), 0.6 s cast. Curses the ground 4 s: enemies inside are Chilled continuously, take `58 (+30% AP)`/s, and Minis inside fight for **no one** (stand confused). At expiry, all champions still inside are Feared 1.2 s away from the center. *Anim:* Wisp spins up into the air trailing spirits; zone = desaturation + floating gravestone shadows (Graveyard props as translucent ghosts), clock-tick SFX building to the midnight gong.
 - **Entrance:** *Cold Spot* — 1.5 u chill nova (10% slow 1 s) + Wisp is untargetable for the 0.35 s swap morph (only Entrance that touches the swap itself — her identity).
 - **Signature Augments:** ①**Poltergeist** (Silver): W decoy explodes when destroyed `70 (+40% AP)`. ②**Separation Anxiety** (Gold): Q pierces; every enemy hit extends R's next duration +0.5 s. ③**Midnight Society** (Prismatic): R also summons 3 ghost Minis (Graveyard skeletons, spectral shader) that fight for Wisp 6 s.
 

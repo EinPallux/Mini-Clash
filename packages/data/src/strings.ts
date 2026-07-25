@@ -43,11 +43,16 @@ export const STRINGS = {
   matchSummary: 'Match summary',
   continueLabel: 'Continue',
   mvp: 'MVP',
+  trainerDuo: 'Duo',
+  trainerSolo: 'Solo',
+  trainerDuoHint: 'Space swaps · 9s cooldown',
+  trainerSoloHint: 'Pick a bench to practise Tag Swap',
   cheats: 'Trainer',
   cheatCooldowns: 'No cooldowns',
   cheatEnergy: 'Infinite energy',
   cheatLevelUp: 'Level up',
   cheatResetDummies: 'Reset dummies',
+  cheatDraft: 'Deal augment draft',
   dps: 'DPS',
   level: 'Level',
   settingsVideo: 'Video',
@@ -78,3 +83,12 @@ export const STRINGS = {
 } as const;
 
 export type StringKey = keyof typeof STRINGS;
+
+/** Quick-chat phrases (GAME_DESIGN §17 comms) — team-scoped canned lines,
+ * relayed by the server against this whitelist. */
+export const QUICK_CHAT: Record<string, string> = {
+  nice: 'Nice!',
+  thanks: 'Thanks!',
+  help: 'Help!',
+  onit: 'On it!',
+};

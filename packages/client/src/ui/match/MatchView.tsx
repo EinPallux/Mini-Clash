@@ -33,14 +33,33 @@ export function MatchView(): React.ReactElement {
     runtime.onEscape = () => setMenuOpen((v) => !v);
     let alive = true;
     const myChampion = mode === 'bridge' ? (lineup?.[0]?.championId ?? championId) : championId;
+    // Lobby matches always ride the socket (seat reservation from the lobby);
+    // ?online=1 additionally routes solo bridge matches through the server.
+    const join = useSession.getState().matchJoin;
+    const net =
+      mode === 'bridge' &&
+      (join !== null || new URLSearchParams(window.location.search).get('online') === '1')
+        ? ('socket' as const)
+        : ('worker' as const);
+    const name = useSession.getState().profile?.name;
     runtime
-      .start(canvas, myChampion, (p) => alive && setProgress(p), mode, lineup ?? undefined)
+      .start(
+        canvas,
+        myChampion,
+        (p) => alive && setProgress(p),
+        mode,
+        lineup ?? undefined,
+        net,
+        join ? { ...join, name } : undefined,
+      )
       .then(() => alive && setReady(true))
       .catch((err: unknown) => alive && setError(err instanceof Error ? err.message : String(err)));
     return () => {
       alive = false;
       runtime.dispose();
       runtimeRef.current = null;
+      // A lobby handoff is one match only — the next round mints a new token.
+      useSession.getState().setMatchJoin(null);
     };
   }, []);
 
@@ -67,7 +86,12 @@ export function MatchView(): React.ReactElement {
                   .filter((p) => p.team === 0)
                   .map((p) => (
                     <div key={p.id} className="load-card">
-                      <span className="ltr">{CHAMPIONS[p.championId].name.slice(0, 1)}</span>
+                      <span className="ltr">
+                        {CHAMPIONS[p.championId].name.slice(0, 1)}
+                        {p.benchId && (
+                          <span className="ltr-bench">{CHAMPIONS[p.benchId].name.slice(0, 1)}</span>
+                        )}
+                      </span>
                       <span className="who">{p.bot ? (p.name ?? 'Bot') : 'You'}</span>
                     </div>
                   ))}

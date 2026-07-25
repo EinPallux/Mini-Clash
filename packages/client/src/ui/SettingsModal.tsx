@@ -18,6 +18,7 @@ const KEY_LABELS: Record<keyof Keybinds, string> = {
   attackMove: 'Attack-move',
   stop: 'Stop',
   dance: 'Dance',
+  swap: 'Tag Swap',
 };
 
 export function SettingsModal({ onClose }: { onClose: () => void }): React.ReactElement {

@@ -134,6 +134,47 @@ export class NavGrid {
     return cells;
   }
 
+  /** Stamp a temporary circular obstacle (Boltz's droppod bunker). Returns cell indices; reverse with unstampWall. */
+  stampDisc(cx: number, cz: number, rad: number): number[] {
+    const cells: number[] = [];
+    const r = rad + CLEARANCE;
+    const c0 = this.toCol(cx - r);
+    const c1 = this.toCol(cx + r);
+    const r0 = this.toRow(cz - r);
+    const r1 = this.toRow(cz + r);
+    for (let row = r0; row <= r1; row++) {
+      for (let col = c0; col <= c1; col++) {
+        if (col < 0 || col >= this.cols || row < 0 || row >= this.rows) continue;
+        const dx = this.colX(col) - cx;
+        const dz = this.rowZ(row) - cz;
+        if (dx * dx + dz * dz > r * r) continue;
+        const i = this.idx(col, row);
+        if (this.blocked[i] === 1) continue; // never disturb static blockers
+        this.blocked[i] = this.blocked[i] === 0 ? 2 : this.blocked[i] + 1;
+        cells.push(i);
+      }
+    }
+    this.version++;
+    return cells;
+  }
+
+  /**
+   * Stamp an annulus of blocked cells (Castle Drop's standing crater rim).
+   * Same lifecycle as stampDisc — reverse with unstampWall.
+   */
+  stampRing(cx: number, cz: number, rad: number, thickness: number): number[] {
+    const outer = this.stampDisc(cx, cz, rad);
+    const inner = new Set(this.stampDisc(cx, cz, Math.max(0, rad - thickness)));
+    const ring: number[] = [];
+    for (const cell of outer) {
+      if (inner.has(cell)) continue;
+      ring.push(cell);
+    }
+    // The inner disc was stamped only to compute the hole — give it back.
+    this.unstampWall([...inner]);
+    return ring;
+  }
+
   unstampWall(cells: number[]): void {
     for (const i of cells) {
       const v = this.blocked[i];

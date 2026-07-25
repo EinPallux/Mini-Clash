@@ -1,11 +1,15 @@
 /**
  * Client ⇄ simulation contract: intents in, snapshots + events out.
- * Pure types (no logic). Binary codecs join in v0.3 when the wire is a real network;
- * v0.1 transports these structures over Worker structured clone.
+ * Offline transports these structures over Worker structured clone; online they
+ * ride the binary delta-snapshot codec in ./codec (TECH §6 — quantized, dirty-
+ * masked, baseline-keyed, ≤ 12 KB/s per client, enforced by test).
  */
 import type { Slot, Team } from '@mini-clash/data';
 
 export { PROTOCOL_VERSION } from '@mini-clash/data';
+
+/** Placeholder id for an enemy augment this team has not discovered yet. */
+export const UNKNOWN_AUGMENT = '?';
 
 export type EntityId = number;
 export type PlayerId = number;
@@ -25,6 +29,11 @@ export type Intent =
   | { t: 'buyRelic'; relicId: string }
   | { t: 'sell'; itemId: string }
   | { t: 'dance' }
+  | { t: 'swap' }
+  /** Take offer 0/1/2 from the open augment draft. */
+  | { t: 'draftPick'; offer: 0 | 1 | 2 }
+  /** Spend the match's reroll token on the current offer set. */
+  | { t: 'draftReroll' }
   | { t: 'ping'; kind: PingKind; x: number; z: number }
   | { t: 'surrender' }
   | { t: 'trainer'; cmd: TrainerCmd };
@@ -34,7 +43,11 @@ export type TrainerCmd =
   | { k: 'infiniteEnergy'; on: boolean }
   | { k: 'levelUp' }
   | { k: 'resetDummies' }
-  | { k: 'switchChampion'; championId: string };
+  | { k: 'switchChampion'; championId: string }
+  /** Training duo config: set (or clear, with null) the benched half. */
+  | { k: 'setBench'; championId: string | null }
+  /** Training: deal a fresh augment draft on demand, at any level. */
+  | { k: 'openDraft' };
 
 export interface IntentMsg {
   seq: number;
@@ -49,6 +62,8 @@ export type BotTier = 'recruit' | 'veteran' | 'elite';
 export interface MatchPlayerConfig {
   id: PlayerId;
   championId: string;
+  /** Second champion of the duo (v0.4 Tag Team). Absent = solo champion. */
+  benchId?: string;
   team: Team;
   /** Present = sim-driven bot at this tier. */
   bot?: BotTier;
@@ -60,8 +75,14 @@ export interface MatchConfig {
   seed: number;
   mapId: string;
   players: MatchPlayerConfig[];
-  /** Test/dev hook (offline smokes only — the v0.3 server ignores it). */
-  rig?: { enemyCoreHp?: number; enemyTowerHp?: number };
+  /** Test/dev hook (offline smokes only — the server builds configs itself and
+   * never forwards a client-supplied rig). */
+  rig?: {
+    enemyCoreHp?: number;
+    enemyTowerHp?: number;
+    /** Balance A/B: bots on this team never Tag Swap (ROADMAP v0.4 acceptance). */
+    noSwapTeam?: Team;
+  };
 }
 
 /* -------------------------------- Snapshots ------------------------------- */
@@ -70,6 +91,16 @@ export interface BuffSnap {
   id: string;
   tLeft: number;
   stacks: number;
+}
+
+/** One aggregated damage source on the death screen (UI_UX §10, top 3). */
+export interface RecapEntry {
+  /** Source champion (null = minis/structures/burns without a champion). */
+  championId: string | null;
+  name: string;
+  /** 'aa' | 'q' | 'w' | 'r' | 'passive' | 'item:<id>' | 'mini' | 'tower' | 'core' | 'burn'. */
+  label: string;
+  amount: number;
 }
 
 export interface CastSnap {
@@ -126,8 +157,43 @@ export interface ChampionSnap extends EntityBase {
   buffs: BuffSnap[];
   /** Champion-specific passive readouts (stonewall charge, powder counter). */
   passive: Record<string, number>;
+  /** What killed you — present while dead (death-screen recap, UI_UX §10). */
+  recap?: RecapEntry[];
+  /** Tag Team duo state (GAME_DESIGN §7.2) — absent for solo champions. */
+  duo?: {
+    /** Benched champion. */
+    championId: string;
+    energy: number;
+    cooldowns: Record<Slot, number>;
+    /** Seconds until Space is available again. */
+    swapCd: number;
+    /** Morph transition remaining (0.35 → 0); 0 = fully swapped. */
+    morphT: number;
+  };
   dancing: boolean;
+  /**
+   * Augments taken this match, in pick order (docs/AUGMENTS.md). Enemy entries
+   * you have not yet seen on the field arrive as `UNKNOWN_AUGMENT` — the count
+   * is public, the identities are earned (UI_UX §11).
+   */
+  augments: string[];
+  /** Your open draft — only ever present on your OWN champion. */
+  draft?: DraftSnap;
+  /** Reroll tokens left. */
+  rerolls: number;
   stats: { ad: number; attackSpeed: number; moveSpeed: number; armor: number; ward: number };
+}
+
+/** An open augment draft (AUGMENTS.md §1). The match keeps running around it. */
+export interface DraftSnap {
+  /** 0/1/2 — which of the three drafts this is. */
+  index: number;
+  /** Three augment ids. */
+  offers: string[];
+  /** Seconds until auto-pick. */
+  tLeft: number;
+  /** True once the reroll has been spent on this set. */
+  rerolled: boolean;
 }
 
 export interface DummySnap extends EntityBase {
@@ -201,11 +267,32 @@ export interface FlowerSnap extends EntityBase {
   tLeft: number;
 }
 
-/** Ground aura zone (Sylva's ward). */
+/** Ground area effect: Sylva's ward, Boltz's dome/pod, Wisp's curse. */
 export interface ZoneSnap extends EntityBase {
   kind: 'zone';
+  /** Picks the client look + behaviour readout. */
+  variant: 'garden' | 'dome' | 'pod' | 'curse' | 'trail';
   tLeft: number;
   duration: number;
+}
+
+/** Piper's companion: untargetable, undamageable, always on stage. */
+export interface PetSnap extends EntityBase {
+  kind: 'pet';
+  unitId: string;
+  /** Running an errand (fetch or Q dash) rather than orbiting. */
+  busy: boolean;
+  /** Fed by an unclaimed snack — the next fetch hits twice as hard. */
+  empowered: boolean;
+}
+
+/** A dropped snack waiting for an ally (Piper W). */
+export interface PickupSnap extends EntityBase {
+  kind: 'pickup';
+  unitId: string;
+  tLeft: number;
+  /** Toss arc phase 0..1 while it is still in the air. */
+  tossPhase?: number;
 }
 
 export type EntitySnap =
@@ -219,7 +306,9 @@ export type EntitySnap =
   | CoreSnap
   | OrbSnap
   | FlowerSnap
-  | ZoneSnap;
+  | ZoneSnap
+  | PetSnap
+  | PickupSnap;
 
 /* --------------------------------- Events --------------------------------- */
 
@@ -290,7 +379,21 @@ export type SimEvent =
   | { t: 'overtime' }
   | { t: 'suddenDeath' }
   | { t: 'ping'; player: PlayerId; team: Team; kind: PingKind; x: number; z: number }
-  | { t: 'surrendered'; team: Team };
+  | { t: 'surrendered'; team: Team }
+  /* Draft events carry `team` so the server can scope them like pings: an
+   * enemy must never see your offers (UI_UX §9) or learn a pick before the
+   * card shows itself on the field (AUGMENTS §1, the visibility mandate). */
+  | { t: 'draftOpen'; player: PlayerId; team: Team; index: number; offers: string[] }
+  | { t: 'draftReroll'; player: PlayerId; team: Team; offers: string[] }
+  | {
+      t: 'augmentPicked';
+      player: PlayerId;
+      team: Team;
+      augmentId: string;
+      index: number;
+      /** True when the 45 s timer ran out and the coach picked for you. */
+      auto: boolean;
+    };
 
 export interface Snapshot {
   tick: number;
@@ -299,6 +402,68 @@ export interface Snapshot {
   entities: EntitySnap[];
   events: SimEvent[];
 }
+
+/* ---------------------------------- Lobby --------------------------------- */
+
+/** One of 8 lobby seats (two team columns × 4). */
+export interface LobbySeatSnap {
+  team: Team;
+  /** 0..3 within the team column. */
+  idx: number;
+  occupant:
+    | { kind: 'human'; key: string; name: string; ready: boolean; leader: boolean }
+    | { kind: 'bot'; tier: BotTier }
+    | null;
+}
+
+/** Broadcast to every member on any lobby mutation. */
+export interface LobbySnap {
+  code: string;
+  phase: 'lobby' | 'select';
+  seats: LobbySeatSnap[];
+  botFill: boolean;
+  /** Why START is unavailable right now (null = leader can start). */
+  startBlocked: string | null;
+}
+
+/** Per-client champion-select view — enemy picks never cross the wire. */
+export interface LobbySelectSnap {
+  timeLeft: number;
+  /** Your duo: [active, bench] — both are yours, either may be rerolled. */
+  you: { duo: [string, string]; rerolls: number; locked: boolean };
+  /** Your team's four duo cards in seat order (includes you). */
+  team: {
+    key: string;
+    name: string;
+    duo: [string, string];
+    locked: boolean;
+    bot: boolean;
+    you: boolean;
+  }[];
+  /** Shared team bench (rerolled champions, first-come swaps). */
+  bench: string[];
+  /** Enemy cards to draw face-down. */
+  enemyCount: number;
+}
+
+/** Handoff into the authoritative match room once everyone locked. */
+export interface LobbyMatchMsg {
+  roomId: string;
+  token: string;
+  seat: PlayerId;
+}
+
+export type LobbyClientMsg =
+  | { t: 'seat'; team: Team; idx: number }
+  | { t: 'bot'; team: Team; idx: number; tier: BotTier | null }
+  | { t: 'fill'; on: boolean }
+  | { t: 'ready'; on: boolean }
+  | { t: 'start' }
+  /** Reroll one half of your duo (slot 0 = active, 1 = bench). */
+  | { t: 'reroll'; slot: 0 | 1 }
+  /** Swap a team-bench champion into one of your duo slots. */
+  | { t: 'swap'; championId: string; slot: 0 | 1 }
+  | { t: 'lock' };
 
 /* ------------------------------- Worker link ------------------------------ */
 
@@ -311,3 +476,4 @@ export type WorkerToClient =
   | { t: 'ready' }
   | { t: 'snapshot'; snap: Snapshot }
   | { t: 'fatal'; message: string };
+export { BASELINE_EVERY, SnapshotDecoder, SnapshotEncoder } from './codec';

@@ -13,6 +13,13 @@ export interface AssetEntry {
   keepClips?: string[];
   /** Animation-library files whose clips graft onto this model's rig (KayKit path). */
   mergeAnims?: string[];
+  /**
+   * Recenter the scene on its horizontal footprint, base at y = 0. Some packs
+   * (SpaceKit) author meshes at their position in a showcase grid rather than at
+   * the origin, which would place every instance metres away from where the game
+   * puts it. Opt-in so already-tuned centered models never shift.
+   */
+  recenter?: boolean;
 }
 
 /** KayKit Rig_Medium clip subset the champion state machine uses. */
@@ -38,6 +45,26 @@ const KAYKIT_SKELETON_ANIMS = [
 
 /** Mini crowd bodies keep only the states their actor drives (bytes matter ×30 on screen). */
 const MINI_CLIPS = ['idle', 'walk', 'attack-melee-right', 'holding-right-shoot', 'die'];
+
+/** CubePets ship 8 clips; Chomp and the stampede herd only ever drive these four. */
+const PET_CLIPS = ['idle', 'walk', 'run', 'eat'];
+
+/**
+ * STAMPEDE! (Piper R) trades on species variety — the joke is that the whole
+ * menagerie answers the whistle. Eight big, silhouette-distinct animals carry it
+ * at ~8× the byte cost of one; the full 24-model pack is a post-launch nicety,
+ * not worth 3 MB of match-core payload for a single ultimate.
+ */
+const STAMPEDE_SPECIES = [
+  'giraffe',
+  'elephant',
+  'panda',
+  'cow',
+  'pig',
+  'deer',
+  'tiger',
+  'hog',
+] as const;
 
 const CHAR_CLIPS = [
   'idle',
@@ -147,6 +174,80 @@ export const ASSET_MANIFEST: AssetEntry[] = [
     src: 'Kenney_GraveyardKit/GLB format/gravestone-bevel.glb',
     group: 'champion',
   },
+
+  // v0.4 champions — Boltz (astronaut dress on the Kenney-Skinned rig) + Wisp (ghost)
+  {
+    key: 'chars/character-male-c',
+    src: 'Kenney_CuteCharacters/GLB format/character-male-c.glb',
+    group: 'champion',
+    keepClips: CHAR_CLIPS,
+  },
+  {
+    key: 'graveyard/ghost',
+    src: 'Kenney_GraveyardKit/GLB format/character-ghost.glb',
+    group: 'champion',
+    keepClips: CHAR_CLIPS,
+  },
+  // SpaceKit meshes are authored at their showcase-grid position, not the origin.
+  {
+    key: 'space/weapon-gun',
+    src: 'Kenney_SpaceKit/GLTF format/weapon_gun.glb',
+    group: 'champion',
+    recenter: true,
+  },
+  // Boltz R bunker: the droppod that lands, shields, then launches away.
+  {
+    key: 'space/rocket-pod',
+    src: 'Kenney_SpaceKit/GLTF format/rocket_baseA.glb',
+    group: 'champion',
+    recenter: true,
+  },
+
+  // v0.5 champions — Piper (+ Chomp the fox) and Vex
+  {
+    key: 'chars/character-female-a',
+    src: 'Kenney_CuteCharacters/GLB format/character-female-a.glb',
+    group: 'champion',
+    keepClips: CHAR_CLIPS,
+  },
+  {
+    key: 'graveyard/vampire',
+    src: 'Kenney_GraveyardKit/GLB format/character-vampire.glb',
+    group: 'champion',
+    keepClips: CHAR_CLIPS,
+  },
+  {
+    key: 'weapons/rapier',
+    src: 'KayKit_FantasyWeaponsBits_1.0_FREE/Assets/gltf/sword_C.gltf',
+    group: 'champion',
+  },
+  // Piper's W snack: a plate the fox will absolutely eat if nobody claims it.
+  {
+    key: 'dungeon/plate-full',
+    src: 'KayKit_Dungeon/Models/gltf/plateFull.gltf.glb',
+    group: 'champion',
+  },
+  // Chomp — a persistent companion, so he carries his own clip set.
+  {
+    key: 'pets/fox',
+    src: 'Kenney_CubePets/GLB format/animal-fox.glb',
+    group: 'champion',
+    keepClips: PET_CLIPS,
+  },
+  // Two Good Boys (Piper signature) adds a second pet to the rotation.
+  {
+    key: 'pets/dog',
+    src: 'Kenney_CubePets/GLB format/animal-dog.glb',
+    group: 'champion',
+    keepClips: PET_CLIPS,
+  },
+  // STAMPEDE! draws its waves from this menagerie (seeded per wave).
+  ...STAMPEDE_SPECIES.map((s) => ({
+    key: `pets/${s}`,
+    src: `Kenney_CubePets/GLB format/animal-${s}.glb`,
+    group: 'champion' as const,
+    keepClips: PET_CLIPS,
+  })),
 
   // Dummy body
   {
