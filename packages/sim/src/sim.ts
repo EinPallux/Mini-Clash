@@ -18,7 +18,14 @@ import type {
   Snapshot,
   TrainerCmd,
 } from '@mini-clash/protocol';
-import { applySpawnEffects, canAttack, tryCast, updateAutoAttack, updateCasts } from './abilities';
+import {
+  applySpawnEffects,
+  canAttack,
+  tryCast,
+  trySwap,
+  updateAutoAttack,
+  updateCasts,
+} from './abilities';
 import { healEntity, plantFlower } from './actions';
 import { type BotBrain, makeBrain, thinkBots } from './bots';
 import { isHiddenFrom, updateBrushState } from './brush';
@@ -126,6 +133,8 @@ export class Sim {
     for (const p of config.players) {
       const def = CHAMPIONS[p.championId];
       if (!def) throw new Error(`unknown champion '${p.championId}'`);
+      const benchDef = p.benchId ? CHAMPIONS[p.benchId] : undefined;
+      if (p.benchId && !benchDef) throw new Error(`unknown champion '${p.benchId}'`);
       const spawn = w.spawnPoints[p.team];
       const idx = teamCounts[p.team]++;
       const e = w.add({
@@ -181,12 +190,29 @@ export class Sim {
           respawnIn: 0,
           dancing: false,
           passive: def.passive.id === 'stonewall' ? { stonewallCd: 0 } : { powderCount: 0 },
+          duo: benchDef
+            ? {
+                def: benchDef,
+                energy: 100,
+                cds: { q: 0, w: 0, r: 0 },
+                aaCd: 0,
+                passive:
+                  benchDef.passive.id === 'stonewall' ? { stonewallCd: 0 } : { powderCount: 0 },
+                swapCd: 0,
+                morphT: 0,
+              }
+            : null,
           speed: 0,
         },
       });
       this.playerEnts.set(p.id, e.id);
       this.trainer.set(p.id, { noCooldowns: false, infiniteEnergy: false });
       if (p.bot) this.brains.set(p.id, makeBrain(config.seed, p.id, p.bot));
+      if (benchDef) {
+        // Duos share one pool: the average of both HP curves (GAME_DESIGN §7.2).
+        e.hpMax = championStats(e).hpMax;
+        e.hp = e.hpMax;
+      }
       applySpawnEffects(w, e);
     }
 
@@ -336,6 +362,11 @@ export class Sim {
       }
       case 'cast': {
         const deny = tryCast(w, e, it.slot, it.x, it.z, flags.noCooldowns, flags.infiniteEnergy);
+        if (deny) w.emit({ t: 'castDenied', player: m.player, reason: deny });
+        break;
+      }
+      case 'swap': {
+        const deny = trySwap(w, e);
         if (deny) w.emit({ t: 'castDenied', player: m.player, reason: deny });
         break;
       }
@@ -636,6 +667,11 @@ export class Sim {
     c.energy = 100;
     c.respawnIn = 0;
     c.recap = null; // the recap lives on the death screen only
+    if (c.duo) {
+      c.duo.energy = 100;
+      c.duo.swapCd = 0;
+      c.duo.morphT = 0;
+    }
     this.world.emit({ t: 'respawn', id: e.id });
     applySpawnEffects(this.world, e);
   }
@@ -898,6 +934,15 @@ export class Sim {
         buffs: e.buffs.map((b) => ({ id: b.id, tLeft: b.tLeft, stacks: b.stacks })),
         passive: { ...c.passive },
         recap: e.dead && c.recap ? c.recap : undefined,
+        duo: c.duo
+          ? {
+              championId: c.duo.def.id,
+              energy: Math.floor(c.duo.energy),
+              cooldowns: { ...c.duo.cds },
+              swapCd: Math.ceil(c.duo.swapCd * 10) / 10,
+              morphT: c.duo.morphT,
+            }
+          : undefined,
         dancing: c.dancing,
         stats: {
           ad: Math.round(stats.ad),

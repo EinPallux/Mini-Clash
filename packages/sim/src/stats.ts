@@ -48,8 +48,13 @@ export function championStats(e: Entity): StatTotals {
   if (!c) throw new Error('not a champion');
   const s = c.def.stats;
   const lv = c.level - 1;
+  // Tag Team shares one HP pool: the average of both champions' HP curves
+  // (GAME_DESIGN §7.2) — symmetric, so swapping never changes hpMax.
+  const bs = c.duo?.def.stats;
   const t: StatTotals = {
-    hpMax: s.hp + s.hpPerLevel * lv,
+    hpMax: bs
+      ? (s.hp + s.hpPerLevel * lv + (bs.hp + bs.hpPerLevel * lv)) / 2
+      : s.hp + s.hpPerLevel * lv,
     ad: s.ad + s.adPerLevel * lv,
     ap: 0,
     attackSpeed: s.attackSpeed + s.attackSpeedPerLevel * lv,

@@ -5,6 +5,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 Entry categories: `Added` · `Changed` · `Fixed` · `Balance` · `Content` · `Assets` · `Docs`
 
+## [Unreleased] — v0.4.0 "Tag Team" (in progress)
+
+### Added
+- **Tag Swap sim core (GAME_DESIGN §7.2):** duos live in the simulation — `MatchPlayerConfig` takes a `benchId`, and the champion entity carries a duo bank: the benched champion's kit, cooldowns (which keep ticking), Energy (which keeps refilling — swapping is a resource play), and passive scratch. The `swap` intent exchanges the banks in place: HP (one shared pool, the average of both champions' HP curves — symmetric, so swapping never moves your health bar), position, items, level, gold, buffs and shields all stay put. 9 s swap cooldown, 0.35 s morph (you keep moving and stay targetable, but attacks/casts wait), +20% move speed decaying over 1 s on swap-in, and the arriving champion's entrance effect fires. Blocked while channeling, leaping, stunned or airborne — a basic-attack windup just cancels. Death kills the duo on one timer; respawn restores both Energy bars with swap ready. Solo configs (v0.3 shape) are untouched. Seven edge-case sim tests: shared-pool math across swaps and level-ups, per-champion banks with bench recovery, morph lockout, channel/CC blocks, buff carryover, swap-adjacent projectile flight, death-frame handling, and snapshot duo blocks.
+
 ## [Unreleased] — v0.3.0 "Online" (in progress)
 
 ### Added

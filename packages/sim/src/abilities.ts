@@ -1,4 +1,4 @@
-import { type AbilityDef, BRIDGE, type Slot } from '@mini-clash/data';
+import { type AbilityDef, BRIDGE, type Slot, TAG_SWAP } from '@mini-clash/data';
 import { executeActions, plantFlower } from './actions';
 import { isHiddenFrom } from './brush';
 import { applyBuff, applyBuffById, applyCc } from './buffs';
@@ -33,6 +33,7 @@ export function tryCast(
   const c = e.champ;
   if (!c) return null;
   if (e.dead) return 'dead';
+  if (c.duo && c.duo.morphT > 0) return 'casting'; // mid-swap: hands off the kit
 
   // Recast stage takes priority (free, instant). Multi-charge recasts chain (Grukk R).
   if (c.recast && c.recast.slot === slot) {
@@ -170,6 +171,18 @@ export function updateCasts(w: World, e: Entity, dt: number, noCooldowns: boolea
   c.energy = Math.min(100, c.energy + 4 * dt);
   if (c.passive.stonewallCd !== undefined)
     c.passive.stonewallCd = Math.max(0, c.passive.stonewallCd - dt);
+  // The benched half keeps living (GAME_DESIGN §7.2): cooldowns tick, Energy
+  // refills — swapping is a resource play precisely because the bench recovers.
+  const duo = c.duo;
+  if (duo) {
+    duo.swapCd = Math.max(0, duo.swapCd - dt);
+    duo.morphT = Math.max(0, duo.morphT - dt);
+    for (const s of ['q', 'w', 'r'] as const) duo.cds[s] = Math.max(0, duo.cds[s] - dt);
+    duo.aaCd = Math.max(0, duo.aaCd - dt);
+    duo.energy = Math.min(100, duo.energy + 4 * dt);
+    if (duo.passive.stonewallCd !== undefined)
+      duo.passive.stonewallCd = Math.max(0, duo.passive.stonewallCd - dt);
+  }
 
   if (c.recast) {
     c.recast.tLeft -= dt;
@@ -219,6 +232,7 @@ export function updateCasts(w: World, e: Entity, dt: number, noCooldowns: boolea
 export function updateAutoAttack(w: World, e: Entity, _dt: number): void {
   const c = e.champ;
   if (!c || e.dead || c.leap) return;
+  if (c.duo && c.duo.morphT > 0) return; // mid-swap: the weapon isn't there yet
   if (c.cast && c.cast.kind !== 'aa') return;
 
   const stats = championStats(e);
@@ -374,6 +388,13 @@ export function applySpawnEffects(w: World, e: Entity): void {
   const c = e.champ;
   if (!c) return;
   applyBuffById(e, 'spawn_haste');
+  applyEntrance(w, e);
+}
+
+/** The champion's signature swap-in/spawn micro-effect (GAME_DESIGN §7.2). */
+export function applyEntrance(w: World, e: Entity): void {
+  const c = e.champ;
+  if (!c) return;
   const p = c.def.entrance.params;
   switch (c.def.entrance.id) {
     case 'shieldwall': {
@@ -426,6 +447,48 @@ export function applySpawnEffects(w: World, e: Entity): void {
 }
 
 /** Powder-blast splash resolution (called from projectile impact). */
+/** Tag Swap (GAME_DESIGN §7.2): exchange the active kit with the bench.
+ * Shared on the entity: HP, position, items, level, gold, buffs, shields.
+ * Exchanged: def, Energy, cooldowns, passive scratch. Movement continues;
+ * attacks/casts wait out the 0.35 s morph. */
+export function trySwap(w: World, e: Entity): DenyReason | null {
+  const c = e.champ;
+  if (!c || !c.duo) return null; // solo champion — Space does nothing
+  if (e.dead) return 'dead';
+  const duo = c.duo;
+  if (duo.swapCd > 0.001) return 'cooldown';
+  if (duo.morphT > 0) return 'casting';
+  // Blocked while channeling/winding up an ability or leaping; a basic-attack
+  // windup just cancels (swap is an identity action, not a channel).
+  if (c.cast && c.cast.kind !== 'aa') return 'casting';
+  if (c.leap) return 'casting';
+  // Hard CC only: stuns and knock-ups. Roots leave your hands free.
+  if (e.airborne > 0 || e.buffs.some((b) => b.id === 'cc_stun')) return 'casting';
+
+  c.cast = null;
+  c.recast = null;
+  c.aaTarget = null;
+  c.dancing = false;
+  [c.def, duo.def] = [duo.def, c.def];
+  [c.energy, duo.energy] = [duo.energy, c.energy];
+  [c.cds, duo.cds] = [duo.cds, c.cds];
+  [c.aaCd, duo.aaCd] = [duo.aaCd, c.aaCd];
+  [c.passive, duo.passive] = [duo.passive, c.passive];
+  duo.swapCd = TAG_SWAP.cooldown;
+  duo.morphT = TAG_SWAP.morphS;
+  c.lastActionAt = w.time; // swapping reveals in brush like any action
+
+  applyBuff(e, {
+    id: 'tag_swap_momentum',
+    name: 'Tag Momentum',
+    duration: TAG_SWAP.hasteDuration,
+    decayingMsBonus: TAG_SWAP.haste,
+  });
+  applyEntrance(w, e);
+  w.fx('duo.swap', e.x, e.z, { source: e.id });
+  return null;
+}
+
 export function powderBlast(w: World, owner: Entity, target: Entity): void {
   const c = owner.champ;
   if (!c) return;

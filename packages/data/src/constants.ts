@@ -5,6 +5,17 @@ export const TICK_DT = 1 / TICK_RATE;
 export const ENERGY_MAX = 100;
 export const ENERGY_REGEN_PER_SEC = 4;
 
+/** Tag Swap (GAME_DESIGN §7.2). */
+export const TAG_SWAP = {
+  /** Seconds between swaps, starting when the swap fires. */
+  cooldown: 9,
+  /** Morph transition — moving and targetable, but no attacks/casts. */
+  morphS: 0.35,
+  /** Swap-in move-speed burst, decaying linearly over the duration. */
+  haste: 0.2,
+  hasteDuration: 1,
+} as const;
+
 export const LEVEL_MAX = 10;
 /** Cumulative XP per level 1..10 (index 0 = level 1 = 0 XP). */
 export const XP_CURVE = [0, 80, 200, 360, 560, 800, 1090, 1430, 1820, 2260] as const;

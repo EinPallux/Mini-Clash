@@ -47,6 +47,20 @@ export interface LeapState {
   ability: AbilityDef;
 }
 
+/** The benched half of a Tag Team duo (GAME_DESIGN §7.2): its own kit,
+ * cooldowns, Energy and passive scratch — everything else is shared. */
+export interface DuoBank {
+  def: ChampionDef;
+  energy: number;
+  cds: Record<Slot, number>;
+  aaCd: number;
+  passive: Record<string, number>;
+  /** Seconds until the next swap (starts at 9 on swap). */
+  swapCd: number;
+  /** Morph transition remaining; > 0 blocks attacks/casts, not movement. */
+  morphT: number;
+}
+
 export interface ChampState {
   player: PlayerId;
   def: ChampionDef;
@@ -75,6 +89,8 @@ export interface ChampState {
   }[];
   /** Aggregated top-3 killers, frozen at death, cleared on respawn. */
   recap: import('@mini-clash/protocol').RecapEntry[] | null;
+  /** Tag Team bench (null = solo champion, pre-v0.4 configs). */
+  duo: DuoBank | null;
   /** Item passive scratch (dragonfang counter, nullwave timer…). */
   itemState: Record<string, number>;
   /** world.time of last damage dealt or taken (windrunner). */

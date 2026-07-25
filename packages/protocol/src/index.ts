@@ -26,6 +26,7 @@ export type Intent =
   | { t: 'buyRelic'; relicId: string }
   | { t: 'sell'; itemId: string }
   | { t: 'dance' }
+  | { t: 'swap' }
   | { t: 'ping'; kind: PingKind; x: number; z: number }
   | { t: 'surrender' }
   | { t: 'trainer'; cmd: TrainerCmd };
@@ -50,6 +51,8 @@ export type BotTier = 'recruit' | 'veteran' | 'elite';
 export interface MatchPlayerConfig {
   id: PlayerId;
   championId: string;
+  /** Second champion of the duo (v0.4 Tag Team). Absent = solo champion. */
+  benchId?: string;
   team: Team;
   /** Present = sim-driven bot at this tier. */
   bot?: BotTier;
@@ -139,6 +142,17 @@ export interface ChampionSnap extends EntityBase {
   passive: Record<string, number>;
   /** What killed you — present while dead (death-screen recap, UI_UX §10). */
   recap?: RecapEntry[];
+  /** Tag Team duo state (GAME_DESIGN §7.2) — absent for solo champions. */
+  duo?: {
+    /** Benched champion. */
+    championId: string;
+    energy: number;
+    cooldowns: Record<Slot, number>;
+    /** Seconds until Space is available again. */
+    swapCd: number;
+    /** Morph transition remaining (0.35 → 0); 0 = fully swapped. */
+    morphT: number;
+  };
   dancing: boolean;
   stats: { ad: number; attackSpeed: number; moveSpeed: number; armor: number; ward: number };
 }
