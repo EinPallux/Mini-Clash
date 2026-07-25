@@ -188,6 +188,21 @@ describe('Tag Swap', () => {
     expect(e.hp).toBeCloseTo(e.hpMax, 3);
   });
 
+  it('fires the arriving champion’s entrance on every swap-in', () => {
+    const { sim, msg } = duoSim();
+    const e = me(sim);
+    // Rook → Fathom: Lucky Doubloon buff arrives with him.
+    sim.applyIntents([msg({ t: 'swap' })]);
+    sim.tick();
+    expect(e.buffs.some((b) => b.id === 'fathom_entrance_luck')).toBe(true);
+    // …and back: Rook re-enters with Shieldwall's block charge.
+    run(sim, TAG_SWAP.cooldown + 0.2);
+    sim.applyIntents([msg({ t: 'swap' })]);
+    sim.tick();
+    const wall = e.buffs.find((b) => b.id === 'rook_entrance_shieldwall');
+    expect(wall?.blockNextHit).toBe(true);
+  });
+
   it('snapshots carry the duo block; solo configs stay duo-free with old hp rules', () => {
     const { sim } = duoSim();
     const snap = mySnap(sim);
