@@ -138,7 +138,8 @@ const duoStats = new Map();
 const augStats = new Map();
 const augRow = (id) =>
   augStats.get(id) ??
-  augStats.set(id, { offered: 0, taken: 0, tookGames: 0, tookWins: 0, passGames: 0, passWins: 0 })
+  augStats
+    .set(id, { offered: 0, taken: 0, tookGames: 0, tookWins: 0, passGames: 0, passWins: 0 })
     .get(id);
 
 for (let m = 0; m < MATCHES; m++) {
@@ -309,9 +310,7 @@ if (augStats.size > 0) {
     .sort((a, b) => b.pick - a.pick);
   const generics = rows.filter((r) => r.generic);
   const sigs = rows.filter((r) => !r.generic);
-  const sigPick = sigs.length
-    ? (100 * sigs.reduce((t, r) => t + r.pick, 0)) / sigs.length
-    : 0;
+  const sigPick = sigs.length ? (100 * sigs.reduce((t, r) => t + r.pick, 0)) / sigs.length : 0;
   console.info(
     `\n  augment report — ${augStats.size}/${Object.keys(AUGMENTS).length} cards seen ` +
       `(rails apply to the ${generics.length} generics: pick <= 65%, win <= 56%)`,

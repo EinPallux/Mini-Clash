@@ -168,7 +168,9 @@ No crit, no dodge/miss — damage variance comes from skill expression (skillsho
 Per champion: **Passive**, **Q**, **W** (basic; Energy + CD), **R** ultimate (unlocks at level 4; CD only). No manual skill-points — abilities scale automatically with level; the *draft* choices are Augments. Ability categories: skillshot projectile, cone/line sweep, area (telegraphed circle), dash/blink, zone/summon, self/aura buff. Launch kits avoid ally-click targeting entirely (keeps controls to move + 4 buttons; ally support happens via areas and cones).
 
 ### 10.3 Crowd control
-Stun, Root, Slow, Knock-up, Fear, Taunt. Hard CC (everything except Slow/Root) obeys diminishing returns: a target hard-CC'd within the last 5 s takes 50% duration from subsequent hard CC. Knock-ups are cleanse-immune. Purge Bell relic and select augments grant cleanse/tenacity.
+Stun, Root, Slow, Knock-up, Fear, Taunt, **Silence**. Hard CC (everything except Slow/Root/Silence) obeys diminishing returns: a target hard-CC'd within the last 5 s takes 50% duration from subsequent hard CC. Knock-ups are cleanse-immune. Purge Bell relic and select augments grant cleanse/tenacity.
+
+**Silence** locks abilities and swaps but leaves your feet free — you can walk out of the thing that silenced you, you just cannot answer it. *(Added in v0.5 for Mortis' Restricted Section signature; reusing a stun there would have been a strictly stronger effect wearing the wrong word.)*
 
 ### 10.4 Projectiles, telegraphs, honesty rules
 - Every avoidable effect has a telegraph: enemy = red fill-up shape, ally = blue outline (see ART_DIRECTION §VFX language).
