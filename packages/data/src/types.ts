@@ -20,7 +20,7 @@ export interface ScalingValue {
   apRatio?: number;
 }
 
-export type CcKind = 'slow' | 'root' | 'stun' | 'knockup' | 'knockback' | 'fear';
+export type CcKind = 'slow' | 'root' | 'stun' | 'knockup' | 'knockback' | 'fear' | 'silence';
 
 export interface CcSpec {
   kind: CcKind;

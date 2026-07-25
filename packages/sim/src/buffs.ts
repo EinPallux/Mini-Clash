@@ -53,6 +53,11 @@ export function applyCc(target: Entity, cc: CcSpec): void {
       // handled by the caller (needs direction context).
       break;
     }
+    case 'silence': {
+      // Hands locked, feet free — you can run, you just cannot answer.
+      applyBuff(target, { id: 'cc_silence', name: 'Silenced', duration: cc.duration });
+      break;
+    }
     case 'root':
     case 'stun': {
       const def: BuffDef = {

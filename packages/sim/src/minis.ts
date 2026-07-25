@@ -39,7 +39,11 @@ export function spawnWave(w: World, battle: Battle, waveIndex: number): void {
   w.fx('wave.spawn', 0, 0, {});
 }
 
-function spawnMini(w: World, unitId: string, team: Team, x: number, z: number): void {
+/**
+ * Spawn one Mini. Exported so Midnight Society can raise its ghost escort out
+ * of the same code path the wave system uses — a summoned Mini is a real Mini.
+ */
+export function spawnMini(w: World, unitId: string, team: Team, x: number, z: number): void {
   const def = UNITS[unitId];
   const mini = def?.mini;
   if (!def || !mini) throw new Error(`unknown mini '${unitId}'`);

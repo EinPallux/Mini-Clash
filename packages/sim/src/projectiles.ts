@@ -1,5 +1,5 @@
 import { applyBasicRiders, capacitorArc, powderBlast } from './abilities';
-import { augFlag, augParam } from './augments';
+import { augFlag, augParam, special } from './augments';
 import { applyCc } from './buffs';
 import { dealDamage, displace } from './combat';
 import { dist, norm } from './vec';
@@ -38,6 +38,50 @@ function poppedByField(w: World, e: Entity): boolean {
   return false;
 }
 
+/**
+ * Spawn two reduced-power copies of a live projectile off its diagonals.
+ * Used by Chain Shot; the copies inherit everything but their heading, so they
+ * behave exactly like the parent shot at a fraction of the damage.
+ */
+function splitOff(w: World, e: Entity, spreadDeg: number, power: number): void {
+  const p = e.proj;
+  if (!p) return;
+  for (const sign of [-1, 1]) {
+    const a = (sign * spreadDeg * Math.PI) / 180;
+    const dx = p.dirX * Math.cos(a) - p.dirZ * Math.sin(a);
+    const dz = p.dirX * Math.sin(a) + p.dirZ * Math.cos(a);
+    w.add({
+      kind: 'projectile',
+      srcLabel: e.srcLabel,
+      team: e.team,
+      x: e.x,
+      z: e.z,
+      fx: dx,
+      fz: dz,
+      radius: e.radius * 0.75,
+      hp: 1,
+      hpMax: 1,
+      dead: false,
+      airborne: 0,
+      airborneTotal: 0,
+      buffs: [],
+      proj: {
+        ...p,
+        def: undefined, // no pulses on the shards: they hit once and stop
+        dirX: dx,
+        dirZ: dz,
+        traveled: 0,
+        maxRange: Math.max(1, p.maxRange - p.traveled),
+        pulsesFired: 0,
+        hitIds: new Set(),
+        damage: p.damage * power,
+        size: p.size * 0.75,
+      },
+    });
+  }
+  w.fx('augment.chainshot', e.x, e.z, { source: p.owner });
+}
+
 export function updateProjectile(w: World, e: Entity, dt: number): void {
   const p = e.proj;
   if (!p || e.dead) return;
@@ -63,6 +107,7 @@ export function updateProjectile(w: World, e: Entity, dt: number): void {
     ) {
       const pulse = def.pulses[p.pulsesFired];
       p.pulsesFired++;
+      const lastSkip = p.pulsesFired === def.pulses.length;
       // Exact pulse position (independent of tick granularity).
       const px = e.x - p.dirX * (p.traveled - pulse.atDistance);
       const pz = e.z - p.dirZ * (p.traveled - pulse.atDistance);
@@ -76,6 +121,9 @@ export function updateProjectile(w: World, e: Entity, dt: number): void {
           dealDamage(w, { source: src, label: e.srcLabel }, u, p.damage * pulse.damageMul, p.dtype);
         }
       }
+      // Chain Shot: the last skip throws two smaller balls off the diagonals.
+      const chain = lastSkip && owner ? special(owner, 'chain_shot') : null;
+      if (chain) splitOff(w, e, chain.spreadDeg ?? 26, chain.power ?? 0.55);
     }
   } else {
     // Direct-hit skillshot: first enemy touched (overkill can carry through).
@@ -87,8 +135,34 @@ export function updateProjectile(w: World, e: Entity, dt: number): void {
         // Wisp Boo bites harder into Chilled targets.
         const bvb = p.def?.bonusVsBuff;
         const mul = bvb && u.buffs.some((b) => b.id === bvb.buff) ? bvb.mul : 1;
+        const inscribed = u.buffs.some((b) => b.id === 'mortis_inscribed');
         dealDamage(w, { source: owner ?? e, label: e.srcLabel }, u, p.damage * mul, p.dtype);
         if (p.def?.cc && !u.dead) applyCc(u, p.def.cc);
+        // Special Collections: a bolt that strikes an inscribed debtor forks on
+        // to the next one — the reason to brand before you fire.
+        const coll = inscribed && owner ? special(owner, 'special_collections') : null;
+        if (coll && owner) {
+          let next: Entity | undefined;
+          let bestD: number = coll.radius ?? 6;
+          for (const v of w.enemiesOf(e.team)) {
+            if (v.kind === 'keg' || v.dead || v.id === u.id || p.hitIds.has(v.id)) continue;
+            const d = dist(u.x, u.z, v.x, v.z);
+            if (d < bestD) {
+              bestD = d;
+              next = v;
+            }
+          }
+          if (next) {
+            dealDamage(
+              w,
+              { source: owner, tag: 'item', label: 'augment' },
+              next,
+              p.damage * (coll.power ?? 0.6),
+              p.dtype,
+            );
+            w.fx('augment.chain', next.x, next.z, { source: owner.id, target: next.id });
+          }
+        }
         // Separation Anxiety: Boo! punches through, and every body it passes
         // banks a second onto the next Haunting Hour.
         const bank = owner ? augParam(owner, 'wisp.curseBonusPerHit', 0) : 0;

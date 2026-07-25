@@ -113,6 +113,20 @@ export function dealDamage(
       target.hp = 0;
       target.keg.killedByTeam = ctx.source.team;
       w.fx('wisp.decoy.break', target.x, target.z, { target: target.id });
+      // Poltergeist: popping the sheet is the trap, not the escape.
+      const owner = w.get(target.keg.owner);
+      const pg = owner ? special(owner, 'poltergeist') : null;
+      if (owner && pg) {
+        const s = championStats(owner);
+        const boom = (pg.base ?? 70) + (pg.apRatio ?? 0.4) * s.ap;
+        for (const u of [...w.enemiesOf(owner.team)]) {
+          if (u.kind === 'keg' || u.dead) continue;
+          if (dist(target.x, target.z, u.x, u.z) <= (pg.radius ?? 2.2) + u.radius) {
+            dealDamage(w, { source: owner, tag: 'item', label: 'augment' }, u, boom, 'arcane');
+          }
+        }
+        w.fx('augment.poltergeist', target.x, target.z, { source: owner.id });
+      }
       kill(w, target, ctx.source);
     }
     return 1;

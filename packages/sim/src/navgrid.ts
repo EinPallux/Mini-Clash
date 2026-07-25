@@ -158,6 +158,23 @@ export class NavGrid {
     return cells;
   }
 
+  /**
+   * Stamp an annulus of blocked cells (Castle Drop's standing crater rim).
+   * Same lifecycle as stampDisc — reverse with unstampWall.
+   */
+  stampRing(cx: number, cz: number, rad: number, thickness: number): number[] {
+    const outer = this.stampDisc(cx, cz, rad);
+    const inner = new Set(this.stampDisc(cx, cz, Math.max(0, rad - thickness)));
+    const ring: number[] = [];
+    for (const cell of outer) {
+      if (inner.has(cell)) continue;
+      ring.push(cell);
+    }
+    // The inner disc was stamped only to compute the hole — give it back.
+    this.unstampWall([...inner]);
+    return ring;
+  }
+
   unstampWall(cells: number[]): void {
     for (const i of cells) {
       const v = this.blocked[i];

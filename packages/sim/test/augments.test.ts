@@ -1,4 +1,4 @@
-import { AUGMENTS, DRAFT, GENERIC_AUGMENTS } from '@mini-clash/data';
+import { AUGMENT_LIST, AUGMENTS, DRAFT, GENERIC_AUGMENTS } from '@mini-clash/data';
 import type { Intent, IntentMsg } from '@mini-clash/protocol';
 import { describe, expect, it } from 'vitest';
 import { Sim } from '../src';
@@ -546,6 +546,35 @@ describe('augment effects', () => {
     expect(rolled).toBeLessThan(3);
     run(sim, 2);
     expect(c.augState.element).toBe(rolled); // never re-rolls mid-match
+  });
+
+  it('every signature augment survives its own champion casting the whole kit', {
+    timeout: 90_000,
+  }, () => {
+    const broken: string[] = [];
+    for (const def of AUGMENT_LIST) {
+      if (def.category !== 'signature' || !def.championId) continue;
+      try {
+        const sim = bridge(def.championId, def.championId === 'rook' ? 'fathom' : 'rook');
+        grant(sim, def.id);
+        const c = me(sim).champ;
+        if (!c) throw new Error('no champ');
+        levelTo(sim, 4); // R unlocks at 4 in bridge mode
+        c.draft = null;
+        championStats(me(sim));
+        for (const slot of ['q', 'w', 'r'] as const) {
+          const e = me(sim);
+          c.energy = 100;
+          c.cds = { q: 0, w: 0, r: 0 };
+          sim.applyIntents([msg({ t: 'cast', slot, x: e.x + 3, z: e.z })]);
+          run(sim, 1);
+        }
+        run(sim, 2); // let scheduled tails (echoes, pods, trails) resolve
+      } catch (err) {
+        broken.push(`${def.id}: ${(err as Error).message}`);
+      }
+    }
+    expect(broken).toEqual([]);
   });
 
   it('every generic augment can be granted without throwing', () => {

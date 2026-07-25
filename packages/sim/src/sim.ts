@@ -900,6 +900,15 @@ export class Sim {
           );
         }
         if (z.enemyBuff) applyBuffById(u, z.enemyBuff);
+        // Restricted Section: the maelstrom drags its readers toward the desk.
+        if (z.pullPerSec) {
+          const dx = e.x - u.x;
+          const dz = e.z - u.z;
+          const len = Math.hypot(dx, dz) || 1;
+          const step = Math.min(len, z.pullPerSec * dt);
+          u.x += (dx / len) * step;
+          u.z += (dz / len) * step;
+        }
         // Minis inside stop fighting for anyone — the cursed ground confuses them.
         if (z.disableMinis && u.mini) {
           applyBuff(u, {
@@ -915,12 +924,44 @@ export class Sim {
       return;
     }
 
-    // Sylva's garden.
+    if (z.variant === 'trail') {
+      // Blood Waltz: Vex's own slick. Allies get carried, enemies get stuck.
+      for (const u of w.champions()) {
+        if (dist(e.x, e.z, u.x, u.z) > z.radius + u.radius) continue;
+        if (u.team === e.team) {
+          if (z.allyMs) {
+            applyBuff(u, {
+              id: 'aug_waltz_ms',
+              name: 'Blood Waltz',
+              duration: 0.4,
+              mul: { moveSpeed: 1 + z.allyMs },
+            });
+          }
+        } else if (z.enemySlow) {
+          applyCc(u, { kind: 'slow', duration: 0.4, strength: z.enemySlow });
+        }
+      }
+      return;
+    }
+
+    // Sylva's garden. Heartwood makes it walk with her.
+    if (z.follows && owner && !owner.dead) {
+      e.x = owner.x;
+      e.z = owner.z;
+    }
     for (const u of w.champions()) {
       const inside = dist(e.x, e.z, u.x, u.z) <= z.radius + u.radius;
       if (!inside) continue;
       if (u.team === e.team) {
         healEntity(owner ?? u, u, (z.healPerSec ?? 0) * dt);
+        if (z.allyMs) {
+          applyBuff(u, {
+            id: 'aug_heartwood_ms',
+            name: 'Heartwood',
+            duration: 0.4,
+            mul: { moveSpeed: 1 + z.allyMs },
+          });
+        }
         if (z.cleanseSlows && z.cleansed && !z.cleansed.has(u.id)) {
           z.cleansed.add(u.id);
           u.buffs = u.buffs.filter((b) => !b.id.startsWith('cc_slow'));
@@ -948,6 +989,15 @@ export class Sim {
         if (dist(e.x, e.z, u.x, u.z) <= z.radius + u.radius) {
           applyFear(u, e.x, e.z, z.expireFear);
           w.fx('wisp.fear', u.x, u.z, { source: u.id });
+        }
+      }
+    }
+    if (z.expireSilence) {
+      for (const u of w.champions()) {
+        if (u.team === e.team) continue;
+        if (dist(e.x, e.z, u.x, u.z) <= z.radius + u.radius) {
+          applyCc(u, { kind: 'silence', duration: z.expireSilence });
+          w.fx('augment.silence', u.x, u.z, { source: u.id });
         }
       }
     }

@@ -7,10 +7,11 @@ import {
   type ScalingValue,
   UNITS,
 } from '@mini-clash/data';
-import { augFlag, augParam } from './augments';
+import { augFlag, augParam, special } from './augments';
 import { applyBuff, applyBuffById, applyCc, shieldTotal } from './buffs';
 import { dealDamage, displace } from './combat';
 import { healEntity } from './heal';
+import { spawnMini } from './minis';
 import { launchPetDash } from './pets';
 import { resolveScaling as baseScaling, championStats } from './stats';
 import { dist, inCone, inRect, norm } from './vec';
@@ -140,6 +141,52 @@ function executeAction(ctx: ActionCtx, a: Action): void {
         [dx, dz] = [dx * cos - dz * sin, dx * sin + dz * cos];
       }
       const damage = def.damage ? amt(ctx, def.damage.amount) : 0;
+      // Knife Juggler: every dagger is thrown twice — out, then back through
+      // whatever it missed on the way. The return leg is a mirrored shot.
+      const juggler = special(caster, 'knife_juggler');
+      if (juggler && ctx.ability.slot === 'q') {
+        const casterId = caster.id;
+        const outX = ctx.ox + dx * def.maxRange;
+        const outZ = ctx.oz + dz * def.maxRange;
+        w.schedule(def.maxRange / Math.max(1, def.speed), (world) => {
+          const src = world.get(casterId);
+          if (!src || src.dead) return;
+          const [bx, bz] = norm(src.x - outX, src.z - outZ);
+          world.add({
+            kind: 'projectile',
+            srcLabel: ctx.ability.slot,
+            team: src.team,
+            x: outX,
+            z: outZ,
+            fx: bx,
+            fz: bz,
+            radius: def.radius,
+            hp: 1,
+            hpMax: 1,
+            dead: false,
+            airborne: 0,
+            airborneTotal: 0,
+            buffs: [],
+            proj: {
+              def,
+              style: 'def',
+              owner: src.id,
+              ownerPlayer: c.player,
+              dirX: bx,
+              dirZ: bz,
+              speed: def.speed,
+              traveled: 0,
+              maxRange: def.maxRange,
+              pulsesFired: 0,
+              hitIds: new Set(),
+              damage: damage * (juggler.power ?? 0.4),
+              dtype: def.damage?.type ?? 'physical',
+              color: def.visual.color,
+              size: def.visual.size * 0.85,
+            },
+          });
+        });
+      }
       w.add({
         kind: 'projectile',
         srcLabel: ctx.ability.slot,
@@ -270,28 +317,51 @@ function executeAction(ctx: ActionCtx, a: Action): void {
 
     case 'volley': {
       const [dx, dz] = norm(ctx.aimX - ctx.ox, ctx.aimZ - ctx.oz);
-      const ox = ctx.ox;
-      const oz = ctx.oz;
       const amount = amt(ctx, a.amount);
-      const hits = new Map<number, number>();
       const step = a.length / a.count;
-      for (let i = 0; i < a.count; i++) {
-        const px = ox + dx * step * (i + 0.5);
-        const pz = oz + dz * step * (i + 0.5);
-        const delay = (a.startDelay ?? 0) + a.interval * i;
-        const casterId = caster.id;
-        w.schedule(delay, (world) => {
-          world.fx(`${c.def.id}.r.volley`, px, pz, { source: casterId });
-          for (const u of world.units()) {
-            if (u.team === caster.team || u.kind === 'keg') continue;
-            if (dist(px, pz, u.x, u.z) > a.pulseRadius + u.radius) continue;
-            const n = hits.get(u.id) ?? 0;
-            if (n >= a.maxHitsPerTarget) continue;
-            hits.set(u.id, n + 1);
-            const src = world.get(casterId);
-            if (src) dealDamage(world, { source: src, label: ctx.ability.slot }, u, amount, a.type);
-          }
+      // Fleet Admiral: a second ship comes up the opposite flank, offset across
+      // the firing line so the two broadsides bracket whatever is between them.
+      const fleet = special(caster, 'fleet_admiral');
+      const lanes: { ox: number; oz: number; power: number }[] = [
+        { ox: ctx.ox, oz: ctx.oz, power: 1 },
+      ];
+      if (fleet) {
+        const across = 3.2;
+        lanes[0] = { ox: ctx.ox - -dz * across * 0.5, oz: ctx.oz - dx * across * 0.5, power: 1 };
+        lanes.push({
+          ox: ctx.ox + -dz * across * 0.5,
+          oz: ctx.oz + dx * across * 0.5,
+          power: fleet.power ?? 1,
         });
+      }
+      for (const lane of lanes) {
+        const hits = new Map<number, number>();
+        for (let i = 0; i < a.count; i++) {
+          const px = lane.ox + dx * step * (i + 0.5);
+          const pz = lane.oz + dz * step * (i + 0.5);
+          const delay = (a.startDelay ?? 0) + a.interval * i;
+          const casterId = caster.id;
+          w.schedule(delay, (world) => {
+            world.fx(`${c.def.id}.r.volley`, px, pz, { source: casterId });
+            for (const u of world.units()) {
+              if (u.team === caster.team || u.kind === 'keg') continue;
+              if (dist(px, pz, u.x, u.z) > a.pulseRadius + u.radius) continue;
+              const n = hits.get(u.id) ?? 0;
+              if (n >= a.maxHitsPerTarget) continue;
+              hits.set(u.id, n + 1);
+              const src = world.get(casterId);
+              if (src) {
+                dealDamage(
+                  world,
+                  { source: src, label: ctx.ability.slot },
+                  u,
+                  amount * lane.power,
+                  a.type,
+                );
+              }
+            }
+          });
+        }
       }
       break;
     }
@@ -342,6 +412,40 @@ function executeAction(ctx: ActionCtx, a: Action): void {
       }
       const fromX = caster.x;
       const fromZ = caster.z;
+      // Blood Waltz: the bats leave a slick of blood along the whole dash.
+      const waltz = special(caster, 'blood_waltz');
+      if (waltz) {
+        const steps = Math.max(2, Math.round(end / 1.2));
+        for (let i = 0; i <= steps; i++) {
+          const t = i / steps;
+          w.add({
+            kind: 'zone',
+            srcLabel: ctx.ability.slot,
+            team: caster.team,
+            x: fromX + dx * end * t,
+            z: fromZ + dz * end * t,
+            fx: dx,
+            fz: dz,
+            radius: waltz.radius ?? 1.4,
+            hp: 1,
+            hpMax: 1,
+            dead: false,
+            airborne: 0,
+            airborneTotal: 0,
+            buffs: [],
+            zone: {
+              owner: caster.id,
+              variant: 'trail',
+              tLeft: waltz.seconds ?? 3,
+              duration: waltz.seconds ?? 3,
+              radius: waltz.radius ?? 1.4,
+              allyMs: waltz.allyMs ?? 0.15,
+              enemySlow: waltz.enemySlow ?? 0.15,
+            },
+          });
+        }
+        w.fx('augment.waltz', fromX, fromZ, { fx: dx, fz: dz, source: caster.id });
+      }
       c.leap = {
         tLeft: a.duration,
         tTotal: a.duration,
@@ -478,6 +582,22 @@ function executeAction(ctx: ActionCtx, a: Action): void {
       grantDashCharges(w, caster);
       const amount = amt(ctx, a.amount);
       dealDamage(w, { source: caster, label: ctx.ability.slot }, target, amount, a.type);
+      // Repo Man: anything left under the threshold is repossessed on the spot.
+      const repo = special(caster, 'repo_man');
+      if (
+        repo &&
+        !target.dead &&
+        target.hp / Math.max(1, target.hpMax) <= (repo.threshold ?? 0.12)
+      ) {
+        w.fx('augment.execute', target.x, target.z, { source: caster.id, target: target.id });
+        dealDamage(
+          w,
+          { source: caster, tag: 'item', label: 'augment' },
+          target,
+          target.hp + 1,
+          a.type,
+        );
+      }
       if (a.harvest && !target.dead) {
         c.passive.harvestId = target.id;
         c.passive.harvestUntil = w.time + a.harvest.window;
@@ -530,6 +650,9 @@ function executeAction(ctx: ActionCtx, a: Action): void {
         zone: {
           owner: caster.id,
           variant: 'garden',
+          // Heartwood: the ward walks with Sylva and carries allies along.
+          follows: special(caster, 'heartwood') ? true : undefined,
+          allyMs: special(caster, 'heartwood')?.ms,
           tLeft: a.duration,
           duration: a.duration,
           radius: a.radius,
@@ -573,6 +696,57 @@ function executeAction(ctx: ActionCtx, a: Action): void {
           }
           // Vex's lash primes a lunging follow-up basic.
           if (a.onChampBuffSelf) applyBuffById(caster, a.onChampBuffSelf);
+          // Debt Interest: tally marks climb the victim until the debt is called.
+          const debt = special(caster, 'debt_interest');
+          if (debt && !target.dead) {
+            applyBuff(target, {
+              id: 'vex_debt',
+              name: 'Crimson Tally',
+              duration: debt.window ?? 6,
+              maxStacks: debt.stacks ?? 3,
+            });
+            const mark = target.buffs.find((b) => b.id === 'vex_debt');
+            if (mark && mark.stacks >= (debt.stacks ?? 3)) {
+              target.buffs.splice(target.buffs.indexOf(mark), 1);
+              applyCc(target, { kind: 'stun', duration: debt.stun ?? 0.8 });
+              w.fx('augment.debt', target.x, target.z, {
+                source: caster.id,
+                target: target.id,
+              });
+            }
+          }
+        }
+      }
+      // Overvolt: the beam arcs on to one more body outside the corridor.
+      const volt = special(caster, 'overvolt');
+      if (volt) {
+        const struck = new Set(
+          shapeTargets(
+            { ...ctx, ox: caster.x, oz: caster.z },
+            'self',
+            { kind: 'rect', length: a.length, width: a.width },
+            'enemies',
+          ).map((u) => u.id),
+        );
+        let best: Entity | undefined;
+        let bestD = volt.radius ?? 4.5;
+        for (const u of w.enemiesOf(caster.team)) {
+          if (u.kind === 'keg' || u.dead || struck.has(u.id)) continue;
+          const d = dist(caster.x, caster.z, u.x, u.z);
+          if (d < bestD) {
+            bestD = d;
+            best = u;
+          }
+        }
+        if (best) {
+          dealDamage(
+            w,
+            { source: caster, tag: 'item', label: 'augment' },
+            best,
+            amount * (volt.power ?? 0.6),
+            a.type,
+          );
+          w.fx('augment.chain', best.x, best.z, { source: caster.id, target: best.id });
         }
       }
       if (a.fx) w.fx(a.fx, caster.x, caster.z, { fx: ctx.fx, fz: ctx.fz, source: caster.id });
@@ -642,6 +816,37 @@ function executeAction(ctx: ActionCtx, a: Action): void {
           },
         });
       };
+      // Kessler Protocol: the strike walks down the line as three impacts.
+      const kessler = special(caster, 'kessler');
+      if (kessler) {
+        const extra = kessler.extra ?? 2;
+        const spacing = kessler.spacing ?? 2.6;
+        const power = kessler.power ?? 0.6;
+        for (let i = 1; i <= extra; i++) {
+          const kx = ctx.aimX + ctx.fx * spacing * i;
+          const kz = ctx.aimZ + ctx.fz * spacing * i;
+          const casterId = caster.id;
+          if (a.telegraphFx) w.fx(a.telegraphFx, kx, kz, { source: casterId });
+          w.schedule((a.delay ?? 0) + 0.2 * i, (world) => {
+            const src = world.get(casterId);
+            if (!src || src.dead || !a.impact) return;
+            const boom = amt({ ...ctx, w: world, caster: src }, a.impact.amount) * power;
+            for (const u of [...world.enemiesOf(src.team)]) {
+              if (u.kind === 'keg' || u.dead) continue;
+              if (dist(kx, kz, u.x, u.z) > a.impact.radius + u.radius) continue;
+              dealDamage(
+                world,
+                { source: src, tag: 'item', label: 'augment' },
+                u,
+                boom,
+                a.impact.type,
+              );
+              if (a.impact.cc && a.impact.cc.kind !== 'knockback') applyCc(u, a.impact.cc);
+            }
+            if (a.impact.fx) world.fx(a.impact.fx, kx, kz, { source: casterId });
+          });
+        }
+      }
       if (a.delay) {
         if (a.telegraphFx) w.fx(a.telegraphFx, ctx.aimX, ctx.aimZ, { source: caster.id });
         w.schedule(a.delay, (world) => {
@@ -659,6 +864,22 @@ function executeAction(ctx: ActionCtx, a: Action): void {
       // Separation Anxiety banks seconds on Boo! hits; the curse spends them.
       const curseBonus = c.augState.cursePlus ?? 0;
       c.augState.cursePlus = 0;
+      // Midnight Society: the hour raises an escort out of the cursed ground.
+      const society = special(caster, 'midnight_society');
+      if (society) {
+        const n = society.count ?? 3;
+        for (let i = 0; i < n; i++) {
+          const ang = (Math.PI * 2 * i) / n;
+          spawnMini(
+            w,
+            'mini_bruiser',
+            caster.team,
+            ctx.aimX + Math.cos(ang) * (a.radius * 0.6),
+            ctx.aimZ + Math.sin(ang) * (a.radius * 0.6),
+          );
+        }
+        w.fx('augment.society', ctx.aimX, ctx.aimZ, { source: caster.id });
+      }
       w.add({
         kind: 'zone',
         srcLabel: ctx.ability.slot,
@@ -680,6 +901,9 @@ function executeAction(ctx: ActionCtx, a: Action): void {
           tLeft: a.duration + curseBonus,
           duration: a.duration + curseBonus,
           radius: a.radius,
+          // Restricted Section turns the maelstrom into a vortex with a finale.
+          pullPerSec: special(caster, 'restricted_section')?.pullPerSec,
+          expireSilence: special(caster, 'restricted_section')?.silence,
           enemyDmgPerSec: amt(ctx, a.dmgPerSec),
           enemyBuff: a.enemyBuff,
           disableMinis: a.disableMinis,
@@ -732,6 +956,41 @@ function executeAction(ctx: ActionCtx, a: Action): void {
         },
       });
       w.fx('piper.w.toss', ent.x, ent.z, { source: caster.id, target: ent.id });
+      // Sharing Is Caring: the snack shatters into a little scatter of them.
+      const share = special(caster, 'sharing_is_caring');
+      if (share) {
+        const extra = Math.max(0, (share.count ?? 3) - 1);
+        for (let i = 0; i < extra; i++) {
+          const ang = (Math.PI * 2 * (i + 1)) / (extra + 1);
+          w.add({
+            kind: 'pickup',
+            srcLabel: ctx.ability.slot,
+            team: caster.team,
+            x: ctx.aimX + Math.cos(ang) * 0.9,
+            z: ctx.aimZ + Math.sin(ang) * 0.9,
+            fx: 1,
+            fz: 0,
+            radius: unit.radius * 0.8,
+            hp: 1,
+            hpMax: 1,
+            dead: false,
+            airborne: 0,
+            airborneTotal: 0,
+            buffs: [],
+            pickup: {
+              def: unit,
+              owner: caster.id,
+              ownerPlayer: c.player,
+              tLeft: a.duration,
+              heal: amt(ctx, a.heal) * (share.power ?? 0.55),
+              ownerFallbackFrac: a.ownerFallbackFrac ?? 0.5,
+              empowersPet: a.empowersPet ?? false,
+              tossPhase: 0.001,
+            },
+          });
+        }
+        w.fx('augment.share', ctx.aimX, ctx.aimZ, { source: caster.id });
+      }
       break;
     }
 
@@ -750,13 +1009,23 @@ function executeAction(ctx: ActionCtx, a: Action): void {
           const here: ActionCtx = { ...frozen, w: world, ox: src.x, oz: src.z };
           if (a.waveFx)
             world.fx(a.waveFx, src.x, src.z, { fx: frozen.fx, fz: frozen.fz, source: casterId });
+          // Apex Herd: the final wave comes in heavier — everyone it touches
+          // gets the knock-up, not just whoever ate all three.
+          const apex = isLast ? special(src, 'apex_herd') : null;
           for (const target of shapeTargets(here, 'self', a.shape, 'enemies')) {
             dealDamage(world, { source: src, label: frozen.ability.slot }, target, amount, a.type);
             if (a.cc) applyCc(target, a.cc);
+            if (apex) applyCc(target, { kind: 'slow', duration: 2, strength: apex.slow ?? 0.3 });
             const n = (hits.get(target.id) ?? 0) + 1;
             hits.set(target.id, n);
-            if (isLast && a.ccOnAllWaves && n >= a.count && target.kind === 'champion') {
-              applyCc(target, a.ccOnAllWaves);
+            const earned = apex ? n >= 1 : n >= a.count;
+            if (isLast && a.ccOnAllWaves && earned && target.kind === 'champion') {
+              applyCc(
+                target,
+                apex
+                  ? { ...a.ccOnAllWaves, duration: apex.knockup ?? a.ccOnAllWaves.duration }
+                  : a.ccOnAllWaves,
+              );
             }
           }
         });
@@ -836,8 +1105,14 @@ function resolveAreaDamage(ctx: ActionCtx, a: Extract<Action, { t: 'areaDamage' 
   const c = caster.champ;
   if (!c) return;
   const amount = amt(ctx, a.amount);
+  // Seismic Overtime: Grukk's slams drag the field toward the crater.
+  const seismic = ctx.ability.slot === 'r' ? special(caster, 'seismic_overtime') : null;
   for (const target of shapeTargets(ctx, a.at, a.shape, 'enemies')) {
     dealDamage(w, { source: caster, label: ctx.ability.slot }, target, amount, a.type);
+    if (seismic && !target.dead) {
+      const [px, pz] = norm(ctx.aimX - target.x, ctx.aimZ - target.z);
+      displace(w, target, px, pz, seismic.pull ?? 2);
+    }
     const cc = target.kind === 'mini' && a.ccMinis ? a.ccMinis : a.cc;
     if (cc) {
       if (cc.kind === 'knockback') {
@@ -901,6 +1176,18 @@ export function bloomFlowersIn(
     for (const ally of w.champions()) {
       if (ally.team !== caster.team) continue;
       if (dist(e.x, e.z, ally.x, ally.z) <= p.healRadius) healEntity(caster, ally, heal);
+    }
+    // Nettle Garden: the same bloom that heals allies stings anyone else near it.
+    const nettle = special(caster, 'nettle_garden');
+    if (nettle) {
+      const sting = (nettle.base ?? 35) + (nettle.apRatio ?? 0.2) * stats.ap;
+      for (const u of [...w.enemiesOf(caster.team)]) {
+        if (u.kind === 'keg' || u.dead) continue;
+        if (dist(e.x, e.z, u.x, u.z) <= (nettle.radius ?? 1.5) + u.radius) {
+          dealDamage(w, { source: caster, tag: 'item', label: 'augment' }, u, sting, 'arcane');
+        }
+      }
+      w.fx('augment.nettle', e.x, e.z, { source: caster.id });
     }
     w.fx('sylva.flower.bloom', e.x, e.z, { source: caster.id });
     w.remove(e.id);

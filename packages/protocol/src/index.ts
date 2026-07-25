@@ -264,7 +264,7 @@ export interface FlowerSnap extends EntityBase {
 export interface ZoneSnap extends EntityBase {
   kind: 'zone';
   /** Picks the client look + behaviour readout. */
-  variant: 'garden' | 'dome' | 'pod' | 'curse';
+  variant: 'garden' | 'dome' | 'pod' | 'curse' | 'trail';
   tLeft: number;
   duration: number;
 }

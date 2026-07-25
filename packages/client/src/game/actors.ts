@@ -1170,6 +1170,8 @@ const ZONE_STYLE = {
   dome: { ring: 0x8fd8ff, disc: 0x8fd8ff, discOpacity: 0.1 },
   pod: { ring: 0xffb14b, disc: 0xff9a3c, discOpacity: 0.12 },
   curse: { ring: 0x8a5fb0, disc: 0x3a2450, discOpacity: 0.3 },
+  /** Blood Waltz's slick: a dark crimson smear, not a glowing field. */
+  trail: { ring: 0xb0304a, disc: 0x6a1526, discOpacity: 0.28 },
 } as const;
 
 class ZoneActor implements Actor {

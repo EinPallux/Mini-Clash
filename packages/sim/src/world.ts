@@ -311,7 +311,7 @@ export interface PickupState {
 /** Ground area effect: Sylva's ward (garden), Boltz's dome/pod, Wisp's curse. */
 export interface ZoneState {
   owner: EntityId;
-  variant: 'garden' | 'dome' | 'pod' | 'curse';
+  variant: 'garden' | 'dome' | 'pod' | 'curse' | 'trail';
   tLeft: number;
   duration: number;
   radius: number;
@@ -328,6 +328,16 @@ export interface ZoneState {
   navCells?: number[];
   /** Habitat Module: fraction of max HP restored per second to allies inside. */
   regenPct?: number;
+  /* Restricted Section (Mortis R). */
+  /** Units per second the curse hauls victims toward its centre. */
+  pullPerSec?: number;
+  /** Seconds of silence applied to everyone still inside when it ends. */
+  expireSilence?: number;
+  /* Blood Waltz (Vex W) trail, and Heartwood's walking ward. */
+  allyMs?: number;
+  enemySlow?: number;
+  /** Heartwood: the zone tracks its owner instead of standing still. */
+  follows?: boolean;
   /** Fx emitted when the field launches away at expiry (pod). */
   expireFx?: string;
   /* Wisp curse. */

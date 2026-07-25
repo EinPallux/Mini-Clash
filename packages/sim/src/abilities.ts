@@ -82,6 +82,7 @@ export function tryCast(
   }
 
   if (c.cast && c.cast.kind !== 'aa') return 'casting';
+  if (e.buffs.some((b) => b.id === 'cc_silence')) return 'casting';
   // Ultimates unlock at level 4 in real matches (GAME_DESIGN §10.3).
   if (slot === 'r' && w.match?.mode === 'bridge' && c.level < BRIDGE.rUnlockLevel) return 'level';
   if (c.cds[slot] > 0.001) return 'cooldown';
@@ -201,11 +202,12 @@ export function commitAbility(
 
   if (ability.recast) {
     // Cooldown waits until all recasts resolve or the window closes.
+    // Seismic Overtime buys Grukk one more slam on the same window.
     c.recast = {
       slot: ability.slot,
       tLeft: ability.recast.window,
       ability,
-      left: ability.recast.charges ?? 1,
+      left: (ability.recast.charges ?? 1) + (special(e, 'seismic_overtime') ? 1 : 0),
     };
   } else {
     c.cds[ability.slot] = noCooldowns
@@ -374,6 +376,38 @@ export function updateCasts(w: World, e: Entity, dt: number, noCooldowns: boolea
         leap.onLand,
       );
       w.fx(`${c.def.id}.r.land`, e.x, e.z, { fx, fz, source: e.id });
+      // Castle Drop: the rim of the crater stays up as real, walkable-around
+      // terrain — a keep dropped mid-fight, not just a bigger number.
+      const drop = special(e, 'castle_drop');
+      if (drop) {
+        const radius = drop.radius ?? 2.6;
+        const cells = w.nav.stampRing(e.x, e.z, radius, 0.7);
+        w.add({
+          kind: 'zone',
+          srcLabel: 'r',
+          team: e.team,
+          x: e.x,
+          z: e.z,
+          fx,
+          fz,
+          radius,
+          hp: 1,
+          hpMax: 1,
+          dead: false,
+          airborne: 0,
+          airborneTotal: 0,
+          buffs: [],
+          zone: {
+            owner: e.id,
+            variant: 'pod',
+            tLeft: drop.seconds ?? 4,
+            duration: drop.seconds ?? 4,
+            radius,
+            navCells: cells,
+          },
+        });
+        w.fx('augment.castle', e.x, e.z, { source: e.id });
+      }
     }
   }
 }
