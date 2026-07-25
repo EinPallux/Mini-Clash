@@ -212,7 +212,9 @@ try {
   await page.waitForTimeout(3200);
   const both = await page.evaluate(() => globalThis.__mcDebug?.augments ?? []);
   if (both.length !== 2) errors.push(`expected 2 held augments, got ${both.length}`);
-  const strip = await page.evaluate(() => document.querySelectorAll('.augment-strip .aug-pip').length);
+  const strip = await page.evaluate(
+    () => document.querySelectorAll('.augment-strip .aug-pip').length,
+  );
   if (strip !== 2) errors.push(`augment strip shows ${strip} pips, expected 2`);
   await page.screenshot({ path: `${OUT}/9-two-augments.png` });
 } catch (e) {

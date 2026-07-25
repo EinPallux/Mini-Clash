@@ -249,9 +249,9 @@ describe('draft flow', () => {
 
     // Standing in the open for a tick is what buys the information.
     run(sim, 0.5);
-    const after = sim.snapshotFor(1, 2).entities.find(
-      (e) => e.kind === 'champion' && e.player === 1,
-    );
+    const after = sim
+      .snapshotFor(1, 2)
+      .entities.find((e) => e.kind === 'champion' && e.player === 1);
     expect(after?.kind === 'champion' ? after.augments : []).toEqual(['stoneskin']);
   });
 
