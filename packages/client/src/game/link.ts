@@ -1,4 +1,5 @@
 import type {
+  DraftSnap,
   Intent,
   IntentMsg,
   MatchConfig,
@@ -152,6 +153,8 @@ export class SocketLink implements NetLink {
   private disposed = false;
   private rtt = 0;
   private rttTimer: ReturnType<typeof setInterval> | null = null;
+  /** Latest private draft from the server's per-client channel (online only). */
+  private draft: DraftSnap | null = null;
   onSnapshot: ((snap: Snapshot) => void) | null = null;
   onDropped: ((reason: string) => void) | null = null;
   /** Server put a bot on our seat (AFK) / gave it back. */
@@ -233,7 +236,21 @@ export class SocketLink implements NetLink {
       const snap = decoder.decode(buf);
       if (!snap) return;
       if (typeof snap.ack === 'number') this.ackedSeq = snap.ack;
+      // The draft rides its own per-client channel — the snapshot buffer is
+      // shared by a whole team, and a teammate must not read your offers
+      // either (AUGMENTS §1). Stitch it back onto our champion here.
+      if (this.draft) {
+        for (const e of snap.entities) {
+          if (e.kind === 'champion' && e.player === this.playerId) {
+            e.draft = this.draft;
+            break;
+          }
+        }
+      }
       this.onSnapshot?.(snap);
+    });
+    room.onMessage('draft', (msg: DraftSnap | null) => {
+      this.draft = msg ?? null;
     });
     room.onMessage('rtt', (msg: { t: number }) => {
       const sample = Math.max(1, performance.now() - msg.t);

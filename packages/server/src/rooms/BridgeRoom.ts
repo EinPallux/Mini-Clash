@@ -259,6 +259,9 @@ export class BridgeRoom extends Room {
     }, 1000 / 30);
   }
 
+  /** Did this client have a draft open last frame? (edge-triggers the clear). */
+  private lastDraft = new Map<string, boolean>();
+
   private broadcastSnapshots(): void {
     const sim = this.sim;
     if (!sim) return;
@@ -279,6 +282,18 @@ export class BridgeRoom extends Room {
       }
       snapshotBytes.inc(payload.length);
       delayed(() => client.send('snapb', payload));
+      // The draft is the one thing that cannot ride the team-shared buffer: a
+      // teammate must not read your offers either (AUGMENTS §1). It is tiny and
+      // exists for ~45 s three times a match, so it goes per-client as JSON.
+      const draft = sim.draftOf(player);
+      const had = this.lastDraft.get(client.sessionId) ?? false;
+      if (draft) {
+        this.lastDraft.set(client.sessionId, true);
+        delayed(() => client.send('draft', draft));
+      } else if (had) {
+        this.lastDraft.set(client.sessionId, false);
+        delayed(() => client.send('draft', null));
+      }
     }
   }
 

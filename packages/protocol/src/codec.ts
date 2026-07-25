@@ -332,6 +332,10 @@ function rareJson(e: EntitySnap): string {
         recap: e.recap ?? null,
         // Tag Team: the benched champion's identity only moves on a swap.
         benchId: e.duo?.championId ?? null,
+        // Augments change three times a match at most (and enemy entries are
+        // already `?`-masked per team by snapshotFor) — rare block material.
+        augments: e.augments,
+        rerolls: e.rerolls,
       });
     case 'mini':
       return JSON.stringify({

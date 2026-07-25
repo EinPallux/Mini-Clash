@@ -12,6 +12,7 @@ import {
 import {
   type BotTier,
   type ChampionSnap,
+  type DraftSnap,
   type EntitySnap,
   type IntentMsg,
   type MatchConfig,
@@ -1102,6 +1103,25 @@ export class Sim {
       entities.push(snap);
     }
     return { tick: w.tick, time: w.time, match: this.matchSnap(), entities, events: w.events };
+  }
+
+  /**
+   * This player's open draft, or null. The server sends it per client rather
+   * than inside the team-shared snapshot buffer — offers are private to the
+   * drafter, not to their team (AUGMENTS §1).
+   */
+  draftOf(player: PlayerId): DraftSnap | null {
+    for (const e of this.world.entities) {
+      const c = e.champ;
+      if (c?.player !== player || !c.draft) continue;
+      return {
+        index: c.draft.index,
+        offers: [...c.draft.offers],
+        tLeft: Math.max(0, Math.ceil(c.draft.tLeft * 10) / 10),
+        rerolled: c.draft.rerolled,
+      };
+    }
+    return null;
   }
 
   /** Clear the per-tick event queue after all per-team views are built. */
