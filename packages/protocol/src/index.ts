@@ -36,7 +36,9 @@ export type TrainerCmd =
   | { k: 'infiniteEnergy'; on: boolean }
   | { k: 'levelUp' }
   | { k: 'resetDummies' }
-  | { k: 'switchChampion'; championId: string };
+  | { k: 'switchChampion'; championId: string }
+  /** Training duo config: set (or clear, with null) the benched half. */
+  | { k: 'setBench'; championId: string | null };
 
 export interface IntentMsg {
   seq: number;
@@ -64,8 +66,14 @@ export interface MatchConfig {
   seed: number;
   mapId: string;
   players: MatchPlayerConfig[];
-  /** Test/dev hook (offline smokes only — the v0.3 server ignores it). */
-  rig?: { enemyCoreHp?: number; enemyTowerHp?: number };
+  /** Test/dev hook (offline smokes only — the server builds configs itself and
+   * never forwards a client-supplied rig). */
+  rig?: {
+    enemyCoreHp?: number;
+    enemyTowerHp?: number;
+    /** Balance A/B: bots on this team never Tag Swap (ROADMAP v0.4 acceptance). */
+    noSwapTeam?: Team;
+  };
 }
 
 /* -------------------------------- Snapshots ------------------------------- */

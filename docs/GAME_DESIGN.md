@@ -287,6 +287,8 @@ Bots are a first-class feature (full lobbies must be fun solo). Three tiers + pe
 
 Personalities (Aggro / Guardian / Objective / Chaotic) bias utility weights so bot teams don't move as one organism. Bots take over disconnected/AFK players seamlessly at the player's last tier-appropriate level.
 
+*(v0.4 — swap behavior shipped as specced, with one finding worth recording: because Elites hold a ready ultimate rather than trading it away mid-fight, they swap **less often** than Veterans while getting far more out of each swap. Frequency is not competence. The value is measured directly by `scripts/swap-ab.mjs`, which pits identical duo deals against each other with one side pinned to a single half: the swapping side won 92.5% over 40 Elite matches. That margin says the swap is close to mandatory at the current roster — a design property to keep an eye on, since a player who never presses Space is giving up roughly half their live ability access.)*
+
 ## 17. Social & session rules (in-match)
 
 - **Comms:** pings + quick-chat phrases + emote stickers. Free text chat only within premade parties (safety-first default; full team text post-1.0 with mute tools).

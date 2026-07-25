@@ -292,6 +292,11 @@ export class MatchRuntime {
     this.link.send({ t: 'trainer', cmd: { k: 'switchChampion', championId } });
   }
 
+  /** Training duo config: set or clear (null) the benched half. */
+  setBench(championId: string | null): void {
+    this.link.send({ t: 'trainer', cmd: { k: 'setBench', championId } });
+  }
+
   /** Ping at the current cursor ground position (wheel/quick-ping UI). */
   ping(kind: PingKind): void {
     const g = this.input.cursorGround;
@@ -371,13 +376,19 @@ export class MatchRuntime {
     this.link.send({ t: 'trainer', cmd });
   }
 
-  private seatName(player: number): { name: string; championId: string; team: number } {
+  private seatName(player: number): {
+    name: string;
+    championId: string;
+    benchId?: string;
+    team: number;
+  } {
     const snap = this.buffer.current;
     for (const e of snap?.entities ?? []) {
       if (e.kind === 'champion' && e.player === player) {
         return {
           name: e.player === this.selfPlayer ? 'You' : e.name,
           championId: e.championId,
+          benchId: e.duo?.championId,
           team: e.team,
         };
       }
@@ -387,6 +398,7 @@ export class MatchRuntime {
       ? {
           name: seat.player === this.selfPlayer ? 'You' : seat.name,
           championId: seat.championId,
+          benchId: seat.benchChampionId,
           team: seat.team,
         }
       : { name: '—', championId: 'rook', team: 0 };
@@ -421,6 +433,10 @@ export class MatchRuntime {
             kind: 'kill',
             killerChamp: killer?.championId,
             victimChamp: victim.championId,
+            // Duo kill cards (UI_UX §10): the pair that got the kill, and the
+            // pair that lost the fight — the bench half reads dimmed.
+            killerBench: killer?.benchId,
+            victimBench: victim.benchId,
             killerName: killer?.name ?? 'The bridge',
             victimName: victim.name,
             team: killer?.team ?? (victim.team === 0 ? 1 : 0),

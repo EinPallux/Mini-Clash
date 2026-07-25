@@ -1,4 +1,4 @@
-import { ITEMS, type MapDef, RELICS } from '@mini-clash/data';
+import { BRIDGE, type ChampionDef, ITEMS, type MapDef, RELICS, type Slot } from '@mini-clash/data';
 import type { BotTier, Intent, IntentMsg, PlayerId } from '@mini-clash/protocol';
 import { isHiddenFrom } from './brush';
 import { structureInvulnerable } from './combat';
@@ -31,6 +31,14 @@ interface TierParams {
   focusFire: boolean;
   /** Veteran+: commit to closing on ranged harassers instead of eating poke. */
   punishKiters: boolean;
+  /**
+   * Tag Swap competence (GAME_DESIGN §7.2). 'none' = never swaps (recruits play
+   * one half, which is exactly how a beginner plays); 'basic' = cycles the bench
+   * for Energy and cooldowns and burns the swap-in haste to escape; 'smart' adds
+   * range counter-pivots and entrance weaving, and refuses to trade away a ready
+   * ultimate mid-fight.
+   */
+  swaps: 'none' | 'basic' | 'smart';
 }
 
 const TIERS: Record<BotTier, TierParams> = {
@@ -44,6 +52,7 @@ const TIERS: Record<BotTier, TierParams> = {
     dodges: false,
     focusFire: false,
     punishKiters: false,
+    swaps: 'none',
   },
   veteran: {
     microTicks: 8,
@@ -55,6 +64,7 @@ const TIERS: Record<BotTier, TierParams> = {
     dodges: false,
     focusFire: true,
     punishKiters: true,
+    swaps: 'basic',
   },
   elite: {
     microTicks: 6,
@@ -66,6 +76,7 @@ const TIERS: Record<BotTier, TierParams> = {
     dodges: true,
     focusFire: true,
     punishKiters: true,
+    swaps: 'smart',
   },
 };
 
@@ -84,9 +95,11 @@ export interface BotBrain {
   pingX: number;
   pingZ: number;
   lastPingTick: number;
+  /** Balance A/B knob: false pins this bot to one half of its duo. */
+  maySwap: boolean;
 }
 
-export function makeBrain(seed: number, player: PlayerId, tier: BotTier): BotBrain {
+export function makeBrain(seed: number, player: PlayerId, tier: BotTier, maySwap = true): BotBrain {
   const rng = new Pcg32(seed, 0x8000 + player);
   const personality = (['aggro', 'guardian', 'objective', 'chaotic'] as const)[rng.int(4)];
   return {
@@ -103,7 +116,96 @@ export function makeBrain(seed: number, player: PlayerId, tier: BotTier): BotBra
     pingX: 0,
     pingZ: 0,
     lastPingTick: -1,
+    maySwap,
   };
+}
+
+/** How many of this kit's abilities are castable right now (off cooldown + affordable)? */
+function readyAbilities(
+  def: ChampionDef,
+  cds: Record<Slot, number>,
+  energy: number,
+  level: number,
+): number {
+  let n = 0;
+  for (const slot of ['q', 'w', 'r'] as const) {
+    const ab = def.abilities[slot];
+    if (slot === 'r' && level < BRIDGE.rUnlockLevel) continue;
+    if (cds[slot] <= 0.001 && energy >= ab.cost) n++;
+  }
+  return n;
+}
+
+/** Entrances worth swapping *into* when a fight is already touching us. */
+const COMBAT_ENTRANCES = new Set([
+  'shieldwall', // eats the next hit outright
+  'reshelved', // dust nova damage
+  'booth_rules', // slow aura
+  'cold_spot', // chill nova + untargetable morph
+  'lucky_doubloon', // +40% on the next shot
+  'ossuary_flourish', // free Q
+]);
+
+/**
+ * Tag Swap decision (GAME_DESIGN §7.2). The bench keeps recovering while it sits,
+ * so the swap is fundamentally a resource play: spend a depleted half, bring in a
+ * loaded one. Higher tiers additionally pivot on range and weave entrances.
+ */
+function wantsSwap(
+  e: Entity,
+  brain: BotBrain,
+  tp: TierParams,
+  ctx: { hpFrac: number; nearest: Entity | undefined; nearestD: number; activeRange: number },
+): boolean {
+  const c = e.champ;
+  const duo = c?.duo;
+  if (!c || !duo || tp.swaps === 'none' || !brain.maySwap) return false;
+  // The sim would reject these anyway; checking here keeps the intent stream clean.
+  if (duo.swapCd > 0.001 || duo.morphT > 0 || c.feared) return false;
+  if ((c.cast && c.cast.kind !== 'aa') || c.leap) return false;
+  if (e.airborne > 0 || e.buffs.some((b) => b.id === 'cc_stun')) return false;
+
+  const mineReady = readyAbilities(c.def, c.cds, c.energy, c.level);
+  const benchReady = readyAbilities(duo.def, duo.cds, duo.energy, c.level);
+  const engaged = ctx.nearest !== undefined && ctx.nearestD < ctx.activeRange + 4;
+
+  // Never trade away a ready ultimate in a live fight (smart tiers only — this is
+  // exactly the discipline that separates Elite from Veteran).
+  if (tp.swaps === 'smart' && engaged && c.level >= BRIDGE.rUnlockLevel) {
+    const rUp = c.cds.r <= 0.001 && c.energy >= c.def.abilities.r.cost;
+    if (rUp && !(c.energy < 20 && duo.energy > 70)) return false;
+  }
+
+  // 1. Energy cycling: our half is spent, the bench is loaded.
+  if (c.energy < 25 && duo.energy > 60) return true;
+
+  // 2. Cooldown access: nothing to press, the bench has options.
+  if (mineReady === 0 && benchReady >= 2) return true;
+
+  // 3. Escape tempo: the swap-in haste is a free disengage (basic tiers included).
+  if (brain.goal === 'retreat' && ctx.hpFrac < 0.45 && benchReady >= 1) return true;
+
+  if (tp.swaps !== 'smart') return false;
+
+  // 4. Range counter-pivot: bring in the half that fits the engagement distance.
+  const benchRange = duo.def.stats.range;
+  if (engaged && ctx.nearest) {
+    const wantLong = ctx.nearestD > ctx.activeRange + 1.5 && benchRange > ctx.activeRange + 1.5;
+    const wantShort =
+      ctx.nearestD < 2.5 && ctx.activeRange > 4.5 && benchRange < ctx.activeRange - 1.5;
+    if ((wantLong || wantShort) && benchReady >= 1) return true;
+  }
+
+  // 5. Entrance weaving: the arriving half's entrance is itself a combat play.
+  if (
+    engaged &&
+    ctx.nearestD < 4 &&
+    COMBAT_ENTRANCES.has(duo.def.entrance.id) &&
+    benchReady >= mineReady
+  ) {
+    return true;
+  }
+  return false;
 }
 
 function personalityMul(
@@ -335,6 +437,20 @@ function act(w: World, e: Entity, brain: BotBrain, tp: TierParams, map: MapDef):
         out.push({ t: 'attackMove', x: orb.x, z: orb.z });
       }
     }
+  }
+
+  // --- Tag Swap -------------------------------------------------------------
+  // Decided after the goal is known (retreat wants the swap-in haste) but before
+  // the goal executes: the 0.35 s morph would swallow a cast issued this pass.
+  if (wantsSwap(e, brain, tp, { hpFrac, nearest, nearestD, activeRange: stats.range })) {
+    out.push({ t: 'swap' });
+    // Keep walking — movement survives the morph, and a retreating bot must not
+    // stand still through it.
+    if (brain.goal === 'retreat') out.push({ t: 'move', x: home.x, z: home.z });
+    else if (brain.goal === 'push') {
+      out.push({ t: 'attackMove', x: enemyCore.x, z: enemyCore.z });
+    }
+    return out;
   }
 
   // --- Execute --------------------------------------------------------------

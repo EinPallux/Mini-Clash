@@ -59,7 +59,7 @@ Duo randomness means any two roles can pair — every kit must be self-sufficien
 A stoic living statue of the old bridge-keepers' order; fights like a piece of architecture that got opinions.
 
 - **Model:** `Kenney_MiniArena/character-soldier.glb` (stone-grey + team-color tabard palette). Props: `Kenney_Minidungeon/shield-rectangle.glb` (left hand), `Kenney_MiniArena/weapon-sword.glb` (right).
-- **Passive — Stonewall:** every 8 s, Rook's next incoming hit is reduced by `40 (+8×level)`. Blocked hits chip a visible stone-shard off his shield (regrows — readable timer).
+- **Passive — Stonewall:** every 9.5 s, Rook's next incoming hit is reduced by `40 (+8×level)`. Blocked hits chip a visible stone-shard off his shield (regrows — readable timer).
 - **Q — Bash & Batter:** 25⚡ / 7 s / 2.6 u arc. Shield slam: `70 (+65% AD)` physical + 25% slow 1.5 s; **recast within 3 s:** sword backswing `55 (+50% AD)`. *Anim:* `attack-melee-left` (shield arm) into `attack-melee-right`, 15% overspeed, stone-dust cone VFX + screen-nudge on hit.
 - **W — Rampart:** 35⚡ / 14 s / place at 3 u. Raises a 3-u stone wall (blocks movement, not projectiles) for 2.5 s; allies passing gain 15% MS. *Anim:* `interact-right` ground-punch; wall erupts as animated Castle-kit crenellation chunks with dust burst; crumbles on expiry.
 - **R — Keep's Wrath:** ⏱ 70 s / self 4 u. Rook leaps (0.6 s) and lands as a fortress: `160 (+90% AD)` physical, knock-up 1 s in 2.5 u, then gains 25% DR aura for allies within 4 u for 3 s. *Anim:* `jump` → slam frame-hold, camera shake M, radial crack decal, banner-flags sprout from his shoulders (flag props) for the aura duration.
@@ -157,10 +157,10 @@ A decommissioned survey astronaut who refuses to accept the mission ended; the b
 A small ghost who haunts the bridge not out of malice but because the view is nice and leaving is hard.
 
 - **Model:** `Kenney_GraveyardKit/character-ghost.glb` (translucent shader, soft emissive rim; hover bob procedural — no walk cycle needed: locomotion is float with lean).
-- **Passive — Ectoplasm:** Wisp phases through units (no unit collision, ever). Passing through an enemy chills them: 10% slow 1 s + marks them "Chilled" 3 s.
+- **Passive — Ectoplasm:** Wisp phases through units (no unit collision, ever). Passing through an enemy chills them: 13% slow 1 s + marks them "Chilled" 3 s.
 - **Q — Boo!:** 25⚡ / 5 s / 6.5 u skillshot. Spook-bolt `84 (+60% AP)` arcane; vs Chilled targets +25% and briefly **Fears Minis** 1 s. *Anim:* inflate-face lunge (scale-pop + `emote-no` head snap); bolt = wailing face sprite-sheet with ribbon tail; hit = "BOO" glyph burst.
 - **W — Sheet Slip:** 35⚡ / 10 s / 3.5 u blink. Drops her sheet (decoy: stands still, taunts Minis, 1 HP-until-hit twice) and blinks invisible for 1 s (breaks on cast/attack). *Anim:* sheet prop collapses realistically (cloth-sim-lite bones); reappear = sheet whooshes back on with sparkle.
-- **R — Haunting Hour:** ⏱ 80 s / 5 u circle (3 u), 0.6 s cast. Curses the ground 4 s: enemies inside are Chilled continuously, take `54 (+30% AP)`/s, and Minis inside fight for **no one** (stand confused). At expiry, all champions still inside are Feared 1.2 s away from the center. *Anim:* Wisp spins up into the air trailing spirits; zone = desaturation + floating gravestone shadows (Graveyard props as translucent ghosts), clock-tick SFX building to the midnight gong.
+- **R — Haunting Hour:** ⏱ 80 s / 5 u circle (3 u), 0.6 s cast. Curses the ground 4 s: enemies inside are Chilled continuously, take `58 (+30% AP)`/s, and Minis inside fight for **no one** (stand confused). At expiry, all champions still inside are Feared 1.2 s away from the center. *Anim:* Wisp spins up into the air trailing spirits; zone = desaturation + floating gravestone shadows (Graveyard props as translucent ghosts), clock-tick SFX building to the midnight gong.
 - **Entrance:** *Cold Spot* — 1.5 u chill nova (10% slow 1 s) + Wisp is untargetable for the 0.35 s swap morph (only Entrance that touches the swap itself — her identity).
 - **Signature Augments:** ①**Poltergeist** (Silver): W decoy explodes when destroyed `70 (+40% AP)`. ②**Separation Anxiety** (Gold): Q pierces; every enemy hit extends R's next duration +0.5 s. ③**Midnight Society** (Prismatic): R also summons 3 ghost Minis (Graveyard skeletons, spectral shader) that fight for Wisp 6 s.
 

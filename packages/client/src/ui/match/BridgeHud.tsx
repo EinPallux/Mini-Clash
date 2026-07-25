@@ -218,24 +218,44 @@ function TeamFrames(): React.ReactElement {
 
 /* -------------------------------- Killfeed -------------------------------- */
 
+/** Portrait chip pair: active half solid, benched half dimmed behind it. */
+export function DuoChip({
+  active,
+  bench,
+  flip,
+}: {
+  active: string;
+  bench?: string;
+  flip?: boolean;
+}): React.ReactElement {
+  const chips = [
+    <span key="a" className="fchip" style={{ background: CHAMP_TONE[active] ?? '#555' }}>
+      {champLetter(active)}
+    </span>,
+    bench ? (
+      <span
+        key="b"
+        className="fchip bench"
+        style={{ background: CHAMP_TONE[bench] ?? '#555' }}
+        title="benched"
+      >
+        {champLetter(bench)}
+      </span>
+    ) : null,
+  ];
+  return <span className="duo-chip">{flip ? [chips[1], chips[0]] : chips}</span>;
+}
+
 function FeedRow({ e }: { e: FeedEntry }): React.ReactElement {
   const selfTeam = useHud((s) => s.selfTeam);
   if (e.kind === 'kill') {
     return (
       <div className={`feed-row ${e.team === selfTeam ? 'ally' : 'enemy'}`}>
-        {e.killerChamp && (
-          <span className="fchip" style={{ background: CHAMP_TONE[e.killerChamp] ?? '#555' }}>
-            {champLetter(e.killerChamp)}
-          </span>
-        )}
+        {e.killerChamp && <DuoChip active={e.killerChamp} bench={e.killerBench} />}
         <b>{e.killerName}</b>
         <span className="x">⚔</span>
         <b>{e.victimName}</b>
-        {e.victimChamp && (
-          <span className="fchip" style={{ background: CHAMP_TONE[e.victimChamp] ?? '#555' }}>
-            {champLetter(e.victimChamp)}
-          </span>
-        )}
+        {e.victimChamp && <DuoChip active={e.victimChamp} bench={e.victimBench} flip />}
       </div>
     );
   }
@@ -686,9 +706,20 @@ function Scoreboard(): React.ReactElement | null {
             .filter((s) => s.team === team)
             .map((s) => (
               <div key={s.player} className={`sb-row ${s.player === selfPlayer ? 'self' : ''}`}>
-                <span className="fchip" style={{ background: CHAMP_TONE[s.championId] ?? '#555' }}>
-                  {s.visible || team === selfTeam ? champLetter(s.championId) : '?'}
-                </span>
+                {s.visible || team === selfTeam ? (
+                  <DuoChip active={s.championId} bench={s.benchChampionId} />
+                ) : (
+                  <span className="duo-chip">
+                    <span className="fchip" style={{ background: '#555' }}>
+                      ?
+                    </span>
+                    {s.benchChampionId && (
+                      <span className="fchip bench" style={{ background: '#555' }}>
+                        ?
+                      </span>
+                    )}
+                  </span>
+                )}
                 <span className="sb-name">
                   {s.player === selfPlayer ? 'You' : s.name}
                   {!s.visible && <i className="sb-hidden"> hidden</i>}
@@ -964,7 +995,17 @@ interface HistoryEntry {
   duration: number;
   kills: [number, number];
   myChampion: string;
-  seats: { championId: string; name: string; team: number; k: number; d: number; a: number }[];
+  /** Benched half of your duo (absent for pre-v0.4 entries and solo configs). */
+  myBench?: string;
+  seats: {
+    championId: string;
+    benchId?: string;
+    name: string;
+    team: number;
+    k: number;
+    d: number;
+    a: number;
+  }[];
 }
 
 function writeHistory(entry: HistoryEntry): void {
@@ -1004,8 +1045,10 @@ function EndSequence(): React.ReactElement | null {
       duration: match.time,
       kills: match.teamKills,
       myChampion: champ.championId,
+      myBench: champ.duo?.championId,
       seats: seats.map((s) => ({
         championId: s.championId,
+        benchId: s.benchChampionId,
         name: s.player === selfPlayer ? 'You' : s.name,
         team: s.team,
         k: s.kills,
@@ -1048,6 +1091,11 @@ function EndSequence(): React.ReactElement | null {
             >
               {i === 0 && <span className="crown">{STRINGS.mvp}</span>}
               <span className="big">{champLetter(s.championId)}</span>
+              {s.benchChampionId && (
+                <span className="podium-bench">
+                  {CHAMPIONS[s.championId]?.name} + {CHAMPIONS[s.benchChampionId]?.name}
+                </span>
+              )}
               <span className="who">{s.player === selfPlayer ? 'You' : s.name}</span>
               <span className="kda">
                 {s.kills} / {s.deaths} / {s.assists}
@@ -1087,13 +1135,15 @@ function EndSequence(): React.ReactElement | null {
               .filter((s) => s.team === team)
               .map((s) => (
                 <div key={s.player} className={`sb-row ${s.player === selfPlayer ? 'self' : ''}`}>
-                  <span
-                    className="fchip"
-                    style={{ background: CHAMP_TONE[s.championId] ?? '#555' }}
-                  >
-                    {champLetter(s.championId)}
+                  <DuoChip active={s.championId} bench={s.benchChampionId} />
+                  <span className="sb-name">
+                    {s.player === selfPlayer ? 'You' : s.name}
+                    {s.benchChampionId && (
+                      <i className="sb-duo">
+                        {CHAMPIONS[s.championId]?.name} + {CHAMPIONS[s.benchChampionId]?.name}
+                      </i>
+                    )}
                   </span>
-                  <span className="sb-name">{s.player === selfPlayer ? 'You' : s.name}</span>
                   <span className="sb-lv">{s.level}</span>
                   <span className="sb-kda">
                     {s.kills}/{s.deaths}/{s.assists}

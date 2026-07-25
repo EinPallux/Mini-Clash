@@ -53,6 +53,8 @@ export interface HudSeat {
   player: number;
   team: number;
   championId: string;
+  /** Benched half of this seat's duo (absent for solo configs). */
+  benchChampionId?: string;
   name: string;
   bot: boolean;
   level: number;
@@ -79,9 +81,12 @@ export interface ChatEntry {
 export interface FeedEntry {
   id: number;
   kind: 'kill' | 'tower' | 'surrender';
-  /** Champion ids for portrait chips (kill entries). */
+  /** Champion ids for portrait chips (kill entries) — active half. */
   killerChamp?: string;
   victimChamp?: string;
+  /** Benched halves: kill cards show the whole duo, dimmed (UI_UX §10). */
+  killerBench?: string;
+  victimBench?: string;
   killerName?: string;
   victimName?: string;
   /** Team of the actor (colors the entry edge). */
@@ -242,6 +247,7 @@ export const useHud = create<HudState>()((set, get) => ({
       player: e.player,
       team: e.team,
       championId: e.championId,
+      benchChampionId: e.duo?.championId,
       name: e.name,
       bot: e.bot,
       level: e.level,

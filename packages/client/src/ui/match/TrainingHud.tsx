@@ -43,6 +43,37 @@ export function TrainingHud({
       {/* top-right: trainer panel + dummy DPS */}
       <div className="hud-topright">
         <div className="trainer-panel">
+          {/* Duo config (GAME_DESIGN §7.2): pick a bench and practise the swap
+              against any pairing without leaving the Grounds. */}
+          <h4>{STRINGS.trainerDuo}</h4>
+          <div className="duo-config">
+            <button
+              type="button"
+              className={`hud-chip ${champ.duo ? '' : 'on'}`}
+              onClick={() => {
+                uiSound('ui_click');
+                runtime()?.setBench(null);
+              }}
+            >
+              {STRINGS.trainerSolo}
+            </button>
+            {CHAMPION_LIST.filter((c) => c.id !== champ.championId).map((c) => (
+              <button
+                type="button"
+                key={c.id}
+                className={`hud-chip ${champ.duo?.championId === c.id ? 'on' : ''}`}
+                onClick={() => {
+                  uiSound('ui_click');
+                  runtime()?.setBench(c.id);
+                }}
+              >
+                {c.name}
+              </button>
+            ))}
+          </div>
+          <p className="duo-config-hint">
+            {champ.duo ? STRINGS.trainerDuoHint : STRINGS.trainerSoloHint}
+          </p>
           <h4>{STRINGS.cheats}</h4>
           <div className="set-row">
             <span>{STRINGS.cheatCooldowns}</span>

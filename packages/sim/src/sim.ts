@@ -223,7 +223,12 @@ export class Sim {
       });
       this.playerEnts.set(p.id, e.id);
       this.trainer.set(p.id, { noCooldowns: false, infiniteEnergy: false });
-      if (p.bot) this.brains.set(p.id, makeBrain(config.seed, p.id, p.bot));
+      if (p.bot) {
+        // Balance A/B (ROADMAP v0.4): rig.noSwapTeam pins that team's bots to one
+        // half of their duo so the swap's contribution can be measured directly.
+        const maySwap = config.rig?.noSwapTeam !== p.team;
+        this.brains.set(p.id, makeBrain(config.seed, p.id, p.bot, maySwap));
+      }
       if (benchDef) {
         // Duos share one pool: the average of both HP curves (GAME_DESIGN §7.2).
         e.hpMax = championStats(e).hpMax;
@@ -449,6 +454,29 @@ export class Sim {
         e.hp = stats.hpMax;
         c.energy = 100;
         applySpawnEffects(w, e);
+        break;
+      }
+      case 'setBench': {
+        // Training duo config: build/replace/clear the bench so Space can be
+        // practised against any pairing without leaving the Grounds.
+        const def = cmd.championId ? CHAMPIONS[cmd.championId] : null;
+        if (cmd.championId && !def) break;
+        if (def && def.id === c.def.id) break; // a duo is never two of the same
+        c.duo = def
+          ? {
+              def,
+              energy: 100,
+              cds: { q: 0, w: 0, r: 0 },
+              aaCd: 0,
+              passive: initPassive(def),
+              swapCd: 0,
+              morphT: 0,
+            }
+          : null;
+        // Shared pool changes shape with the pairing — refill so the panel never
+        // leaves the trainer at a fraction of a brand-new bar.
+        e.hpMax = championStats(e).hpMax;
+        e.hp = e.hpMax;
         break;
       }
     }

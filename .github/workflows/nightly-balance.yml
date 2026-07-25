@@ -30,10 +30,13 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - name: Run ${{ github.event.inputs.matches || '70' }} mixed matches (seed ${{ matrix.seed }})
+        # --free-duos: select-accurate dealing hands each team 8 team-unique
+        # halves, so at a roster of 8 both teams field everything and champion
+        # winrate is pinned at 50%. Per-seat draws make it observable again.
         run: >
           node scripts/botmatch.mjs
           --matches ${{ github.event.inputs.matches || '70' }}
-          --mixed --seed ${{ matrix.seed }}
+          --mixed --free-duos --seed ${{ matrix.seed }}
           --json shard-${{ matrix.seed }}.json
       - uses: actions/upload-artifact@v4
         with:
@@ -52,3 +55,18 @@ jobs:
           merge-multiple: true
       - name: Combined winrate table
         run: node scripts/balance-aggregate.mjs shard-*.json | tee -a "$GITHUB_STEP_SUMMARY"
+
+  swap-ab:
+    # ROADMAP v0.4 acceptance, re-run nightly: do swapping bots still beat
+    # identical pinned bots? Red if the effect falls under the 55% bar.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Tag Swap A/B (40 elite matches)
+        run: node scripts/swap-ab.mjs --matches 40 --tier elite --seed 700 | tee -a "$GITHUB_STEP_SUMMARY"

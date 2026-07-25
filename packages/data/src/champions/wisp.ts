@@ -33,7 +33,7 @@ export const WISP: ChampionDef = {
     name: 'Ectoplasm',
     description:
       'Wisp phases through units. Passing through an enemy chills them: {slow}% slow for {slowDur}s and marks them Chilled for {markDur}s.',
-    params: { slow: 0.1, slowDur: 1, markDur: 3 },
+    params: { slow: 0.13, slowDur: 1, markDur: 3 },
   },
   abilities: {
     q: {
@@ -82,7 +82,7 @@ export const WISP: ChampionDef = {
           at: 'aim',
           radius: 3,
           duration: 4,
-          dmgPerSec: { base: 54, perLevel: 4.5, apRatio: 0.3 },
+          dmgPerSec: { base: 58, perLevel: 4.5, apRatio: 0.3 },
           type: 'arcane',
           enemyBuff: 'wisp_chilled',
           disableMinis: true,

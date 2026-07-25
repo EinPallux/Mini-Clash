@@ -4,7 +4,7 @@ Instructions for any AI coding agent working in this repository. The extended ve
 
 ## Project
 
-Mini Clash — browser 4v4 tag-team ARAM MOBA. TypeScript monorepo (pnpm): Three.js client + React UI, deterministic shared sim package, authoritative Colyseus/Node game server, Fastify + Postgres platform API. Status: **planning done, no code yet**; next milestone is `v0.1` in [ROADMAP.md](ROADMAP.md).
+Mini Clash — browser 4v4 tag-team ARAM MOBA. TypeScript monorepo (pnpm): Three.js client + React UI, deterministic shared sim package, authoritative Colyseus/Node game server, Fastify + Postgres platform API. Status: **v0.1–v0.4 implemented** (Training Grounds, full bot match, authoritative online + lobbies + reconnect, Tag Team duos; 8 champions); next milestone is `v0.5 "Power Surge"` in [ROADMAP.md](ROADMAP.md).
 
 ## Read before you build
 

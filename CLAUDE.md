@@ -6,7 +6,7 @@ This file governs how Claude (and any AI agent) works in this repository. Read i
 
 **Mini Clash** — a browser-native 4v4 tag-team ARAM MOBA. TypeScript monorepo: Three.js client, deterministic shared simulation, authoritative Colyseus/Node server, React UI overlay, Fastify + Postgres platform backend. Chunky CC0 low-poly art (Kenney / KayKit) with a mo.co / Brawl Stars-style presentation.
 
-**Current status:** planning complete, implementation not started. The next milestone is `v0.1 "Training Grounds"` in [ROADMAP.md](ROADMAP.md).
+**Current status:** v0.1–v0.4 implemented. The game plays end-to-end: Training Grounds, a full 4v4 Bridge Brawl vs bots, authoritative online play with custom lobbies and reconnect, and the Tag Team duo system (deal, swap, entrances) across every surface. Roster: 8 champions. The next milestone is `v0.5 "Power Surge"` (the augment draft) in [ROADMAP.md](ROADMAP.md) — check the phase's acceptance checklist there for what's still open in earlier phases (a few items are parked on the nightly sweep or need real hardware/humans).
 
 ## Source-of-truth map
 

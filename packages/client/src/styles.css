@@ -1099,6 +1099,24 @@ input[type="range"] {
   font-size: 0.92rem;
   color: var(--gold);
 }
+/* Training duo config: a wrapping chip grid + its one-line hint. */
+.duo-config {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 6px;
+  max-width: 250px;
+}
+.duo-config .hud-chip {
+  font-size: 0.62rem;
+  padding: 3px 6px;
+}
+.duo-config-hint {
+  margin: 0 0 10px;
+  font-size: 0.64rem;
+  opacity: 0.6;
+  letter-spacing: 0.02em;
+}
 .trainer-panel .set-row {
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   padding: 0.25rem 0;
@@ -1761,6 +1779,26 @@ input[type="range"] {
   color: #fff;
   border: 1px solid rgba(255, 255, 255, 0.3);
 }
+/* Duo portrait pair (kill cards, scoreboard, summary): the active half reads
+   solid and the benched half tucks behind it, dimmed and slightly smaller —
+   one glance says "this is a pair, and that one is out front". */
+.duo-chip {
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+}
+.duo-chip .fchip.bench {
+  width: 14px;
+  height: 14px;
+  font-size: 0.6rem;
+  opacity: 0.55;
+  margin-left: -5px;
+  border-color: rgba(255, 255, 255, 0.18);
+}
+.duo-chip .fchip.bench:first-child {
+  margin-left: 0;
+  margin-right: -5px;
+}
 @keyframes feedin {
   from {
     opacity: 0;
@@ -2021,6 +2059,14 @@ input[type="range"] {
   opacity: 0.5;
   font-size: 0.68rem;
 }
+/* "Rook + Wisp" under the player name on the summary sheet. */
+.sb-duo {
+  display: block;
+  font-style: normal;
+  font-size: 0.66rem;
+  opacity: 0.6;
+  letter-spacing: 0.02em;
+}
 .sb-lv {
   opacity: 0.75;
 }
@@ -2204,6 +2250,13 @@ input[type="range"] {
   flex: 1;
   display: grid;
   place-items: center;
+}
+.podium-card .podium-bench {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  opacity: 0.75;
+  margin-bottom: 2px;
 }
 .podium-card .who {
   font-weight: 700;
