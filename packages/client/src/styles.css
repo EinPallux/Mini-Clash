@@ -2819,3 +2819,79 @@ input[type="range"] {
   margin-left: 2px;
   vertical-align: super;
 }
+
+/* --------------------- Duo panel (UI_UX §8, Tag Swap) --------------------- */
+
+.duo-panel {
+  position: relative;
+  width: 62px;
+  height: 62px;
+  flex: none;
+  align-self: flex-end;
+  margin-right: -6px;
+  margin-bottom: 4px;
+}
+.duo-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  mask: radial-gradient(circle, transparent 62%, #000 63%);
+  -webkit-mask: radial-gradient(circle, transparent 62%, #000 63%);
+  pointer-events: none;
+}
+.duo-bench {
+  position: absolute;
+  inset: 7px;
+  display: grid;
+  place-items: center;
+  font-family: var(--font-display, inherit);
+  font-style: italic;
+  font-weight: 900;
+  font-size: 1.5rem;
+  color: rgba(255, 255, 255, 0.82);
+  filter: grayscale(0.55) brightness(0.75);
+  transition:
+    filter 0.18s ease-out,
+    transform 0.18s ease-out;
+}
+.duo-panel.ready .duo-bench {
+  filter: none;
+}
+.duo-panel.glint .duo-bench {
+  transform: scale(1.04);
+  box-shadow: 0 0 14px rgba(255, 199, 46, 0.75);
+}
+.duo-key {
+  position: absolute;
+  left: 50%;
+  bottom: -13px;
+  transform: translateX(-50%);
+  font-size: 0.55rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  color: rgba(255, 255, 255, 0.75);
+  background: rgba(13, 17, 26, 0.9);
+  padding: 1px 5px;
+  white-space: nowrap;
+}
+.duo-panel.ready .duo-key {
+  color: var(--gold);
+}
+/* The bench's own Energy bar — swapping into an empty bar is a real cost. */
+.duo-energy {
+  position: absolute;
+  right: -6px;
+  top: 8px;
+  bottom: 8px;
+  width: 4px;
+  background: rgba(255, 255, 255, 0.12);
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+}
+.duo-energy > span {
+  display: block;
+  width: 100%;
+  background: var(--gold);
+  opacity: 0.85;
+}

@@ -1,4 +1,10 @@
-import { CHAMPION_LIST, CHAMPIONS, SHATTERBRIDGE_MAP, TRAINING_MAP } from '@mini-clash/data';
+import {
+  CHAMPION_LIST,
+  CHAMPIONS,
+  SHATTERBRIDGE_MAP,
+  TAG_SWAP,
+  TRAINING_MAP,
+} from '@mini-clash/data';
 import type {
   ChampionSnap,
   MatchPlayerConfig,
@@ -86,6 +92,14 @@ export class MatchRuntime {
   private fx!: FxRunner;
   private buffer = new SnapshotBuffer();
   private predicted: PredictedSelf | null = null;
+  /** performance.now() when a locally-predicted swap morph ends (0 = none). */
+  private predictedMorphUntil = 0;
+  /** The morph the local champion is actually rendering this frame. */
+  private renderedMorphT = 0;
+  /** Swap-feel instrumentation (ROADMAP v0.4: input → morph ≤ 50 ms online).
+   * Measured in-page: CDP polling can't resolve a 350 ms window. */
+  private swapPressedAt = 0;
+  private swapLatencyMs = -1;
   private bridge: BridgeSet | null = null;
   private selfTeam: 0 | 1 = 0;
   private raf = 0;
@@ -209,6 +223,13 @@ export class MatchRuntime {
             this.predicted.halt(seq);
           }
         }
+        // Tag Swap is presentation-predicted (TECH §6 cast-commit): the morph
+        // starts on the keypress, not a round trip later. The server decides
+        // the outcome; if it refuses, the morph simply plays out harmlessly.
+        if (intent.t === 'swap') {
+          this.swapPressedAt = performance.now();
+          this.predictSwap();
+        }
       },
       quickPing: mode === 'bridge' ? () => this.ping('attack') : undefined,
       pickEntity: (nx, ny) => this.pick(nx, ny),
@@ -277,9 +298,18 @@ export class MatchRuntime {
     this.link.send({ t: 'ping', kind, x: g.x, z: g.z });
   }
 
-  /** Team quick-chat phrase (T wheel). */
+  /** Team quick-chat phrase (C wheel). */
   chat(id: string): void {
     this.link.sendChat?.(id);
+  }
+
+  /** Start the swap presentation immediately (see the input hook). */
+  private predictSwap(): void {
+    const champ = useHud.getState().champion;
+    if (!champ?.duo || champ.dead || champ.duo.swapCd > 0.001 || champ.duo.morphT > 0) return;
+    this.predictedMorphUntil = performance.now() + TAG_SWAP.morphS * 1000;
+    const self = this.selfPos();
+    this.fx.handle({ t: 'fx', key: 'duo.swap', x: self.x, z: self.z, source: this.selfPlayer });
   }
 
   surrender(): void {
@@ -476,6 +506,30 @@ export class MatchRuntime {
     this.handleEvents(this.buffer.drainEvents());
 
     const entities = this.buffer.sample();
+    // Predicted swap morph: the actor squashes from the keypress, before the
+    // authoritative snapshot carrying morphT has had time to arrive.
+    {
+      const self = entities.find(
+        (e) => e.snap.kind === 'champion' && e.snap.player === this.selfPlayer,
+      );
+      const snap = self?.snap;
+      const authoritative = snap?.kind === 'champion' ? (snap.duo?.morphT ?? 0) : 0;
+      const leftMs = this.predictedMorphUntil - performance.now();
+      if (leftMs <= 0) this.predictedMorphUntil = 0;
+      const predicted = Math.max(0, leftMs / 1000);
+      const wasMorphing = this.renderedMorphT > 0;
+      this.renderedMorphT = Math.max(authoritative, predicted);
+      // First frame of a morph after a keypress: that is the felt latency.
+      if (!wasMorphing && this.renderedMorphT > 0 && this.swapPressedAt > 0) {
+        this.swapLatencyMs = Math.round(performance.now() - this.swapPressedAt);
+        this.swapPressedAt = 0;
+      }
+      if (self && snap?.kind === 'champion' && snap.duo && predicted > authoritative) {
+        // Clone: snapshots are shared with the decoder's history.
+        self.snap = { ...snap, duo: { ...snap.duo, morphT: predicted } };
+      }
+    }
+
     // Local champion: predicted transform replaces the interpolated one online.
     if (this.predicted) {
       this.predicted.update(rawDt);
@@ -569,6 +623,8 @@ export class MatchRuntime {
           ? Math.round(this.predicted.maxCorrection * 100) / 100
           : undefined,
         maxError: this.predicted ? Math.round(this.predicted.maxError * 100) / 100 : undefined,
+        morphT: Math.round(this.renderedMorphT * 1000) / 1000,
+        swapLatencyMs: this.swapLatencyMs,
         rtt: Math.round(this.link?.rttMs ?? 0),
         calls: this.renderer.renderer.info.render.calls,
         tris: this.renderer.renderer.info.render.triangles,

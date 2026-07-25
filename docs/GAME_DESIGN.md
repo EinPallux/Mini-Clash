@@ -263,7 +263,7 @@ Pads at the 30 u / 90 u marks spawn an orb every 45 s (first 1:30). Touch: heal 
 | Right-click / hold | Move (click-to-move, pathfound); on an enemy: attack it |
 | A + click / A | Attack-move |
 | Q / W / R | Abilities (smart-cast with range indicator on hold — default; classic cast toggle in settings) |
-| **Space** | **Tag Swap** |
+| **Space** | **Tag Swap** (rebindable in Settings → Controls) |
 | E | Relic active |
 | S | Stop |
 | Tab (hold) | Scoreboard overlay |

@@ -86,6 +86,17 @@ try {
   console.info('moved within 250ms of the click:', early.toFixed(2), 'u');
   if (early < 0.3) errors.push(`prediction unresponsive under lag (moved ${early.toFixed(2)}u)`);
 
+  // Tag Swap must start on the keypress, not a round trip later (ROADMAP v0.4:
+  // input → morph start ≤ 50 ms at 80 ms RTT; this runs at 150 ms + jitter).
+  // Measured in-page (keypress → first morph frame): CDP round trips are far
+  // too coarse to resolve a 350 ms morph window.
+  await page.keyboard.press('Space');
+  await page.waitForTimeout(1200);
+  const swapMs = await page.evaluate(() => globalThis.__mcDebug?.swapLatencyMs ?? -1);
+  console.info('swap: input → morph start', swapMs, 'ms');
+  if (swapMs < 0) errors.push('swap morph never started');
+  else if (swapMs > 50) errors.push(`swap felt laggy (${swapMs}ms input → morph)`);
+
   // Keep playing ~20 s of orders and watch the correction budget.
   for (let i = 0; i < 20; i++) {
     await page.mouse.click(700 + (i % 5) * 90, 280 + (i % 3) * 60, { button: 'right' });

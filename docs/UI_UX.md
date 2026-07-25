@@ -97,7 +97,7 @@ Team lineup render + per-player progress rings + rotating tips (kit tips for the
 └──────────────────────────────────────────────────────────────┘
 ```
 
-- **Duo panel (bottom-left):** big active portrait, small benched portrait behind it with the 9 s swap radial; Space flips them with a satisfying card-swap animation; benched champion's ready-abilities glint (decision support).
+- **Duo panel (bottom-left):** big active portrait, small benched portrait beside it ringed by the 9 s swap radial (the ring reads as a filling arc, the label flips to **SPACE** when ready); Space flips them with a squash-and-pop morph — puff, ring flash, arrival chime — and the bench portrait glints when it brings a castable ability *and* the Energy to pay for it. A thin bar on the bench portrait shows its own Energy, because swapping into an empty bar is a real cost. *(Shipped v0.4; the morph is client-predicted so it starts on the keypress — measured at 1 ms input→morph over a 544 ms round trip.)*
 - **In-world (WebGL, not DOM):** unit healthbars (chunked per 100 HP, damage-lag ghost), cast bars, floating damage numbers, telegraphs, off-screen event/danger arrows at screen edge.
 - **Event ticker (top-right):** next Living-Bridge event icon + countdown; flips to a full-width banner + horn at T-8 s ("⚠ STORM FRONT — take cover!").
 - **Kill notifications:** duo-portrait vs duo-portrait cards; streak text uses restraint (no 2000s announcer cheese in text form — the horn stingers carry it).

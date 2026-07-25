@@ -1,4 +1,4 @@
-import { CHAMPIONS, type ChampionDef, UNITS } from '@mini-clash/data';
+import { CHAMPIONS, type ChampionDef, TAG_SWAP, UNITS } from '@mini-clash/data';
 import type { ChampionSnap, EntitySnap, MiniSnap, TowerSnap } from '@mini-clash/protocol';
 import * as THREE from 'three';
 import { paletteColors, useSettings } from '../state/settings';
@@ -137,8 +137,15 @@ class ChampionActor implements Actor {
   private championId: string;
   private idleFor = 0;
   private nextFidget = 5 + Math.random() * 5;
+  /** Tag Swap morph (GAME_DESIGN §7.2): the rig changes at the midpoint so the
+   * puff hides the switch; the whole 0.35 s reads as one squash-and-pop. */
+  private morphT = 0;
+  private morphScale = 1;
+
+  private ctx: ActorCtx;
 
   constructor(snap: ChampionSnap, scene: THREE.Scene, ctx: ActorCtx) {
+    this.ctx = ctx;
     this.def = CHAMPIONS[snap.championId];
     this.championId = snap.championId;
     this.buildModel();
@@ -180,8 +187,36 @@ class ChampionActor implements Actor {
   update(re: RenderEntity, dt: number): void {
     const snap = re.snap as ChampionSnap;
 
-    // Trainer champion switch rebuilds the rig.
+    // Tag Swap: the sim flips championId the instant the swap fires, but the
+    // rig waits for the morph's midpoint so the puff covers the change.
+    const morph = snap.duo?.morphT ?? 0;
+    const swapping = morph > 0;
+    if (swapping && this.morphT <= 0 && this.ctx.particles) {
+      // Swap started: puff at the feet, both palettes mingling.
+      this.ctx.particles.burst({
+        x: re.x,
+        z: re.z,
+        y: 0.5,
+        count: 16,
+        color: 0xffffff,
+        color2: teamColor(this.ctx, snap.team, snap.player === this.ctx.selfPlayerId),
+        size: 0.4,
+        speed: 2.6,
+        spread: 360,
+        up: 0.7,
+        life: 0.45,
+        shape: 'puff',
+      });
+    }
+    this.morphT = morph;
+    // Squash to nothing at the midpoint, pop back out — the rig swaps inside it.
+    const half = TAG_SWAP.morphS / 2;
+    this.morphScale = swapping ? Math.abs(morph - half) / half : 1;
+
+    // Champion identity changed (Tag Swap, or the trainer switch): rebuild the
+    // rig — mid-morph that lands exactly when the model is squashed flat.
     if (snap.championId !== this.championId) {
+      if (swapping && morph > half) return; // wait for the squash to hide it
       this.championId = snap.championId;
       this.def = CHAMPIONS[snap.championId];
       this.buildModel();
@@ -195,6 +230,14 @@ class ChampionActor implements Actor {
       this.model.position.y = h;
     } else {
       this.model.position.y = 0;
+    }
+
+    // Tag Swap squash-and-pop, layered over whatever the anim graph is doing.
+    if (this.morphScale < 1) {
+      const k = Math.max(0.02, this.morphScale);
+      this.model.scale.set(1 + (1 - k) * 0.5, k, 1 + (1 - k) * 0.5);
+    } else if (this.model.scale.y !== 1) {
+      this.model.scale.set(1, 1, 1);
     }
 
     // Smooth yaw toward sim facing.

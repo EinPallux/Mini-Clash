@@ -21,6 +21,8 @@ export interface HudChampion {
   passive: Record<string, number>;
   /** Death-screen recap (UI_UX §10) — top 3 damage sources, set while dead. */
   recap: ChampionSnap['recap'];
+  /** Tag Team bench + swap timers (GAME_DESIGN §7.2); absent when solo. */
+  duo: ChampionSnap['duo'];
   stats: ChampionSnap['stats'];
 }
 
@@ -217,6 +219,7 @@ export const useHud = create<HudState>()((set, get) => ({
             recastSlot: e.recast?.slot ?? null,
             passive: e.passive,
             recap: e.recap,
+            duo: e.duo,
             stats: e.stats,
           };
         }

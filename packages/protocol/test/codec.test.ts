@@ -237,6 +237,52 @@ describe('snapshot codec', () => {
     expect(out!.events[3]).toMatchObject({ t: 'ping', kind: 'danger' });
   });
 
+  it('round-trips Tag Team duo state and drops it for solo champions', () => {
+    const { enc, dec } = pair();
+    const withDuo = champ(1, {
+      duo: {
+        championId: 'sylva',
+        energy: 62,
+        cooldowns: { q: 3.4, w: 0, r: 41.2 },
+        swapCd: 7.8,
+        morphT: 0.22,
+      },
+    });
+    const out = dec.decode(enc.encode(snap([withDuo])));
+    const c = out!.entities[0] as ChampionSnap;
+    expect(c.duo?.championId).toBe('sylva');
+    expect(c.duo?.energy).toBe(62);
+    expect(c.duo?.cooldowns.q).toBeCloseTo(3.4, 1);
+    expect(c.duo?.cooldowns.r).toBeCloseTo(41.2, 1);
+    expect(c.duo?.swapCd).toBeCloseTo(7.8, 1);
+    expect(c.duo?.morphT).toBeCloseTo(0.22, 2);
+
+    // A swap exchanges both identities and resets the timers — one delta.
+    const swapped = champ(1, {
+      championId: 'sylva',
+      duo: {
+        championId: 'rattle',
+        energy: 100,
+        cooldowns: { q: 0, w: 0, r: 0 },
+        swapCd: 9,
+        morphT: 0.35,
+      },
+    });
+    const after = dec.decode(enc.encode(snap([swapped], 103)));
+    const c2 = after!.entities[0] as ChampionSnap;
+    expect(c2.championId).toBe('sylva');
+    expect(c2.duo?.championId).toBe('rattle');
+    expect(c2.duo?.swapCd).toBeCloseTo(9, 1);
+    // The pre-swap frame is untouched (no aliasing into decoder history).
+    expect(c.duo?.championId).toBe('sylva');
+
+    // Solo champions carry no duo block at all.
+    const soloDec = new SnapshotDecoder();
+    const soloEnc = new SnapshotEncoder();
+    const solo = soloDec.decode(soloEnc.encode(snap([champ(1)])));
+    expect((solo!.entities[0] as ChampionSnap).duo).toBeUndefined();
+  });
+
   it('ack patches per client at the fixed header offset', () => {
     const { enc, dec } = pair();
     const buf = enc.encode(snap([champ(1)], 100));

@@ -252,6 +252,17 @@ function encCd(w: Writer, c: ChampionSnap): void {
   w.u16(clampU16(q10(c.cooldowns.w)));
   w.u16(clampU16(q10(c.cooldowns.r)));
   w.u16(c.relic ? clampU16(q10(c.relic.cd)) : NONE16);
+  // Tag Team timers tick alongside our own, so they share this block. The
+  // benched champion's identity rides the rare block (it only moves on swap).
+  w.u8(c.duo ? 1 : 0);
+  if (c.duo) {
+    w.u8(clampU8(c.duo.energy));
+    w.u16(clampU16(q10(c.duo.cooldowns.q)));
+    w.u16(clampU16(q10(c.duo.cooldowns.w)));
+    w.u16(clampU16(q10(c.duo.cooldowns.r)));
+    w.u16(clampU16(q10(c.duo.swapCd)));
+    w.u8(clampU8(c.duo.morphT * 100)); // 0.35 s morph → 0.01 s resolution
+  }
 }
 
 function encState(w: Writer, c: ChampionSnap): void {
@@ -310,6 +321,8 @@ function rareJson(e: EntitySnap): string {
         cooldownMax: e.cooldownMax,
         // Death recap: appears at death, static while dead — one resend each.
         recap: e.recap ?? null,
+        // Tag Team: the benched champion's identity only moves on a swap.
+        benchId: e.duo?.championId ?? null,
       });
     case 'mini':
       return JSON.stringify({
@@ -794,6 +807,19 @@ export class SnapshotDecoder {
       e.relic = prevRelic ? { ...prevRelic, cd: relicCd / 10 } : null;
       (e as { __relicCd?: number }).__relicCd = relicCd / 10;
     }
+    // Duo timers (the bench champion's id arrives with the rare block).
+    if (r.u8() === 1) {
+      const prevDuo = e.duo as { championId?: string } | undefined;
+      e.duo = {
+        championId: prevDuo?.championId ?? '',
+        energy: r.u8(),
+        cooldowns: { q: r.u16() / 10, w: r.u16() / 10, r: r.u16() / 10 },
+        swapCd: r.u16() / 10,
+        morphT: r.u8() / 100,
+      };
+    } else {
+      e.duo = undefined;
+    }
   }
 
   private decState(r: Reader, e: Record<string, unknown>): void {
@@ -846,6 +872,13 @@ export class SnapshotDecoder {
       const cd = (e as { __relicCd?: number }).__relicCd ?? 0;
       data.relic = relic ? { id: relic.id, cd, cdMax: relic.cdMax } : null;
       if (data.recap === null) data.recap = undefined;
+      // Stitch the bench identity onto the duo timers from the cooldown block.
+      const benchId = data.benchId as string | null;
+      data.benchId = undefined;
+      const duo = e.duo as Record<string, unknown> | undefined;
+      // Clone: `e` is a shallow copy of the previous snapshot, so mutating the
+      // carried-over duo object in place would rewrite history.
+      if (duo && benchId) e.duo = { ...duo, championId: benchId };
     }
     Object.assign(e, data);
   }

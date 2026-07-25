@@ -11,6 +11,7 @@ export interface Keybinds {
   attackMove: string;
   stop: string;
   dance: string;
+  swap: string;
 }
 
 export const DEFAULT_KEYBINDS: Keybinds = {
@@ -20,6 +21,7 @@ export const DEFAULT_KEYBINDS: Keybinds = {
   attackMove: 'KeyA',
   stop: 'KeyS',
   dance: 'KeyT',
+  swap: 'Space',
 };
 
 interface SettingsState {

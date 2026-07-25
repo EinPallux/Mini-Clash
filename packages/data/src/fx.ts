@@ -529,6 +529,33 @@ export const FX: Record<string, FxTimeline> = {
       { time: 0, op: { t: 'sound', cue: 'death_poof' } },
     ],
   },
+  /** Tag Swap morph (GAME_DESIGN §7.2): puff out, chime in — 0.35 s total. */
+  'duo.swap': {
+    id: 'duo.swap',
+    events: [
+      { time: 0, op: { t: 'sound', cue: 'duo_swap', volume: 0.8 } },
+      {
+        time: 0,
+        op: {
+          t: 'burst',
+          at: 'self',
+          count: 22,
+          color: 0xffffff,
+          color2: 0xffc72e,
+          size: 0.13,
+          speed: 3.4,
+          up: 2.2,
+          life: 0.4,
+          shape: 'puff',
+        },
+      },
+      { time: 0.16, op: { t: 'ring', at: 'self', color: 0xffc72e, radius: 1.5, life: 0.35 } },
+      {
+        time: 0.18,
+        op: { t: 'light', at: 'self', color: 0xffc72e, intensity: 2.4, radius: 4, life: 0.3 },
+      },
+    ],
+  },
   'generic.spawn': {
     id: 'generic.spawn',
     events: [

@@ -161,6 +161,23 @@ export const SOUND_CUES: Record<string, SynthCue> = {
       { wave: 'triangle', freq: 1180, attack: 0.001, decay: 0.22, volume: 0.12, delay: 0.26 },
     ],
   },
+  /** Tag Swap: a quick card-flip whoosh with a bright arrival chime. */
+  duo_swap: {
+    id: 'duo_swap',
+    layers: [
+      { wave: 'sine', freq: 620, freqEnd: 240, attack: 0.005, decay: 0.16, volume: 0.2 },
+      {
+        wave: 'triangle',
+        freq: 340,
+        freqEnd: 1240,
+        attack: 0.005,
+        decay: 0.3,
+        volume: 0.18,
+        delay: 0.14,
+      },
+      { wave: 'sine', freq: 1560, attack: 0.001, decay: 0.16, volume: 0.1, delay: 0.3 },
+    ],
+  },
   block_clang: {
     id: 'block_clang',
     layers: [

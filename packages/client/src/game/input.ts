@@ -8,7 +8,7 @@ import type { FollowCamera } from './camera';
 /**
  * Input (GAME_DESIGN §15): right-click moves — or attacks when over an enemy —
  * left-click targets, smart-cast on key-release with hold-indicator, A attack-move,
- * S stop, T dance.
+ * S stop, T dance, Space tag-swap.
  */
 
 export interface InputCallbacks {
@@ -144,6 +144,11 @@ export class InputManager {
         break;
       case kb.dance:
         this.cb.send({ t: 'dance' });
+        break;
+      case kb.swap:
+        // Tag Swap (GAME_DESIGN §7.2). Space would also scroll the page.
+        e.preventDefault();
+        this.cb.send({ t: 'swap' });
         break;
     }
   };
