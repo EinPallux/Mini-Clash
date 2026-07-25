@@ -1337,7 +1337,7 @@ input[type="range"] {
 }
 .select-stage {
   display: flex;
-  gap: 3.4rem;
+  gap: 2rem;
   align-items: flex-start;
   margin-top: 2.2rem;
   flex-wrap: wrap;
@@ -1367,6 +1367,10 @@ input[type="range"] {
 .deal-card.big {
   width: 150px;
   height: 208px;
+}
+.duo-slot .deal-card.big {
+  width: 128px;
+  height: 178px;
 }
 .deal-card .inner {
   position: absolute;
@@ -2681,4 +2685,137 @@ input[type="range"] {
 }
 .chat-wheel .pw-center {
   font-size: 1rem;
+}
+
+/* ------------------------- Duo dealing (v0.4 select) ---------------------- */
+
+.duo-pair {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+}
+.duo-pair.mine {
+  padding: 0 14px 0 0;
+  margin-right: 10px;
+  border-right: 2px solid rgba(255, 255, 255, 0.12);
+}
+.duo-pair.ally {
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+}
+.ally-cards {
+  display: flex;
+  gap: 4px;
+}
+.ally-name {
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: rgba(255, 255, 255, 0.72);
+}
+.ally-name b {
+  color: #6fe0a8;
+}
+/* Enemy silhouettes carry a duo marker — their pair stays hidden. */
+.duo-hint {
+  position: absolute;
+  bottom: 10px;
+  left: 0;
+  right: 0;
+  text-align: center;
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.3);
+}
+/* The chain glyph joining your pair — sells "one duo, two champions". */
+.duo-link {
+  position: absolute;
+  left: 50%;
+  bottom: -18px;
+  transform: translateX(-50%);
+  color: var(--gold);
+  font-size: 1.1rem;
+  text-shadow: 0 0 10px rgba(255, 199, 46, 0.6);
+  pointer-events: none;
+}
+.duo-pair.mine .duo-link {
+  left: calc(50% - 8px);
+}
+
+.duo-slot {
+  position: relative;
+  padding: 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+  line-height: 0;
+}
+.duo-slot::after {
+  content: "";
+  position: absolute;
+  inset: -5px;
+  border: 2px solid transparent;
+  pointer-events: none;
+  transition: border-color 0.12s ease-out;
+}
+.duo-slot.picked::after {
+  border-color: var(--gold);
+}
+
+.slot-reroll {
+  position: absolute;
+  right: -8px;
+  top: -8px;
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  font-size: 0.9rem;
+  background: #171c28;
+  border: 2px solid var(--gold);
+  color: #fff;
+  cursor: pointer;
+  z-index: 2;
+}
+.slot-reroll:hover {
+  background: var(--gold);
+}
+
+.deal-card.small {
+  width: 78px;
+  height: 108px;
+}
+.deal-card.small .dc-letter {
+  font-size: 2rem;
+}
+.deal-card.small .dc-nm {
+  font-size: 0.6rem;
+}
+
+.reroll-count {
+  font-size: 0.82rem;
+  color: rgba(255, 255, 255, 0.8);
+}
+.reroll-count.spent {
+  opacity: 0.45;
+}
+.reroll-count b {
+  color: var(--gold);
+}
+
+.select-side.enemy .deal-card.back-only {
+  width: 84px;
+  height: 116px;
+}
+.select-side.enemy .select-row {
+  gap: 10px;
+}
+
+/* Loading-veil duo pairs: the benched half rides small behind the active one. */
+.load-card .ltr-bench {
+  font-size: 0.55em;
+  opacity: 0.7;
+  margin-left: 2px;
+  vertical-align: super;
 }

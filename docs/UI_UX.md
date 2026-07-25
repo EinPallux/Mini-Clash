@@ -57,24 +57,24 @@ Backdrop: the 3D hub island (Medieval-Hexagon terrain, harbor with Pirate/Waterc
 - **Party dock (ambient):** avatar chips; + opens invite sheet — 6-char code + copy-link (`?join=ABC123` query link — works on any static host); joining puts you in the leader's dock. Party persists through matches; leader crown transfers on leave. *(v0.3 form: the dock shows your connected lobby — code + member chips — and rides the hub while you browse; the lobby connection survives matches for Play Again.)*
 - **Custom Lobby screen:** two team columns of 4 seats; each seat = player chip / **bot chip** (per-bot difficulty: Recruit/Veteran/Elite) / empty. Seat management is tap-first per principle #5: tap an empty seat to sit there; leaders tap bot tiers directly on the chip (drag lands with the spectator row post-1.0). Right panel: lobby code (huge), mode summary, bot-fill toggle ("fill empty seats on start"). Leader's **START** requires ≥1 human and every seated human readied. Non-leaders see a readiness toggle.
 - Edge states: leader disconnect → crown migrates + toast; joining a full/dead code → friendly error with "make your own lobby" CTA; leaving mid-select turns your seat into a Veteran bot that keeps your pick.
-- *(v0.3)* START runs the champion-select deal **server-side** — per-human deal + 2 rerolls, shared team bench with atomic swaps, 45 s auto-lock — then every human receives a private seat reservation into the match room. Enemy picks never cross the wire before load.
+- *(v0.3)* START runs the champion-select deal **server-side** — per-human deal + 2 rerolls, shared team bench with atomic swaps, auto-lock on the timer — then every human receives a private seat reservation into the match room. Enemy picks never cross the wire before load. *(v0.4: the server deals **duos** — two champions per seat, rerolls and bench swaps addressed per slot.)*
 
 ## 6. Champion Select (the Deal)
 
-45→0 s timer ring around the START slot. Flow: dramatic card-flip **deal of your duo** (two cards land as a pair, chained) → reroll/bench decisions → lock.
+60→0 s timer ring around the START slot. Flow: dramatic card-flip **deal of your duo** (two cards land as a pair, chained) → reroll/bench decisions → lock. *(Shipped in v0.4; v0.2–v0.3 dealt a single champion with a 45 s ring.)*
 
 ```
 ┌──────────────────────────────────────────────┐
 │  YOUR TEAM (4 duo cards, allies' picks live) │
 │        [YOUR DUO: ROOK ♦ FATHOM]             │
-│   [🎲 Reroll (2)]  [team bench row: swaps]   │
+│   [🎲 per-card reroll ×2] [bench row: swaps] │
 │  enemy side: hidden silhouettes until load   │
 │  bottom: duo tips ("Rook walls make Fathom   │
 │  kegs unavoidable"), palette picker, [LOCK]  │
 └──────────────────────────────────────────────┘
 ```
 
-- Reroll animates the specific card exploding into the new champion; rerolled champions slide to the team bench; tapping a bench card swaps it into a chosen slot of your duo (per-slot, LoL-bench-style).
+- Reroll animates the specific card exploding into the new champion; rerolled champions slide to the team bench; tapping a bench card swaps it into a chosen slot of your duo (per-slot, LoL-bench-style — tap a duo card to choose the slot the bench feeds). A reroll always changes the card, and a duo never holds the same champion twice. *(A 4-duo team wants 8 distinct champions; with a smaller roster the deal exhausts it before repeating.)*
 - Everyone locks or timer ends → team splash: all 8 ally champions line up and do their `spawn` pose (this render *is* the loading screen backdrop).
 
 ## 7. Loading

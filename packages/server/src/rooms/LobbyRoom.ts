@@ -20,7 +20,7 @@ import { issueLobbyCode, releaseLobbyCode } from '../lobby-registry';
  * BridgeRoom. The lobby survives the match for "Play Again".
  */
 
-const SELECT_SECONDS = 45;
+const SELECT_SECONDS = 60;
 const TIERS: BotTier[] = ['recruit', 'veteran', 'elite'];
 const BOT_NAMES = ['Krag', 'Nyx', 'Piston', 'Moxie', 'Thorn', 'Ember', 'Gruff', 'Fizz'];
 
@@ -40,7 +40,8 @@ interface BotSeat {
 type Seat = HumanSeat | BotSeat | null;
 
 interface SelectSeat {
-  champion: string;
+  /** [active, bench] — the pair this seat will play (GAME_DESIGN §7.1). */
+  duo: [string, string];
   rerolls: number;
   locked: boolean;
 }
@@ -79,7 +80,7 @@ export class LobbyRoom extends Room {
       this.broadcastLobby();
     });
     this.onMessage('start', (client) => this.startSelect(client));
-    this.onMessage('reroll', (client) => this.reroll(client));
+    this.onMessage('reroll', (client, msg: unknown) => this.reroll(client, msg));
     this.onMessage('swap', (client, msg: unknown) => this.swap(client, msg));
     this.onMessage('lock', (client) => this.lockIn(client));
   }
@@ -237,16 +238,18 @@ export class LobbyRoom extends Room {
     this.phase = 'select';
     this.benches = [[], []];
     this.select = this.seats.map(() => null);
-    // Per-team unique deal (same rule as the offline ceremony).
+    // Per-team unique duo deal: 8 distinct champions per team, paired up.
     for (const team of [0, 1] as const) {
       const dealt: string[] = [];
       for (let idx = 0; idx < 4; idx++) {
         const i = team * 4 + idx;
-        const champion = this.draw([...dealt]);
-        dealt.push(champion);
+        const active = this.draw([...dealt]);
+        dealt.push(active);
+        const bench = this.draw([...dealt], active);
+        dealt.push(bench);
         const seat = this.seats[i];
         this.select[i] = {
-          champion,
+          duo: [active, bench],
           rerolls: 2,
           locked: seat?.kind === 'bot', // bots hold their deal
         };
@@ -258,13 +261,23 @@ export class LobbyRoom extends Room {
     this.broadcastSelect();
   }
 
-  /** Draw a champion not in `exclude`; falls back to any when the pool dries. */
-  private draw(exclude: string[]): string {
-    const pool = CHAMPION_LIST.map((c) => c.id).filter((id) => !exclude.includes(id));
-    if (pool.length === 0) {
-      return CHAMPION_LIST[Math.floor(Math.random() * CHAMPION_LIST.length)].id;
-    }
-    return pool[Math.floor(Math.random() * pool.length)];
+  /**
+   * Draw a champion not in `exclude` (GAME_DESIGN §7.1: no duplicates within a
+   * team). A 4v4 of duos wants 8 distinct champions per team, so the rule only
+   * fully holds once the roster reaches 8 — until then the deal exhausts the
+   * pool first and only then repeats, and `mustDiffer` still guarantees the two
+   * halves of one duo are never the same champion.
+   */
+  private draw(exclude: string[], ...avoid: string[]): string {
+    const all = CHAMPION_LIST.map((c) => c.id);
+    const pool = all.filter((id) => !exclude.includes(id));
+    if (pool.length > 0) return pool[Math.floor(Math.random() * pool.length)];
+    // Pool dry (roster smaller than the deal): repeat, but never hand back a
+    // champion this seat must not hold — its own other half, or the pick a
+    // reroll just spent.
+    const fallback = all.filter((id) => !avoid.includes(id));
+    const from = fallback.length > 0 ? fallback : all;
+    return from[Math.floor(Math.random() * from.length)];
   }
 
   private selectFor(sessionId: string): { i: number; sel: SelectSeat } | null {
@@ -278,24 +291,36 @@ export class LobbyRoom extends Room {
     return null;
   }
 
+  /** Every champion currently held by the team (both halves of every duo). */
   private teamPicks(team: 0 | 1): string[] {
     const out: string[] = [];
     for (let idx = 0; idx < 4; idx++) {
       const sel = this.select[team * 4 + idx];
-      if (sel) out.push(sel.champion);
+      if (sel) out.push(sel.duo[0], sel.duo[1]);
     }
     return out;
   }
 
-  private reroll(client: Client): void {
+  /** Validate a duo slot index off the wire. */
+  private static slotOf(msg: unknown): 0 | 1 | null {
+    const slot = (msg as { slot?: unknown })?.slot;
+    return slot === 0 || slot === 1 ? slot : null;
+  }
+
+  private reroll(client: Client, msg: unknown): void {
     if (this.phase !== 'select') return;
+    const slot = LobbyRoom.slotOf(msg);
+    if (slot === null) return;
     const found = this.selectFor(client.sessionId);
     if (!found || found.sel.locked || found.sel.rerolls <= 0) return;
     const team = found.i < 4 ? 0 : 1;
     const exclude = [...this.teamPicks(team), ...this.benches[team]];
+    const other = found.sel.duo[slot === 0 ? 1 : 0];
+    const spent = found.sel.duo[slot];
     found.sel.rerolls--;
-    this.benches[team].push(found.sel.champion);
-    found.sel.champion = this.draw(exclude);
+    this.benches[team].push(spent);
+    // A reroll must always change the card — never re-draw what it just spent.
+    found.sel.duo[slot] = this.draw(exclude, other, spent);
     this.broadcastSelect();
   }
 
@@ -304,13 +329,16 @@ export class LobbyRoom extends Room {
     const found = this.selectFor(client.sessionId);
     if (!found || found.sel.locked) return;
     const championId = (msg as { championId?: unknown })?.championId;
-    if (typeof championId !== 'string') return;
+    const slot = LobbyRoom.slotOf(msg);
+    if (typeof championId !== 'string' || slot === null) return;
+    // Never let a duo hold the same champion twice.
+    if (found.sel.duo[slot === 0 ? 1 : 0] === championId) return;
     const team = (found.i < 4 ? 0 : 1) as 0 | 1;
     const bench = this.benches[team];
     const at = bench.indexOf(championId);
     if (at === -1) return; // taken by a teammate already — atomic by design
-    bench.splice(at, 1, found.sel.champion);
-    found.sel.champion = championId;
+    bench.splice(at, 1, found.sel.duo[slot]);
+    found.sel.duo[slot] = championId;
     this.broadcastSelect();
   }
 
@@ -341,7 +369,7 @@ export class LobbyRoom extends Room {
       const view: LobbySelectSnap = {
         timeLeft,
         you: {
-          champion: found.sel.champion,
+          duo: [...found.sel.duo] as [string, string],
           rerolls: found.sel.rerolls,
           locked: found.sel.locked,
         },
@@ -352,7 +380,10 @@ export class LobbyRoom extends Room {
           return {
             key: seat?.kind === 'human' ? seat.sessionId : `bot-${i}`,
             name: seat?.kind === 'human' ? seat.name : BOT_NAMES[i % BOT_NAMES.length],
-            champion: sel?.champion ?? CHAMPION_LIST[0].id,
+            duo: (sel ? [...sel.duo] : [CHAMPION_LIST[0].id, CHAMPION_LIST[1].id]) as [
+              string,
+              string,
+            ],
             locked: sel?.locked ?? false,
             bot: seat?.kind !== 'human',
             you: seat?.kind === 'human' && seat.sessionId === client.sessionId,
@@ -390,14 +421,16 @@ export class LobbyRoom extends Room {
         reservations[token] = { player: id, name: seat.name };
         roster.push({
           id,
-          championId: sel?.champion ?? CHAMPION_LIST[0].id,
+          championId: sel?.duo[0] ?? CHAMPION_LIST[0].id,
+          benchId: sel?.duo[1] ?? CHAMPION_LIST[1].id,
           team,
           name: seat.name,
         });
       } else {
         roster.push({
           id,
-          championId: sel?.champion ?? CHAMPION_LIST[0].id,
+          championId: sel?.duo[0] ?? CHAMPION_LIST[0].id,
+          benchId: sel?.duo[1] ?? CHAMPION_LIST[1].id,
           team,
           bot: seat?.kind === 'bot' ? seat.tier : 'veteran',
           name: BOT_NAMES[i % BOT_NAMES.length],

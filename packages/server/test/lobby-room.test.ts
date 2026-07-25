@@ -1,6 +1,6 @@
 import { createServer } from 'node:http';
 import { WebSocketTransport } from '@colyseus/ws-transport';
-import { CHAMPIONS } from '@mini-clash/data';
+import { CHAMPION_LIST, CHAMPIONS } from '@mini-clash/data';
 import type { LobbyMatchMsg, LobbySelectSnap, LobbySnap, Snapshot } from '@mini-clash/protocol';
 import { SnapshotDecoder } from '@mini-clash/protocol';
 import { Server } from 'colyseus';
@@ -103,27 +103,36 @@ describe('lobby room', () => {
     friend.room.send('ready', { on: true });
     await waitFor(() => leader.lobby!.startBlocked === null);
 
-    // START deals both humans a champion; team views never leak enemy picks.
+    // START deals both humans a DUO; team views never leak enemy picks.
     leader.room.send('start', {});
     await waitFor(() => leader.select !== null && friend.select !== null);
-    expect(CHAMPIONS[leader.select!.you.champion]).toBeTruthy();
+    expect(CHAMPIONS[leader.select!.you.duo[0]]).toBeTruthy();
+    expect(CHAMPIONS[leader.select!.you.duo[1]]).toBeTruthy();
+    expect(leader.select!.you.duo[0]).not.toBe(leader.select!.you.duo[1]);
     expect(leader.select!.you.rerolls).toBe(2);
     expect(leader.select!.team.filter((t) => !t.bot).length).toBe(1); // friend is enemy-side
     expect(leader.select!.enemyCount).toBe(4);
-    // Team deal is duplicate-free.
-    const picks = leader.select!.team.map((t) => t.champion);
-    expect(new Set(picks).size).toBe(4);
+    // 4 duos = 8 slots. The deal exhausts the roster before repeating, so it is
+    // duplicate-free exactly when the roster has 8+ champions (Boltz and Wisp
+    // close that gap in v0.4); a single duo never repeats either way.
+    const picks = leader.select!.team.flatMap((t) => t.duo);
+    expect(picks.length).toBe(8);
+    expect(new Set(picks).size).toBe(Math.min(8, CHAMPION_LIST.length));
+    for (const t of leader.select!.team) expect(t.duo[0]).not.toBe(t.duo[1]);
 
-    // Reroll: old pick lands on the shared bench, counter decrements.
-    const before = leader.select!.you.champion;
-    leader.room.send('reroll', {});
+    // Reroll slot 1: that half lands on the shared bench, counter decrements.
+    const before = leader.select!.you.duo[1];
+    const keptActive = leader.select!.you.duo[0];
+    leader.room.send('reroll', { slot: 1 });
     await waitFor(() => leader.select!.you.rerolls === 1);
     expect(leader.select!.bench).toContain(before);
-    expect(leader.select!.you.champion).not.toBe(before);
+    expect(leader.select!.you.duo[1]).not.toBe(before);
+    expect(leader.select!.you.duo[0]).toBe(keptActive); // the other half is untouched
 
-    // Swap it back off the bench.
-    leader.room.send('swap', { championId: before });
-    await waitFor(() => leader.select!.you.champion === before);
+    // Swap it back off the bench into that same slot.
+    leader.room.send('swap', { championId: before, slot: 1 });
+    await waitFor(() => leader.select!.you.duo[1] === before);
+    expect(leader.select!.you.duo[0]).toBe(keptActive);
 
     // Both lock → each human gets a private reservation into the same room.
     leader.room.send('lock', {});
@@ -141,10 +150,19 @@ describe('lobby room', () => {
     });
     m1.onMessage('snapb', () => {});
     const m2 = await c2.joinById(friend.match!.roomId, { token: friend.match!.token });
-    let seat2: { player: number; roster: { id: number; bot?: string }[] } | null = null;
-    m2.onMessage('seat', (msg: { player: number; roster: { id: number; bot?: string }[] }) => {
-      seat2 = msg;
-    });
+    let seat2: {
+      player: number;
+      roster: { id: number; bot?: string; championId: string; benchId?: string }[];
+    } | null = null;
+    m2.onMessage(
+      'seat',
+      (msg: {
+        player: number;
+        roster: { id: number; bot?: string; championId: string; benchId?: string }[];
+      }) => {
+        seat2 = msg;
+      },
+    );
     const snaps2: Snapshot[] = [];
     const dec2 = new SnapshotDecoder();
     m2.onMessage('snapb', (raw: Uint8Array | ArrayBuffer) => {
@@ -158,6 +176,11 @@ describe('lobby room', () => {
     // (team 0 column position 1 → roster id 2).
     const eliteSeat = seat2!.roster.find((p) => p.id === 2);
     expect(eliteSeat?.bot).toBe('elite');
+    // Every seat plays a duo (GAME_DESIGN §7.1).
+    for (const p of seat2!.roster) {
+      expect(p.benchId).toBeTruthy();
+      expect(p.benchId).not.toBe(p.championId);
+    }
 
     await expect(
       new JsClient(`ws://127.0.0.1:${port}`).joinById(leader.match!.roomId, {}),

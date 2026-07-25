@@ -86,7 +86,12 @@ export function MatchView(): React.ReactElement {
                   .filter((p) => p.team === 0)
                   .map((p) => (
                     <div key={p.id} className="load-card">
-                      <span className="ltr">{CHAMPIONS[p.championId].name.slice(0, 1)}</span>
+                      <span className="ltr">
+                        {CHAMPIONS[p.championId].name.slice(0, 1)}
+                        {p.benchId && (
+                          <span className="ltr-bench">{CHAMPIONS[p.benchId].name.slice(0, 1)}</span>
+                        )}
+                      </span>
                       <span className="who">{p.bot ? (p.name ?? 'Bot') : 'You'}</span>
                     </div>
                   ))}

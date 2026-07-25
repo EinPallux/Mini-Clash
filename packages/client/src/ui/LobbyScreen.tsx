@@ -32,13 +32,13 @@ function useLobbySelectDriver(): SelectDriver | null {
   if (!select) return null;
   const elapsed = Math.floor((performance.now() - selectAt) / 1000);
   return {
-    mine: select.you.champion,
+    duo: select.you.duo,
     allies: select.team
       .filter((t) => !t.you)
       .map((t) => ({
         key: t.key,
         name: t.name,
-        champion: t.champion,
+        duo: t.duo,
         locked: t.locked,
         bot: t.bot,
       })),
@@ -47,8 +47,8 @@ function useLobbySelectDriver(): SelectDriver | null {
     locked: select.you.locked,
     timeLeft: Math.max(0, select.timeLeft - elapsed),
     enemyCount: select.enemyCount,
-    reroll: () => send({ t: 'reroll' }),
-    swap: (championId) => send({ t: 'swap', championId }),
+    reroll: (slot) => send({ t: 'reroll', slot }),
+    swap: (championId, slot) => send({ t: 'swap', championId, slot }),
     lock: () => send({ t: 'lock' }),
   };
 }

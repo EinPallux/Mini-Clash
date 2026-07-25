@@ -75,17 +75,25 @@ try {
   await page.getByText('Bridge Brawl', { exact: true }).click({ timeout: 8000 });
   await page.waitForTimeout(2200);
   await page.screenshot({ path: `${OUT}/2-select.png` });
-  const before = await page.evaluate(
-    () => document.querySelector('.deal-card.big .dc-nm')?.textContent,
-  );
-  await page.getByText('Reroll', { exact: false }).click();
+  // Duo deal (GAME_DESIGN §7.1): two chained cards, per-slot reroll + bench.
+  const duoNames = () =>
+    page.evaluate(() =>
+      [...document.querySelectorAll('.duo-slot .dc-nm')].map((n) => n.textContent),
+    );
+  const before = await duoNames();
+  if (before.length !== 2) errors.push(`expected a duo pair, saw ${before.length} card(s)`);
+  if (before[0] === before[1]) errors.push(`duo holds the same champion twice (${before[0]})`);
+  // Reroll the benched half; the active half must be untouched.
+  await page.locator('.duo-slot').nth(1).locator('.slot-reroll').click();
   await page.waitForTimeout(900);
-  const after = await page.evaluate(
-    () => document.querySelector('.deal-card.big .dc-nm')?.textContent,
-  );
-  if (!before || !after || before === after) errors.push(`reroll did not change (${before})`);
+  const after = await duoNames();
+  if (after[1] === before[1]) errors.push(`reroll did not change the card (${before[1]})`);
+  if (after[0] !== before[0]) errors.push('reroll disturbed the other half of the duo');
+  // The rerolled champion sits on the team bench — swap it back into that slot.
   await page.locator('.bench-card').first().click();
   await page.waitForTimeout(400);
+  const back = await duoNames();
+  if (back[1] !== before[1]) errors.push(`bench swap did not restore (${back[1]})`);
   await page.getByText('LOCK IN', { exact: true }).click();
 
   // Match loads; rigged enemy structures make the push land in ~1-2 min.

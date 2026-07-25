@@ -42,11 +42,27 @@ function bridgeRoster(selfChampionId: string): MatchPlayerConfig[] {
   }
   const pick = (): string =>
     pool.shift() ?? CHAMPION_LIST[Math.floor(Math.random() * CHAMPION_LIST.length)].id;
-  const players: MatchPlayerConfig[] = [{ id: SELF_PLAYER, championId: selfChampionId, team: 0 }];
+  // Every seat plays a duo (GAME_DESIGN §7.1) — the pool refills once it dries,
+  // so duplicates across teams are fine, duplicates inside one duo are not.
+  const duo = (active: string): string => {
+    let bench = pick();
+    if (bench === active) bench = pick();
+    return bench;
+  };
+  const players: MatchPlayerConfig[] = [
+    {
+      id: SELF_PLAYER,
+      championId: selfChampionId,
+      benchId: duo(selfChampionId),
+      team: 0,
+    },
+  ];
   for (let i = 0; i < 7; i++) {
+    const active = pick();
     players.push({
       id: SELF_PLAYER + 1 + i,
-      championId: pick(),
+      championId: active,
+      benchId: duo(active),
       team: i < 3 ? 0 : 1,
       bot: 'veteran',
       name: BOT_NAMES[i],

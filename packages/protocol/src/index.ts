@@ -353,12 +353,13 @@ export interface LobbySnap {
 /** Per-client champion-select view — enemy picks never cross the wire. */
 export interface LobbySelectSnap {
   timeLeft: number;
-  you: { champion: string; rerolls: number; locked: boolean };
-  /** Your team's four cards in seat order (includes you). */
+  /** Your duo: [active, bench] — both are yours, either may be rerolled. */
+  you: { duo: [string, string]; rerolls: number; locked: boolean };
+  /** Your team's four duo cards in seat order (includes you). */
   team: {
     key: string;
     name: string;
-    champion: string;
+    duo: [string, string];
     locked: boolean;
     bot: boolean;
     you: boolean;
@@ -382,8 +383,10 @@ export type LobbyClientMsg =
   | { t: 'fill'; on: boolean }
   | { t: 'ready'; on: boolean }
   | { t: 'start' }
-  | { t: 'reroll' }
-  | { t: 'swap'; championId: string }
+  /** Reroll one half of your duo (slot 0 = active, 1 = bench). */
+  | { t: 'reroll'; slot: 0 | 1 }
+  /** Swap a team-bench champion into one of your duo slots. */
+  | { t: 'swap'; championId: string; slot: 0 | 1 }
   | { t: 'lock' };
 
 /* ------------------------------- Worker link ------------------------------ */
