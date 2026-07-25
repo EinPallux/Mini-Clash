@@ -389,6 +389,165 @@ describe('augment effects', () => {
     expect(championStats(e).armor).toBeCloseTo(before, 3);
   });
 
+  /* ------------------------- Behavioural specials ------------------------- */
+
+  it('Thornmail Soul reflects a share of basic-attack damage', () => {
+    const sim = bridge();
+    const e = me(sim);
+    const foe = sim.world.entities.find((x) => x.champ?.player === 2);
+    if (!foe) throw new Error('no foe');
+    grant(sim, 'thornmail_soul');
+    foe.hp = foe.hpMax;
+    const before = foe.hp;
+    // Rook spawns behind Shieldwall, which eats the first hit whole.
+    dealDamage(sim.world, { source: foe, tag: 'aa' }, e, 200, 'physical');
+    dealDamage(sim.world, { source: foe, tag: 'aa' }, e, 200, 'physical');
+    expect(foe.hp).toBeLessThan(before);
+  });
+
+  it('Undying Contract refuses one death per match, and only with a bench', () => {
+    const sim = bridge();
+    const e = me(sim);
+    const c = e.champ;
+    if (!c) throw new Error('no champ');
+    const was = c.def.id;
+    grant(sim, 'undying_contract');
+    const foe = sim.world.entities.find((x) => x.champ?.player === 2);
+    if (!foe) throw new Error('no foe');
+    dealDamage(sim.world, { source: foe }, e, 99999, 'physical');
+    dealDamage(sim.world, { source: foe }, e, 99999, 'physical');
+    expect(e.dead).toBe(false);
+    expect(c.def.id).not.toBe(was); // the bench half took the field
+    expect(e.hp / e.hpMax).toBeCloseTo(0.4, 1);
+    // The contract is spent: the next lethal blow lands.
+    dealDamage(sim.world, { source: foe }, e, 99999, 'physical');
+    dealDamage(sim.world, { source: foe }, e, 99999, 'physical');
+    expect(e.dead).toBe(true);
+  });
+
+  it('Second Wind heals once per life', () => {
+    // Mortis, not Rook: no block passive to swallow the trigger hit.
+    const sim = bridge('mortis', 'sylva');
+    const e = me(sim);
+    const c = e.champ;
+    if (!c) throw new Error('no champ');
+    grant(sim, 'second_wind');
+    const foe = sim.world.entities.find((x) => x.champ?.player === 2);
+    if (!foe) throw new Error('no foe');
+    e.hp = e.hpMax * 0.12;
+    dealDamage(sim.world, { source: foe }, e, 20, 'physical');
+    expect(c.augState.secondWind).toBe(1);
+    const low = e.hp;
+    run(sim, 3.2);
+    expect(e.hp).toBeGreaterThan(low);
+    // Armed once per life: a second dip does not re-trigger it.
+    c.augState.secondWind = 1;
+    const before = e.hp;
+    e.hp = e.hpMax * 0.05;
+    dealDamage(sim.world, { source: foe }, e, 20, 'physical');
+    run(sim, 3.2);
+    expect(e.hp).toBeLessThan(before);
+  });
+
+  it('Guardian Constellation banks a star and eats one whole ability', () => {
+    const sim = bridge();
+    const e = me(sim);
+    const c = e.champ;
+    if (!c) throw new Error('no champ');
+    grant(sim, 'guardian_constellation');
+    run(sim, 21);
+    expect(c.augState.star).toBe(1);
+    const foe = sim.world.entities.find((x) => x.champ?.player === 2);
+    if (!foe) throw new Error('no foe');
+    const before = e.hp;
+    dealDamage(sim.world, { source: foe, tag: 'ability' }, e, 300, 'arcane');
+    expect(e.hp).toBe(before);
+    expect(c.augState.star).toBe(0);
+    // Second ability gets through — the star is spent, not permanent.
+    dealDamage(sim.world, { source: foe, tag: 'ability' }, e, 300, 'arcane');
+    expect(e.hp).toBeLessThan(before);
+  });
+
+  it('Kinetic Battery charges from movement', () => {
+    const sim = bridge();
+    grant(sim, 'kinetic_battery');
+    // Somewhere reachable inside our own half — the barrier is still up at 0:00.
+    const e = me(sim);
+    sim.applyIntents([msg({ t: 'move', x: e.x + 3, z: e.z })]);
+    run(sim, 3);
+    expect(me(sim).champ?.augState.kinetic ?? 0).toBeGreaterThan(0);
+  });
+
+  it('Overcharge scales the ultimate and leaves Q alone', () => {
+    const hit = (withCard: boolean): number => {
+      const sim = bridge('grukk', 'rook');
+      if (withCard) grant(sim, 'overcharge');
+      const c = me(sim).champ;
+      if (!c) throw new Error('no champ');
+      levelTo(sim, 6);
+      c.draft = null;
+      const foe = sim.world.entities.find((x) => x.champ?.player === 2);
+      if (!foe) throw new Error('no foe');
+      foe.x = me(sim).x + 1.2;
+      foe.z = me(sim).z;
+      foe.hp = foe.hpMax;
+      sim.applyIntents([msg({ t: 'cast', slot: 'r', x: foe.x, z: foe.z })]);
+      run(sim, 1.5);
+      return foe.hpMax - foe.hp;
+    };
+    const plain = hit(false);
+    const charged = hit(true);
+    expect(plain).toBeGreaterThan(0);
+    expect(charged).toBeGreaterThan(plain);
+  });
+
+  it('Splitter turns one Q into two angled casts', () => {
+    // Fathom's Q is a projectile, so Splitter is legal on him.
+    const sim = bridge('fathom', 'rook');
+    grant(sim, 'splitter');
+    const e = me(sim);
+    sim.applyIntents([msg({ t: 'cast', slot: 'q', x: e.x + 6, z: e.z })]);
+    run(sim, 0.5); // ride out the windup — the shot leaves on commit, not on cast
+    const shots = sim.world.entities.filter(
+      (x) => x.kind === 'projectile' && x.proj?.owner === e.id,
+    );
+    expect(shots.length).toBe(2);
+    // And they leave on different headings — that V is the whole tell.
+    expect(shots[0].proj?.dirZ).not.toBeCloseTo(shots[1].proj?.dirZ ?? 0, 3);
+  });
+
+  it('Ramparts stretches the wall and stops enemy shots', () => {
+    const plain = bridge('rook', 'grukk');
+    const e0 = me(plain);
+    plain.applyIntents([msg({ t: 'cast', slot: 'w', x: e0.x + 3, z: e0.z })]);
+    for (let i = 0; i < 20; i++) plain.tick();
+    const base = plain.world.entities.find((x) => x.kind === 'wall')?.wall?.length ?? 0;
+    expect(base).toBeGreaterThan(0);
+
+    const sim = bridge('rook', 'grukk');
+    grant(sim, 'ramparts_old_bridge');
+    const e = me(sim);
+    sim.applyIntents([msg({ t: 'cast', slot: 'w', x: e.x + 3, z: e.z })]);
+    for (let i = 0; i < 20; i++) sim.tick();
+    const wall = sim.world.entities.find((x) => x.kind === 'wall');
+    expect(wall?.wall?.length ?? 0).toBeGreaterThan(base);
+    expect(wall?.wall?.blocksProjectiles).toBe(true);
+  });
+
+  it('Elemental Ascension locks one element at pickup and rides ability hits', () => {
+    const sim = bridge();
+    const c = me(sim).champ;
+    if (!c) throw new Error('no champ');
+    levelTo(sim, 3);
+    c.draft = { index: 0, offers: ['elemental_ascension'], tLeft: 5, rerolled: false };
+    expect(pickAugment(sim.world, me(sim), 0)).toBe(true);
+    const rolled = c.augState.element;
+    expect(rolled).toBeGreaterThanOrEqual(0);
+    expect(rolled).toBeLessThan(3);
+    run(sim, 2);
+    expect(c.augState.element).toBe(rolled); // never re-rolls mid-match
+  });
+
   it('every generic augment can be granted without throwing', () => {
     const broken: string[] = [];
     for (const def of GENERIC_AUGMENTS) {

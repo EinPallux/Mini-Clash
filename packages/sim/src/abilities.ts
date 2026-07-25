@@ -1,6 +1,16 @@
 import { type AbilityDef, BRIDGE, type Slot, TAG_SWAP } from '@mini-clash/data';
 import { executeActions, plantFlower } from './actions';
-import { basicRiders, duoMods, economyMods, energyCostMul } from './augments';
+import {
+  augParam,
+  basicRiders,
+  type CastMod,
+  castModFor,
+  duoMods,
+  economyMods,
+  energyCostMul,
+  special,
+  ultPower,
+} from './augments';
 import { isHiddenFrom } from './brush';
 import { applyBuff, applyBuffById, applyCc, isUntargetable } from './buffs';
 import { dealDamage, displace, structureInvulnerable } from './combat';
@@ -147,8 +157,47 @@ export function commitAbility(
   const iv = e.buffs.findIndex((b) => b.id === 'wisp_invis');
   if (iv >= 0) e.buffs.splice(iv, 1);
   const [fx, fz] = norm(aimX - e.x, aimZ - e.z);
-  executeActions({ w, caster: e, ability, ox: e.x, oz: e.z, aimX, aimZ, fx, fz }, ability.actions);
+  const power = c.augments.length > 0 ? ultPower(e, ability.slot) : 1;
+  const mod = c.augments.length > 0 ? castModFor(e, ability.slot) : null;
+  const fire = (ax: number, az: number, p: number): void => {
+    const [dx, dz] = norm(ax - e.x, az - e.z);
+    executeActions(
+      { w, caster: e, ability, ox: e.x, oz: e.z, aimX: ax, aimZ: az, fx: dx, fz: dz, power: p },
+      ability.actions,
+    );
+  };
+
+  if (mod?.mode === 'split') {
+    // Splitter: one cast becomes a V of two weaker ones, so the tell is the
+    // shape of the shot rather than a number on a card.
+    const reach = Math.max(0.5, dist(e.x, e.z, aimX, aimZ));
+    for (const sign of [-1, 1]) {
+      const a = (sign * mod.spreadDeg * Math.PI) / 180;
+      fire(
+        e.x + (fx * Math.cos(a) - fz * Math.sin(a)) * reach,
+        e.z + (fx * Math.sin(a) + fz * Math.cos(a)) * reach,
+        power * mod.power,
+      );
+    }
+  } else {
+    fire(aimX, aimZ, power);
+  }
   w.fx(`${c.def.id}.${ability.slot}.cast`, e.x, e.z, { fx, fz, ax: aimX, az: aimZ, source: e.id });
+  if (mod && mod.mode !== 'split') scheduleRecast(w, e, ability, aimX, aimZ, power, mod);
+
+  // Slipstream: the ult itself is the movement tool.
+  if (ability.slot === 'r' && c.augments.length > 0) {
+    const slip = special(e, 'slipstream');
+    if (slip) {
+      applyBuff(e, {
+        id: 'aug_slipstream',
+        name: 'Slipstream',
+        duration: slip.seconds ?? 2,
+        decayingMsBonus: slip.ms ?? 0.25,
+      });
+      w.fx('augment.slipstream', e.x, e.z, { source: e.id });
+    }
+  }
 
   if (ability.recast) {
     // Cooldown waits until all recasts resolve or the window closes.
@@ -170,6 +219,74 @@ export function commitAbility(
     c.pendingOrder = null;
     c.path = [];
   }
+}
+
+/**
+ * The delayed half of Mirror Strike (`mirror`) and Echo Cast (`echo`).
+ *
+ * Both re-run the same ability at reduced power a beat later — mirror re-aims
+ * at the nearest *other* enemy, echo repeats from the original spot. It runs
+ * through the world scheduler so the replay stays tick-exact, and it re-reads
+ * the caster on arrival: dying (or swapping out) cancels the encore.
+ */
+function scheduleRecast(
+  w: World,
+  e: Entity,
+  ability: AbilityDef,
+  aimX: number,
+  aimZ: number,
+  power: number,
+  mod: CastMod,
+): void {
+  const ownerId = e.id;
+  const championId = e.champ?.def.id;
+  w.schedule(mod.delay, (world) => {
+    const owner = world.get(ownerId);
+    if (!owner || owner.dead || owner.champ?.def.id !== championId) return;
+    let ax = aimX;
+    let az = aimZ;
+    if (mod.mode === 'mirror') {
+      // Nearest enemy that is NOT the one we just hit — the point of the card
+      // is that the second bolt finds a second body.
+      let best: Entity | undefined;
+      let bestD = Number.POSITIVE_INFINITY;
+      for (const u of world.enemiesOf(owner.team)) {
+        if (u.kind === 'keg' || isUntargetable(u)) continue;
+        if (dist(aimX, aimZ, u.x, u.z) < 1.2) continue;
+        const d = dist(owner.x, owner.z, u.x, u.z);
+        if (d < bestD) {
+          bestD = d;
+          best = u;
+        }
+      }
+      if (!best) return; // nobody else on the field: no ghost shot into the void
+      ax = best.x;
+      az = best.z;
+    }
+    const [dx, dz] = norm(ax - owner.x, az - owner.z);
+    executeActions(
+      {
+        w: world,
+        caster: owner,
+        ability,
+        ox: owner.x,
+        oz: owner.z,
+        aimX: ax,
+        aimZ: az,
+        fx: dx,
+        fz: dz,
+        power: power * mod.power,
+      },
+      ability.actions,
+    );
+    world.fx(`augment.${mod.mode}`, owner.x, owner.z, {
+      fx: dx,
+      fz: dz,
+      ax,
+      az,
+      source: owner.id,
+    });
+  });
 }
 
 export function updateCasts(w: World, e: Entity, dt: number, noCooldowns: boolean): void {
@@ -393,7 +510,7 @@ function commitAutoAttack(w: World, e: Entity, targetId: number | undefined): vo
   let powder = false;
   if (c.def.passive.id === 'powder_rounds') {
     c.passive.powderCount = (c.passive.powderCount ?? 0) + 1;
-    const every = c.def.passive.params.every;
+    const every = augParam(e, 'fathom.powderEvery', c.def.passive.params.every);
     if (c.passive.powderCount >= every) {
       c.passive.powderCount = 0;
       powder = true;
@@ -507,8 +624,10 @@ export function applyEntrance(w: World, e: Entity): void {
     }
     case 'fresh_cuttings': {
       const pp = c.def.passive.params;
-      plantFlower(w, e, e.x - 0.5, e.z - 0.3, pp.max, pp.life);
-      plantFlower(w, e, e.x + 0.5, e.z + 0.3, pp.max, pp.life);
+      const max = augParam(e, 'sylva.flowerCap', pp.max);
+      const life = augParam(e, 'sylva.flowerLife', pp.life);
+      plantFlower(w, e, e.x - 0.5, e.z - 0.3, max, life);
+      plantFlower(w, e, e.x + 0.5, e.z + 0.3, max, life);
       break;
     }
     case 'eva_hop': {
@@ -591,6 +710,10 @@ export function trySwap(w: World, e: Entity): DenyReason | null {
   c.recast = null;
   c.aaTarget = null;
   c.dancing = false;
+  // Double Feature: the half walking off stage stays on it as a ghost for a
+  // beat, still swinging — the swap becomes an attack, not just a pivot.
+  const df = c.augments.length > 0 ? special(e, 'double_feature') : null;
+  if (df) spawnGhost(w, e, df);
   [c.def, duo.def] = [duo.def, c.def];
   [c.energy, duo.energy] = [duo.energy, c.energy];
   [c.cds, duo.cds] = [duo.cds, c.cds];
@@ -636,6 +759,45 @@ export function trySwap(w: World, e: Entity): DenyReason | null {
   applyEntrance(w, e);
   w.fx('duo.swap', e.x, e.z, { source: e.id });
   return null;
+}
+
+/**
+ * Double Feature's afterimage: the outgoing champion keeps swinging where it
+ * stood. Implemented with the scheduler rather than a real entity — a ghost
+ * that could be targeted, body-blocked or killed would change far more about a
+ * fight than the card promises.
+ */
+function spawnGhost(w: World, e: Entity, p: Record<string, number>): void {
+  const c = e.champ;
+  if (!c) return;
+  const ownerId = e.id;
+  const gx = e.x;
+  const gz = e.z;
+  const ad = championStats(e).ad * (p.power ?? 1);
+  const range = c.def.stats.range + 1;
+  const secs = p.seconds ?? 2;
+  const interval = Math.max(0.25, p.interval ?? 1);
+  const swings = Math.max(1, Math.floor(secs / interval));
+  w.fx('augment.ghost', gx, gz, { source: e.id });
+  for (let i = 0; i < swings; i++) {
+    w.schedule(interval * i, (world) => {
+      const owner = world.get(ownerId);
+      if (!owner) return;
+      let best: Entity | undefined;
+      let bestD = range;
+      for (const u of world.enemiesOf(owner.team)) {
+        if (u.kind === 'keg' || u.dead || isUntargetable(u)) continue;
+        const d = dist(gx, gz, u.x, u.z);
+        if (d < bestD) {
+          bestD = d;
+          best = u;
+        }
+      }
+      if (!best) return;
+      dealDamage(world, { source: owner, tag: 'item', label: 'augment' }, best, ad, 'physical');
+      world.fx('augment.ghost.swing', gx, gz, { source: owner.id, target: best.id });
+    });
+  }
 }
 
 export function powderBlast(w: World, owner: Entity, target: Entity): void {
@@ -754,8 +916,10 @@ export function updateChampionPassive(w: World, e: Entity, _dt: number): void {
   if (!c || e.dead) return;
   // Companions follow the *fielded* champion: swapping to Piper whistles Chomp
   // back onto the deck, swapping away sends him off it (updatePet retires him).
-  if (c.def.passive.id === 'best_friend' && petsOf(w, e).length === 0) {
-    spawnPet(w, e, 'chomp');
+  if (c.def.passive.id === 'best_friend') {
+    // Two Good Boys puts a second animal on the roster; they alternate errands.
+    const wanted = special(e, 'two_good_boys') ? 2 : 1;
+    for (let i = petsOf(w, e).length; i < wanted; i++) spawnPet(w, e, 'chomp');
   }
   if (c.def.passive.id === 'capacitor') {
     const p = c.def.passive.params;
@@ -770,6 +934,60 @@ export function updateChampionPassive(w: World, e: Entity, _dt: number): void {
         applyBuffById(u, 'wisp_chilled');
         w.fx('wisp.passive.chill', u.x, u.z, { source: e.id, target: u.id });
       }
+    }
+  }
+}
+
+/**
+ * Per-tick augment upkeep: things that accrue rather than react.
+ *
+ * Kept out of `updateChampionPassive` so a champion's own passive code never
+ * has to know augments exist — and skipped entirely for a seat holding no
+ * cards, which is most of the field for the first three minutes.
+ */
+export function updateAugments(w: World, e: Entity, dt: number): void {
+  const c = e.champ;
+  if (!c || c.augments.length === 0 || e.dead) return;
+
+  // Guardian Constellation: one star banks every N seconds, spent on an ability.
+  const star = special(e, 'constellation');
+  if (star) {
+    if ((c.augState.star ?? 0) >= 1) {
+      c.augState.starT = 0;
+    } else {
+      const t = (c.augState.starT ?? 0) + dt;
+      if (t >= (star.every ?? 20)) {
+        c.augState.star = 1;
+        c.augState.starT = 0;
+        w.fx('augment.star.bank', e.x, e.z, { source: e.id });
+      } else {
+        c.augState.starT = t;
+      }
+    }
+  }
+
+  // Kinetic Battery: distance run banks charge, spent by the next hit that
+  // reads it (augmentDamageMul), so standing still is a real cost.
+  const kin = special(e, 'kinetic');
+  if (kin) {
+    const moved = c.speed * dt;
+    const capUnits = (kin.cap ?? 0.15) / (kin.perUnit ?? 0.01);
+    c.augState.kinetic = Math.min(capUnits, (c.augState.kinetic ?? 0) + moved);
+  }
+
+  // Warlord's Banner: allied Minis in the aura hit harder and march faster.
+  const wl = special(e, 'warlord');
+  if (wl) {
+    for (const u of w.entities) {
+      if (u.kind !== 'mini' || u.team !== e.team || u.dead) continue;
+      if (dist(e.x, e.z, u.x, u.z) > (wl.radius ?? 7)) continue;
+      applyBuff(u, {
+        id: 'aug_warlord',
+        name: "Warlord's Banner",
+        duration: 0.5,
+        mul: { moveSpeed: wl.msMul ?? 1.2 },
+        damageAmp: (wl.damageMul ?? 1.3) - 1,
+      });
     }
   }
 }

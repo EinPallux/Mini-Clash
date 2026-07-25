@@ -2451,6 +2451,322 @@ export const FX: Record<string, FxTimeline> = {
     ],
   },
 
+  /* ---- Augment behaviours: every card has to show itself (§1 mandate) ---- */
+  'augment.wall.block': {
+    id: 'augment.wall.block',
+    events: [
+      { time: 0, op: { t: 'sound', cue: 'block_clang', volume: 0.4 } },
+      {
+        time: 0,
+        op: {
+          t: 'burst',
+          at: 'origin',
+          count: 10,
+          color: STONE,
+          color2: DUST,
+          size: 0.1,
+          speed: 3.4,
+          up: 1.2,
+          life: 0.3,
+          shape: 'shard',
+        },
+      },
+    ],
+  },
+  'augment.counterweight': {
+    id: 'augment.counterweight',
+    events: [
+      { time: 0, op: { t: 'sound', cue: 'block_clang', volume: 0.5 } },
+      {
+        time: 0,
+        op: {
+          t: 'burst',
+          at: 'self',
+          count: 12,
+          color: STONE,
+          color2: AUG_GOLD,
+          size: 0.11,
+          speed: 5,
+          life: 0.28,
+          shape: 'shard',
+        },
+      },
+    ],
+  },
+  'augment.thorns': {
+    id: 'augment.thorns',
+    events: [
+      { time: 0, op: { t: 'sound', cue: 'hit_generic', volume: 0.4 } },
+      {
+        time: 0,
+        op: {
+          t: 'burst',
+          at: 'self',
+          count: 14,
+          color: 0x8ade6a,
+          color2: 0xd8e6f2,
+          size: 0.09,
+          speed: 5.5,
+          spread: 60,
+          life: 0.26,
+          shape: 'shard',
+        },
+      },
+    ],
+  },
+  'augment.secondwind': {
+    id: 'augment.secondwind',
+    events: [
+      { time: 0, op: { t: 'sound', cue: 'sylva_bloom', volume: 0.8 } },
+      { time: 0, op: { t: 'ring', at: 'target', color: 0xffb14b, radius: 1.6, life: 0.6 } },
+      {
+        time: 0,
+        op: {
+          t: 'burst',
+          at: 'target',
+          count: 26,
+          color: 0xffb14b,
+          color2: 0xfff3d6,
+          size: 0.1,
+          speed: 2.4,
+          up: 4,
+          life: 1.1,
+          gravity: 1,
+          shape: 'spark',
+        },
+      },
+      {
+        time: 0,
+        op: { t: 'light', at: 'target', color: 0xffb14b, intensity: 2, radius: 4, life: 0.6 },
+      },
+    ],
+  },
+  'augment.star.bank': {
+    id: 'augment.star.bank',
+    events: [
+      { time: 0, op: { t: 'sound', cue: 'relic_purge', volume: 0.35 } },
+      {
+        time: 0,
+        op: {
+          t: 'burst',
+          at: 'self',
+          count: 8,
+          color: 0xbfe8ff,
+          color2: 0xffffff,
+          size: 0.08,
+          speed: 1.4,
+          up: 2.4,
+          life: 0.5,
+          shape: 'spark',
+        },
+      },
+    ],
+  },
+  'augment.star.break': {
+    id: 'augment.star.break',
+    events: [
+      { time: 0, op: { t: 'sound', cue: 'block_clang', volume: 0.7 } },
+      { time: 0, op: { t: 'flash', at: 'target', color: 0xbfe8ff, life: 0.12 } },
+      { time: 0, op: { t: 'ring', at: 'target', color: 0xbfe8ff, radius: 1.5, life: 0.4 } },
+      {
+        time: 0,
+        op: {
+          t: 'burst',
+          at: 'target',
+          count: 22,
+          color: 0xbfe8ff,
+          color2: 0xffffff,
+          size: 0.1,
+          speed: 5,
+          up: 2,
+          life: 0.45,
+          shape: 'shard',
+        },
+      },
+    ],
+  },
+  'augment.deathblossom': {
+    id: 'augment.deathblossom',
+    events: [
+      { time: 0, op: { t: 'sound', cue: 'explosion_big', volume: 0.7 } },
+      {
+        time: 0,
+        op: { t: 'ring', at: 'target', color: PETAL, radius: 2.5, width: 0.2, life: 0.5 },
+      },
+      {
+        time: 0,
+        op: {
+          t: 'burst',
+          at: 'target',
+          count: 46,
+          color: PETAL,
+          color2: CRIMSON,
+          size: 0.13,
+          speed: 7,
+          up: 3,
+          life: 0.8,
+          gravity: 4,
+          shape: 'puff',
+        },
+      },
+      { time: 0, op: { t: 'shake', power: 'm' } },
+    ],
+  },
+  'augment.undying': {
+    id: 'augment.undying',
+    events: [
+      { time: 0, op: { t: 'sound', cue: 'augment_prismatic', volume: 0.8 } },
+      { time: 0, op: { t: 'flash', at: 'self', color: 0xffffff, life: 0.14 } },
+      { time: 0, op: { t: 'hitstop', ms: 60 } },
+      { time: 0, op: { t: 'shake', power: 'm' } },
+      {
+        time: 0,
+        op: { t: 'ring', at: 'self', color: AUG_GOLD, radius: 2.4, width: 0.2, life: 0.7 },
+      },
+      {
+        time: 0,
+        op: {
+          t: 'burst',
+          at: 'self',
+          count: 44,
+          color: 0xfff3d6,
+          color2: AUG_GOLD,
+          size: 0.12,
+          speed: 4.5,
+          up: 6,
+          life: 1,
+          gravity: 3,
+          shape: 'shard',
+        },
+      },
+    ],
+  },
+  'augment.slipstream': {
+    id: 'augment.slipstream',
+    events: [
+      {
+        time: 0,
+        op: {
+          t: 'burst',
+          at: 'self',
+          count: 14,
+          color: AUG_PRISM_B,
+          size: 0.09,
+          speed: 2,
+          spread: 40,
+          life: 0.4,
+          shape: 'puff',
+        },
+      },
+    ],
+  },
+  'augment.ghost': {
+    id: 'augment.ghost',
+    events: [
+      { time: 0, op: { t: 'sound', cue: 'rattle_r_vanish', volume: 0.4 } },
+      { time: 0, op: { t: 'ring', at: 'self', color: GHOSTC, radius: 1.2, width: 0.09, life: 2 } },
+    ],
+  },
+  'augment.ghost.swing': {
+    id: 'augment.ghost.swing',
+    events: [
+      { time: 0, op: { t: 'sound', cue: 'hit_generic', volume: 0.35 } },
+      {
+        time: 0,
+        op: { t: 'ribbonSweep', at: 'origin', color: GHOSTC, radius: 1.6, angleDeg: 90, life: 0.2 },
+      },
+    ],
+  },
+  'augment.mirror': {
+    id: 'augment.mirror',
+    events: [
+      { time: 0, op: { t: 'sound', cue: 'relic_blink', volume: 0.35 } },
+      {
+        time: 0,
+        op: {
+          t: 'burst',
+          at: 'self',
+          count: 10,
+          color: AUG_PRISM_A,
+          color2: 0xffffff,
+          size: 0.09,
+          speed: 3,
+          life: 0.3,
+          shape: 'spark',
+        },
+      },
+    ],
+  },
+  'augment.echo': {
+    id: 'augment.echo',
+    events: [
+      { time: 0, op: { t: 'sound', cue: 'relic_purge', volume: 0.3 } },
+      {
+        time: 0,
+        op: { t: 'ring', at: 'self', color: GHOSTC, radius: 1.3, width: 0.08, life: 0.3 },
+      },
+    ],
+  },
+  'augment.element.flame': {
+    id: 'augment.element.flame',
+    events: [
+      {
+        time: 0,
+        op: {
+          t: 'burst',
+          at: 'target',
+          count: 9,
+          color: 0xff7a3c,
+          color2: 0xffc23c,
+          size: 0.09,
+          speed: 2,
+          up: 2.2,
+          life: 0.4,
+          shape: 'spark',
+        },
+      },
+    ],
+  },
+  'augment.element.frost': {
+    id: 'augment.element.frost',
+    events: [
+      {
+        time: 0,
+        op: {
+          t: 'burst',
+          at: 'target',
+          count: 9,
+          color: CHILL,
+          color2: 0xffffff,
+          size: 0.09,
+          speed: 1.8,
+          up: 1.6,
+          life: 0.4,
+          shape: 'shard',
+        },
+      },
+    ],
+  },
+  'augment.element.storm': {
+    id: 'augment.element.storm',
+    events: [
+      {
+        time: 0,
+        op: {
+          t: 'burst',
+          at: 'target',
+          count: 9,
+          color: ELEC,
+          color2: 0xffffff,
+          size: 0.08,
+          speed: 4,
+          life: 0.28,
+          shape: 'spark',
+        },
+      },
+    ],
+  },
+
   'relic.blink.out': {
     id: 'relic.blink.out',
     events: [

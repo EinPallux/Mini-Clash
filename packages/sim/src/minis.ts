@@ -179,13 +179,16 @@ function acquire(
   e: Entity,
   spec: NonNullable<MiniState['def']['mini']>,
 ): Entity | undefined {
-  // Wisp's sheet decoy taunts nearby Minis — it wins target priority outright.
+  // Taunting props win target priority outright: Wisp's sheet decoy, and
+  // Rattle's skull once Skeleton Key has reinforced it.
   let decoy: Entity | undefined;
   let dDecoy = spec.aggroRange;
   for (const u of w.units()) {
-    if (u.team === e.team || !u.keg?.decoy) continue;
+    if (u.team === e.team || !u.keg) continue;
+    const taunt = u.keg.decoy ? spec.aggroRange : (u.keg.tauntRadius ?? 0);
+    if (taunt <= 0) continue;
     const d = dist(e.x, e.z, u.x, u.z) - u.radius;
-    if (d <= dDecoy) {
+    if (d <= Math.min(dDecoy, taunt)) {
       dDecoy = d;
       decoy = u;
     }

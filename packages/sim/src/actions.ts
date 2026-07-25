@@ -4,13 +4,15 @@ import {
   type AreaShape,
   BUFFS,
   PROJECTILES,
+  type ScalingValue,
   UNITS,
 } from '@mini-clash/data';
+import { augFlag, augParam } from './augments';
 import { applyBuff, applyBuffById, applyCc, shieldTotal } from './buffs';
 import { dealDamage, displace } from './combat';
 import { healEntity } from './heal';
 import { launchPetDash } from './pets';
-import { championStats, resolveScaling } from './stats';
+import { resolveScaling as baseScaling, championStats } from './stats';
 import { dist, inCone, inRect, norm } from './vec';
 import type { Entity, World } from './world';
 
@@ -46,10 +48,24 @@ export interface ActionCtx {
   aimZ: number;
   fx: number;
   fz: number;
+  /** Potency multiplier for this cast (Overcharge, echo/split re-casts). 1 = normal. */
+  power?: number;
 }
 
 export function executeActions(ctx: ActionCtx, actions: readonly Action[]): void {
   for (const a of actions) executeAction(ctx, a);
+}
+
+/**
+ * Every number an action produces, scaled for this cast. `ctx.power` folds in
+ * Overcharge and the reduced-power re-casts from Splitter / Mirror Strike /
+ * Echo Cast, so no individual action has to know those cards exist.
+ */
+function amt(ctx: ActionCtx, v: ScalingValue): number {
+  const c = ctx.caster.champ;
+  if (!c) return 0;
+  const s = championStats(ctx.caster);
+  return baseScaling(v, c.level, s.ad, s.ap) * (ctx.power ?? 1);
 }
 
 function shapeTargets(
@@ -70,12 +86,13 @@ function shapeTargets(
     if (shape.kind === 'circle') {
       hit = dist(px, pz, u.x, u.z) <= shape.radius + u.radius;
     } else if (shape.kind === 'cone') {
+      // Double Shift widens War Bellow; every other cone reads its data angle.
       hit = inCone(
         px,
         pz,
         ctx.fx,
         ctx.fz,
-        cosHalf(shape.angleDeg),
+        cosHalf(Math.min(340, augParam(caster, 'grukk.bellowConeMul', shape.angleDeg))),
         shape.radius,
         u.x,
         u.z,
@@ -122,9 +139,7 @@ function executeAction(ctx: ActionCtx, a: Action): void {
         const sin = sinOf(a.angleOffsetDeg);
         [dx, dz] = [dx * cos - dz * sin, dx * sin + dz * cos];
       }
-      const damage = def.damage
-        ? resolveScaling(def.damage.amount, c.level, stats.ad, stats.ap)
-        : 0;
+      const damage = def.damage ? amt(ctx, def.damage.amount) : 0;
       w.add({
         kind: 'projectile',
         srcLabel: ctx.ability.slot,
@@ -191,7 +206,9 @@ function executeAction(ctx: ActionCtx, a: Action): void {
 
     case 'wall': {
       const [fx, fz] = norm(ctx.aimX - caster.x, ctx.aimZ - caster.z);
-      const cells = w.nav.stampWall(ctx.aimX, ctx.aimZ, fx, fz, a.length, a.thickness);
+      // Ramparts of the Old Bridge stretches the span and makes it eat shots.
+      const length = augParam(caster, 'rook.wallLength', a.length);
+      const cells = w.nav.stampWall(ctx.aimX, ctx.aimZ, fx, fz, length, a.thickness);
       w.add({
         kind: 'wall',
         team: caster.team,
@@ -199,7 +216,7 @@ function executeAction(ctx: ActionCtx, a: Action): void {
         z: ctx.aimZ,
         fx,
         fz,
-        radius: a.length / 2,
+        radius: length / 2,
         hp: 1,
         hpMax: 1,
         dead: false,
@@ -209,10 +226,11 @@ function executeAction(ctx: ActionCtx, a: Action): void {
         wall: {
           tLeft: a.duration,
           duration: a.duration,
-          length: a.length,
+          length,
           cells,
           allyBuff: a.allyBuff,
           owner: caster.id,
+          blocksProjectiles: augFlag(caster, 'rook.wallBlocksProjectiles'),
         },
       });
       break;
@@ -254,7 +272,7 @@ function executeAction(ctx: ActionCtx, a: Action): void {
       const [dx, dz] = norm(ctx.aimX - ctx.ox, ctx.aimZ - ctx.oz);
       const ox = ctx.ox;
       const oz = ctx.oz;
-      const amount = resolveScaling(a.amount, c.level, stats.ad, stats.ap);
+      const amount = amt(ctx, a.amount);
       const hits = new Map<number, number>();
       const step = a.length / a.count;
       for (let i = 0; i < a.count; i++) {
@@ -279,7 +297,7 @@ function executeAction(ctx: ActionCtx, a: Action): void {
     }
 
     case 'heal': {
-      const amount = resolveScaling(a.amount, c.level, stats.ad, stats.ap);
+      const amount = amt(ctx, a.amount);
       healEntity(caster, caster, amount);
       break;
     }
@@ -292,7 +310,7 @@ function executeAction(ctx: ActionCtx, a: Action): void {
         duration: a.duration,
         mul: { moveSpeed: a.moveSpeedMul },
       });
-      const amount = resolveScaling(a.amount, c.level, stats.ad, stats.ap);
+      const amount = amt(ctx, a.amount);
       const ticks = Math.floor(a.duration / a.tickEvery);
       const casterId = caster.id;
       for (let i = 1; i <= ticks; i++) {
@@ -356,7 +374,7 @@ function executeAction(ctx: ActionCtx, a: Action): void {
       }
       grantDashCharges(w, caster);
       if (a.amount && a.type) {
-        const amount = resolveScaling(a.amount, c.level, stats.ad, stats.ap);
+        const amount = amt(ctx, a.amount);
         for (const u of [...w.enemiesOf(caster.team)]) {
           if (u.kind === 'keg') continue;
           if (!inRect(fromX, fromZ, dx, dz, end + 0.4, a.width, u.x, u.z, u.radius)) continue;
@@ -367,6 +385,11 @@ function executeAction(ctx: ActionCtx, a: Action): void {
               const [px, pz] = norm(fromX - u.x, fromZ - u.z);
               displace(w, u, px, pz, a.tipPull.pull);
             }
+          }
+          // Exact Change: Skewer pays Grukk back for every champion it catches.
+          if (u.kind === 'champion') {
+            const refund = augParam(caster, 'grukk.skewerRefund', 0);
+            if (refund > 0) c.energy = Math.min(100, c.energy + refund);
           }
         }
       }
@@ -385,8 +408,9 @@ function executeAction(ctx: ActionCtx, a: Action): void {
         fx: caster.fx,
         fz: caster.fz,
         radius: unit.radius,
-        hp: unit.hp,
-        hpMax: unit.hp,
+        // Skeleton Key reinforces the skull so it survives being noticed.
+        hp: augParam(caster, 'rattle.skullHp', unit.hp),
+        hpMax: augParam(caster, 'rattle.skullHp', unit.hp),
         dead: false,
         airborne: 0,
         airborneTotal: 0,
@@ -399,6 +423,7 @@ function executeAction(ctx: ActionCtx, a: Action): void {
           tossPhase: 1,
           ad: stats.ad,
           level: c.level,
+          tauntRadius: augParam(caster, 'rattle.skullTaunt', 0) || undefined,
         },
       });
       c.passive[a.marker] = ent.id;
@@ -451,7 +476,7 @@ function executeAction(ctx: ActionCtx, a: Action): void {
       caster.fz = -az;
       c.path = [];
       grantDashCharges(w, caster);
-      const amount = resolveScaling(a.amount, c.level, stats.ad, stats.ap);
+      const amount = amt(ctx, a.amount);
       dealDamage(w, { source: caster, label: ctx.ability.slot }, target, amount, a.type);
       if (a.harvest && !target.dead) {
         c.passive.harvestId = target.id;
@@ -465,7 +490,12 @@ function executeAction(ctx: ActionCtx, a: Action): void {
     }
 
     case 'shieldSelf': {
-      const amount = resolveScaling(a.amount, c.level, stats.ad, stats.ap);
+      // Double Shift: the shield doubles once Grukk is genuinely in trouble.
+      const lowMul =
+        caster.hp / Math.max(1, caster.hpMax) < 0.4
+          ? augParam(caster, 'grukk.bellowLowHpShieldMul', 1)
+          : 1;
+      const amount = amt(ctx, a.amount) * lowMul;
       applyBuff(caster, {
         id: a.buffId,
         name: ctx.ability.name,
@@ -503,7 +533,7 @@ function executeAction(ctx: ActionCtx, a: Action): void {
           tLeft: a.duration,
           duration: a.duration,
           radius: a.radius,
-          healPerSec: resolveScaling(a.healPerSec, c.level, stats.ad, stats.ap),
+          healPerSec: amt(ctx, a.healPerSec),
           enemyDamageAmp: a.enemyDamageAmp,
           cleanseSlows: a.cleanseSlows,
           cleansed: new Set(),
@@ -515,7 +545,7 @@ function executeAction(ctx: ActionCtx, a: Action): void {
     case 'vineGrasp': {
       const bloomed = bloomFlowersIn(w, caster, ctx.ox, ctx.oz, ctx.fx, ctx.fz, a.shape);
       const rootDur = a.baseRoot + Math.min(a.rootMax, a.rootPerFlower * bloomed);
-      const amount = resolveScaling(a.amount, c.level, stats.ad, stats.ap);
+      const amount = amt(ctx, a.amount);
       for (const target of shapeTargets(ctx, 'self', a.shape, 'enemies')) {
         dealDamage(w, { source: caster, label: ctx.ability.slot }, target, amount, a.type);
         applyCc(target, { kind: 'root', duration: rootDur });
@@ -525,7 +555,7 @@ function executeAction(ctx: ActionCtx, a: Action): void {
 
     case 'beam': {
       // Instant hitscan corridor from the caster along facing (Boltz Q).
-      const amount = resolveScaling(a.amount, c.level, stats.ad, stats.ap);
+      const amount = amt(ctx, a.amount);
       let refunded = false;
       for (const target of shapeTargets(
         { ...ctx, ox: caster.x, oz: caster.z },
@@ -554,12 +584,7 @@ function executeAction(ctx: ActionCtx, a: Action): void {
         const src = world.get(caster.id);
         // Impact burst (pod slam) resolves at the landing point.
         if (a.impact) {
-          const amt = resolveScaling(
-            a.impact.amount,
-            c.level,
-            championStats(caster).ad,
-            championStats(caster).ap,
-          );
+          const impact = amt(ctx, a.impact.amount);
           for (const u of [...world.enemiesOf(caster.team)]) {
             if (u.kind === 'keg') continue;
             if (dist(ctx.aimX, ctx.aimZ, u.x, u.z) <= a.impact.radius + u.radius) {
@@ -567,7 +592,7 @@ function executeAction(ctx: ActionCtx, a: Action): void {
                 world,
                 { source: src ?? caster, label: ctx.ability.slot },
                 u,
-                amt,
+                impact,
                 a.impact.type,
               );
               if (a.impact.cc) {
@@ -582,8 +607,11 @@ function executeAction(ctx: ActionCtx, a: Action): void {
           }
           if (a.impact.fx) world.fx(a.impact.fx, ctx.aimX, ctx.aimZ, { source: caster.id });
         }
+        // Habitat Module inflates the shell and turns it into a field hospital.
+        const radius = augParam(caster, 'boltz.domeRadius', a.radius);
+        const regenPct = augParam(caster, 'boltz.domeRegenPct', 0);
         const navCells = a.blocksMovement
-          ? world.nav.stampDisc(ctx.aimX, ctx.aimZ, a.radius)
+          ? world.nav.stampDisc(ctx.aimX, ctx.aimZ, radius)
           : undefined;
         world.add({
           kind: 'zone',
@@ -593,7 +621,7 @@ function executeAction(ctx: ActionCtx, a: Action): void {
           z: ctx.aimZ,
           fx,
           fz,
-          radius: a.radius,
+          radius,
           hp: 1,
           hpMax: 1,
           dead: false,
@@ -605,10 +633,11 @@ function executeAction(ctx: ActionCtx, a: Action): void {
             variant: a.variant,
             tLeft: a.duration,
             duration: a.duration,
-            radius: a.radius,
+            radius,
             blocksProjectiles: a.blocksProjectiles,
             allyBuff: a.allyBuff,
             navCells,
+            regenPct: regenPct > 0 ? regenPct : undefined,
             expireFx: a.variant === 'pod' ? 'boltz.pod.launch' : undefined,
           },
         });
@@ -627,6 +656,9 @@ function executeAction(ctx: ActionCtx, a: Action): void {
     }
 
     case 'curse': {
+      // Separation Anxiety banks seconds on Boo! hits; the curse spends them.
+      const curseBonus = c.augState.cursePlus ?? 0;
+      c.augState.cursePlus = 0;
       w.add({
         kind: 'zone',
         srcLabel: ctx.ability.slot,
@@ -645,10 +677,10 @@ function executeAction(ctx: ActionCtx, a: Action): void {
         zone: {
           owner: caster.id,
           variant: 'curse',
-          tLeft: a.duration,
-          duration: a.duration,
+          tLeft: a.duration + curseBonus,
+          duration: a.duration + curseBonus,
           radius: a.radius,
-          enemyDmgPerSec: resolveScaling(a.dmgPerSec, c.level, stats.ad, stats.ap),
+          enemyDmgPerSec: amt(ctx, a.dmgPerSec),
           enemyBuff: a.enemyBuff,
           disableMinis: a.disableMinis,
           expireFear: a.expireFear,
@@ -663,7 +695,7 @@ function executeAction(ctx: ActionCtx, a: Action): void {
       launchPetDash(w, caster, dx, dz, {
         distance: a.distance,
         width: a.width,
-        damage: resolveScaling(a.amount, c.level, stats.ad, stats.ap),
+        damage: amt(ctx, a.amount),
         dtype: a.type,
         stealMs: a.stealMs,
       });
@@ -693,7 +725,7 @@ function executeAction(ctx: ActionCtx, a: Action): void {
           owner: caster.id,
           ownerPlayer: c.player,
           tLeft: a.duration,
-          heal: resolveScaling(a.heal, c.level, stats.ad, stats.ap),
+          heal: amt(ctx, a.heal),
           ownerFallbackFrac: a.ownerFallbackFrac ?? 0.5,
           empowersPet: a.empowersPet ?? false,
           tossPhase: 0.001,
@@ -706,7 +738,7 @@ function executeAction(ctx: ActionCtx, a: Action): void {
     case 'waves': {
       // A stampede: N pulses through the same shape. Anyone caught by every wave
       // eats the finisher — the reward for reading the whole cone, not one edge.
-      const amount = resolveScaling(a.amount, c.level, stats.ad, stats.ap);
+      const amount = amt(ctx, a.amount);
       const hits = new Map<number, number>();
       const casterId = caster.id;
       const frozen: ActionCtx = { ...ctx };
@@ -738,8 +770,10 @@ function executeAction(ctx: ActionCtx, a: Action): void {
       const guests = shapeTargets(ctx, a.at, a.shape, 'enemies').filter(
         (u) => u.kind === 'champion',
       );
+      // Eternal Host keeps the table set for longer.
+      const stay = augParam(caster, 'vex.inviteDuration', BUFFS[a.buff]?.duration ?? 3);
       for (const g of guests) {
-        applyBuffById(g, a.buff);
+        applyBuff(g, { ...BUFFS[a.buff], duration: stay });
         w.fx('vex.r.invite', g.x, g.z, { source: caster.id, target: g.id });
       }
       c.passive.inviteAmp = a.damageAmp;
@@ -801,8 +835,7 @@ function resolveAreaDamage(ctx: ActionCtx, a: Extract<Action, { t: 'areaDamage' 
   const { w, caster } = ctx;
   const c = caster.champ;
   if (!c) return;
-  const stats = championStats(caster);
-  const amount = resolveScaling(a.amount, c.level, stats.ad, stats.ap);
+  const amount = amt(ctx, a.amount);
   for (const target of shapeTargets(ctx, a.at, a.shape, 'enemies')) {
     dealDamage(w, { source: caster, label: ctx.ability.slot }, target, amount, a.type);
     const cc = target.kind === 'mini' && a.ccMinis ? a.ccMinis : a.cc;

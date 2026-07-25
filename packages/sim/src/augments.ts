@@ -140,7 +140,7 @@ export function augmentDamageMul(
   // Kinetic Battery: distance run since the last hit, spent on this one.
   const kin = special(source, 'kinetic');
   if (kin && (tag === 'aa' || tag === 'ability')) {
-    mul *= 1 + Math.min(kin.cap ?? 0.15, (c.passive.kineticCharge ?? 0) * (kin.perUnit ?? 0.01));
+    mul *= 1 + Math.min(kin.cap ?? 0.15, (c.augState.kinetic ?? 0) * (kin.perUnit ?? 0.01));
   }
   return mul;
 }

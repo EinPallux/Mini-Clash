@@ -1,4 +1,5 @@
 import { applyBasicRiders, capacitorArc, powderBlast } from './abilities';
+import { augFlag, augParam } from './augments';
 import { applyCc } from './buffs';
 import { dealDamage, displace } from './combat';
 import { dist, norm } from './vec';
@@ -9,13 +10,29 @@ function poppedByField(w: World, e: Entity): boolean {
   const p = e.proj;
   if (!p) return false;
   for (const z of w.entities) {
-    if (z.dead || z.kind !== 'zone' || !z.zone?.blocksProjectiles) continue;
-    if (z.team === e.team) continue; // allies fire out of their own dome
-    if (dist(e.x, e.z, z.x, z.z) <= z.zone.radius + e.radius) {
-      w.fx('boltz.dome.block', e.x, e.z, { source: z.zone.owner });
-      e.dead = true;
-      w.remove(e.id);
-      return true;
+    if (z.dead) continue;
+    if (z.kind === 'zone' && z.zone?.blocksProjectiles) {
+      if (z.team === e.team) continue; // allies fire out of their own dome
+      if (dist(e.x, e.z, z.x, z.z) <= z.zone.radius + e.radius) {
+        w.fx('boltz.dome.block', e.x, e.z, { source: z.zone.owner });
+        e.dead = true;
+        w.remove(e.id);
+        return true;
+      }
+    }
+    // Ramparts of the Old Bridge: the wall itself stops enemy shots. Rectangle
+    // test in the wall's own frame — along the span, across the thickness.
+    if (z.kind === 'wall' && z.wall?.blocksProjectiles && z.team !== e.team) {
+      const dx = e.x - z.x;
+      const dz = e.z - z.z;
+      const along = dx * -z.fz + dz * z.fx;
+      const across = dx * z.fx + dz * z.fz;
+      if (Math.abs(along) <= z.wall.length / 2 && Math.abs(across) <= 0.6 + e.radius) {
+        w.fx('augment.wall.block', e.x, e.z, { source: z.wall.owner });
+        e.dead = true;
+        w.remove(e.id);
+        return true;
+      }
     }
   }
   return false;
@@ -72,7 +89,14 @@ export function updateProjectile(w: World, e: Entity, dt: number): void {
         const mul = bvb && u.buffs.some((b) => b.id === bvb.buff) ? bvb.mul : 1;
         dealDamage(w, { source: owner ?? e, label: e.srcLabel }, u, p.damage * mul, p.dtype);
         if (p.def?.cc && !u.dead) applyCc(u, p.def.cc);
-        const carriedThrough = p.def?.pierceOnKill && u.dead;
+        // Separation Anxiety: Boo! punches through, and every body it passes
+        // banks a second onto the next Haunting Hour.
+        const bank = owner ? augParam(owner, 'wisp.curseBonusPerHit', 0) : 0;
+        if (bank > 0 && owner?.champ && u.kind === 'champion') {
+          owner.champ.augState.cursePlus = (owner.champ.augState.cursePlus ?? 0) + bank;
+        }
+        const pierced = owner ? augFlag(owner, 'wisp.booPierces') : false;
+        const carriedThrough = (p.def?.pierceOnKill && u.dead) || pierced;
         if (p.def?.pierces !== 'all' && !carriedThrough) {
           e.dead = true;
           w.remove(e.id);

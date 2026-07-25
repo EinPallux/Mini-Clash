@@ -1,4 +1,4 @@
-import { CHAMPIONS, type ChampionDef, TAG_SWAP, UNITS } from '@mini-clash/data';
+import { AUGMENTS, CHAMPIONS, type ChampionDef, TAG_SWAP, UNITS } from '@mini-clash/data';
 import type { ChampionSnap, EntitySnap, MiniSnap, TowerSnap } from '@mini-clash/protocol';
 import * as THREE from 'three';
 import { paletteColors, useSettings } from '../state/settings';
@@ -274,12 +274,23 @@ class ChampionActor implements Actor {
       this.model.position.y = 0;
     }
 
+    // Thick Hide (and any future `visual.scale` card) makes the body visibly
+    // chonkier — the augment's on-screen tell, read straight off the snapshot.
+    let bulk = 1;
+    for (const id of snap.augments) {
+      for (const eff of AUGMENTS[id]?.effects ?? []) {
+        if (eff.k === 'param' && eff.key === 'visual.scale') {
+          bulk *= eff.mode === 'add' ? 1 + eff.value : eff.value;
+        }
+      }
+    }
+
     // Tag Swap squash-and-pop, layered over whatever the anim graph is doing.
     if (this.morphScale < 1) {
       const k = Math.max(0.02, this.morphScale);
-      this.model.scale.set(1 + (1 - k) * 0.5, k, 1 + (1 - k) * 0.5);
-    } else if (this.model.scale.y !== 1) {
-      this.model.scale.set(1, 1, 1);
+      this.model.scale.set(bulk * (1 + (1 - k) * 0.5), bulk * k, bulk * (1 + (1 - k) * 0.5));
+    } else if (this.model.scale.y !== bulk) {
+      this.model.scale.set(bulk, bulk, bulk);
     }
 
     // Smooth yaw toward sim facing.

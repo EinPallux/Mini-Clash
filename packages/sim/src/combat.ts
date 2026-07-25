@@ -1,5 +1,5 @@
 import { BRIDGE, CORE_DEF, type DamageType, TOWER_DEF } from '@mini-clash/data';
-import { augmentDamageMul } from './augments';
+import { augmentDamageMul, augParam, special } from './augments';
 import { absorbShields, applyBuff, applyCc, consumeBlock } from './buffs';
 import { creditKill, onMiniKilled } from './economy';
 import { championStats, hasItemPassive, mitigate, unitStats } from './stats';
@@ -32,6 +32,50 @@ export function structureInvulnerable(w: World, target: Entity): boolean {
   }
   if (target.core) return target.core.invulnerable;
   return false;
+}
+
+/** Elemental Ascension's three flavours (AUGMENTS §3.3): burn, chill, or refund. */
+export const ELEMENTS = ['flame', 'frost', 'storm'] as const;
+export type Element = (typeof ELEMENTS)[number];
+
+/** The element this seat rolled at pickup (stable for the rest of the match). */
+export function elementOf(e: Entity): Element {
+  return ELEMENTS[(e.champ?.augState.element ?? 0) % ELEMENTS.length];
+}
+
+/**
+ * One elemental rider. Flame burns a fraction of the hit over 2 s, frost chills,
+ * storm hands Energy back — and each re-skins the caster's kit, so an enemy can
+ * name your augment from one fight (the visibility mandate).
+ */
+function applyElement(w: World, source: Entity, target: Entity, p: Record<string, number>): void {
+  const c = source.champ;
+  if (!c) return;
+  const el = elementOf(source);
+  if (el === 'flame') {
+    const total = target.hpMax * (p.burnPct ?? 0.03);
+    const secs = p.burnSeconds ?? 2;
+    const ticks = Math.max(1, Math.round(secs * 2));
+    const srcId = source.id;
+    const tgtId = target.id;
+    for (let i = 1; i <= ticks; i++) {
+      w.schedule((secs / ticks) * i, (world) => {
+        const s = world.get(srcId);
+        const t = world.get(tgtId);
+        if (!s || !t || t.dead) return;
+        dealDamage(world, { source: s, tag: 'burn', label: 'augment' }, t, total / ticks, 'arcane');
+      });
+    }
+  } else if (el === 'frost') {
+    applyCc(target, {
+      kind: 'slow',
+      duration: p.slowSeconds ?? 1,
+      strength: p.slow ?? 0.15,
+    });
+  } else {
+    c.energy = Math.min(100, c.energy + (p.energyRefund ?? 8));
+  }
+  w.fx(`augment.element.${el}`, target.x, target.z, { source: source.id, target: target.id });
 }
 
 /**
@@ -93,6 +137,9 @@ export function dealDamage(
   // Rounds has to sit outside the champion-target guard above.
   if (srcChamp && srcChamp.augments.length > 0 && (tag === 'aa' || tag === 'ability')) {
     amount *= augmentDamageMul(ctx.source, target, tag);
+    // Kinetic Battery is spent by the hit that read it — the meter empties and
+    // starts filling again, which is what makes the card a movement decision.
+    if (srcChamp.augState.kinetic) srcChamp.augState.kinetic = 0;
   }
   // Ram Minis siege: bonus vs structures, resilience vs tower fire (both from data).
   if (ctx.source.mini && (target.kind === 'tower' || target.kind === 'core')) {
@@ -119,10 +166,33 @@ export function dealDamage(
   const tc = target.champ;
   if (tc && tc.def.passive.id === 'stonewall' && (tc.passive.stonewallCd ?? 0) <= 0) {
     const p = tc.def.passive.params;
-    amount = Math.max(0, amount - (p.base + p.perLevel * tc.level));
+    const blocked = Math.min(amount, p.base + p.perLevel * tc.level);
+    amount = Math.max(0, amount - blocked);
     tc.passive.stonewallCd = p.icd;
     w.fx('rook.passive.block', target.x, target.z, { target: target.id });
+    // Counterweight: the shield answers back with a share of what it ate.
+    const cw = special(target, 'counterweight');
+    if (cw && blocked > 0 && ctx.source.champ && !ctx.source.dead) {
+      dealDamage(
+        w,
+        { source: target, tag: 'item', label: 'augment' },
+        ctx.source,
+        blocked * (cw.pct ?? 0.6),
+        'physical',
+      );
+      w.fx('augment.counterweight', target.x, target.z, {
+        source: target.id,
+        target: ctx.source.id,
+      });
+    }
     if (amount <= 0) return 0;
+  }
+
+  // Guardian Constellation: a banked star eats one whole ability, then shatters.
+  if (tc && tag === 'ability' && (tc.augState.star ?? 0) >= 1 && special(target, 'constellation')) {
+    tc.augState.star = 0;
+    w.fx('augment.star.break', target.x, target.z, { target: target.id });
+    return 0;
   }
 
   const stats =
@@ -202,6 +272,47 @@ export function dealDamage(
     z: target.z,
   });
 
+  // ---- Augment reactions on the defender (never re-entered from a reflect) ----
+  if (tc && tag !== 'item' && tag !== 'burn') {
+    // Thornmail Soul: basics come back at whoever swung.
+    const thorn = tag === 'aa' ? special(target, 'thornmail') : null;
+    if (thorn && ctx.source.champ && !ctx.source.dead && ctx.source.id !== target.id) {
+      dealDamage(
+        w,
+        { source: target, tag: 'item', label: 'augment' },
+        ctx.source,
+        dealt * (thorn.pct ?? 0.15),
+        'physical',
+      );
+      w.fx('augment.thorns', target.x, target.z, { source: target.id, target: ctx.source.id });
+    }
+    // Second Wind: once per life, falling through the floor starts a regrowth.
+    const sw = special(target, 'second_wind');
+    if (sw && !target.dead && (tc.augState.secondWind ?? 0) === 0) {
+      if (target.hp > 0 && target.hp / Math.max(1, target.hpMax) < (sw.threshold ?? 0.15)) {
+        tc.augState.secondWind = 1;
+        const total = target.hpMax * (sw.healPct ?? 0.2);
+        const secs = sw.seconds ?? 3;
+        const ticks = Math.max(1, Math.round(secs * 4));
+        for (let i = 1; i <= ticks; i++) {
+          const at = target.id;
+          w.schedule((secs / ticks) * i, (world) => {
+            const u = world.get(at);
+            if (!u || u.dead) return;
+            u.hp = Math.min(u.hpMax, u.hp + total / ticks);
+          });
+        }
+        w.fx('augment.secondwind', target.x, target.z, { target: target.id });
+      }
+    }
+  }
+
+  // Elemental Ascension: the chosen element rides every ability hit.
+  if (srcChamp && tag === 'ability' && target.kind !== 'tower' && target.kind !== 'core') {
+    const el = special(ctx.source, 'elemental');
+    if (el) applyElement(w, ctx.source, target, el);
+  }
+
   // Champion passive hooks (never re-entered from item/burn damage).
   if (srcChamp && tag === 'aa' && target.kind !== 'tower' && target.kind !== 'core') {
     // Mortis — Soul Ledger: attacks vs inscribed targets burn extra and refund Energy.
@@ -210,7 +321,10 @@ export function dealDamage(
       if (target.buffs.some((b) => b.id === 'mortis_inscribed')) {
         const stats = championStats(ctx.source);
         const bonus = p.bonusBase + p.bonusApRatio * stats.ap;
-        srcChamp.energy = Math.min(100, srcChamp.energy + p.energyRefund);
+        srcChamp.energy = Math.min(
+          100,
+          srcChamp.energy + augParam(ctx.source, 'mortis.refundMul', p.energyRefund),
+        );
         w.fx('mortis.passive.brand', target.x, target.z, {
           source: ctx.source.id,
           target: target.id,
@@ -254,7 +368,11 @@ export function dealDamage(
       target.kind !== 'core'
     ) {
       const p = srcChamp.def.passive.params;
-      applyBuff(target, { id: 'mortis_inscribed', name: 'Inscribed', duration: p.duration });
+      applyBuff(target, {
+        id: 'mortis_inscribed',
+        name: 'Inscribed',
+        duration: augParam(ctx.source, 'mortis.inscribeDuration', p.duration),
+      });
     }
     if (srcChamp.def.passive.id === 'toll_paid' && target.kind === 'champion') {
       const p = srcChamp.def.passive.params;
@@ -378,11 +496,69 @@ function scheduleBurn(
   }
 }
 
+/**
+ * Undying Contract (AUGMENTS §3.6): the first lethal blow of the match is
+ * refused — the benched champion steps in on the spot at 40% health. Returns
+ * true when the death was cancelled.
+ *
+ * Deliberately a *swap*, not a revive: a solo champion has nobody to send in,
+ * so the card needs a duo to function, which is exactly what its text says.
+ */
+function undyingContract(w: World, target: Entity): boolean {
+  const c = target.champ;
+  if (!c || !c.duo || (c.augState.undying ?? 0) > 0) return false;
+  const u = special(target, 'undying');
+  if (!u) return false;
+  c.augState.undying = 1;
+  target.hp = Math.max(1, target.hpMax * (u.hpFrac ?? 0.4));
+  target.buffs.length = 0;
+  target.airborne = 0;
+  target.airborneTotal = 0;
+  c.cast = null;
+  c.recast = null;
+  c.leap = null;
+  c.feared = null;
+  c.aaTarget = null;
+  const duo = c.duo;
+  [c.def, duo.def] = [duo.def, c.def];
+  [c.energy, duo.energy] = [duo.energy, c.energy];
+  [c.cds, duo.cds] = [duo.cds, c.cds];
+  [c.aaCd, duo.aaCd] = [duo.aaCd, c.aaCd];
+  [c.passive, duo.passive] = [duo.passive, c.passive];
+  target.radius = c.def.stats.radius;
+  duo.swapCd = 0;
+  duo.morphT = 0;
+  w.fx('augment.undying', target.x, target.z, { source: target.id });
+  w.fx('duo.swap', target.x, target.z, { source: target.id });
+  return true;
+}
+
 export function kill(w: World, target: Entity, by?: Entity): void {
   if (target.dead) return;
+  // Undying Contract: once a match, the bench tears up the paperwork and comes
+  // up on the spot instead. Checked before anything else in the death path —
+  // no recap is frozen and no kill is credited, because nobody actually died.
+  if (undyingContract(w, target)) return;
   target.dead = true;
   target.buffs.length = 0;
   w.emit({ t: 'death', id: target.id, x: target.x, z: target.z });
+
+  // Deathblossom: a champion takedown detonates the body.
+  if (target.kind === 'champion' && by?.champ && by.team !== target.team) {
+    const db = special(by, 'deathblossom');
+    if (db) {
+      const s = championStats(by);
+      const nova = (db.base ?? 120) + (db.adRatio ?? 0.2) * s.ad + (db.apRatio ?? 0.2) * s.ap;
+      const radius = db.radius ?? 2.5;
+      for (const u of [...w.enemiesOf(by.team)]) {
+        if (u.kind === 'keg' || u.id === target.id || u.dead) continue;
+        if (dist(target.x, target.z, u.x, u.z) <= radius + u.radius) {
+          dealDamage(w, { source: by, tag: 'item', label: 'augment' }, u, nova, 'arcane');
+        }
+      }
+      w.fx('augment.deathblossom', target.x, target.z, { source: by.id, target: target.id });
+    }
+  }
 
   // Freeze the death recap: top 3 (source, ability) pairs of the last window.
   const dead = target.champ;
@@ -415,6 +591,9 @@ export function kill(w: World, target: Entity, by?: Entity): void {
       const slot = uc.passive.guestResetSlot;
       if (slot === undefined) continue;
       uc.cds[slot === 0 ? 'q' : slot === 1 ? 'w' : 'r'] = 0;
+      // Eternal Host: a guest leaving also hands part of the ultimate back.
+      const refund = augParam(u, 'vex.guestDeathRefund', 0);
+      if (refund > 0) uc.cds.r = Math.max(0, uc.cds.r * (1 - refund));
       w.fx('vex.r.guest', u.x, u.z, { source: u.id });
     }
   }

@@ -133,6 +133,12 @@ export interface ChampState {
   draftsDone: number;
   /** Reroll tokens left this match. */
   rerolls: number;
+  /**
+   * Augment scratch (Undying spent, Second Wind armed, star-shield charge, the
+   * rolled element…). Unlike `passive` this is NOT exchanged on a Tag Swap: a
+   * `[duo]` card belongs to the seat, not to whichever half is on stage.
+   */
+  augState: Record<string, number>;
   /** Champion-specific passive scratch (stonewallCd, powderCount, luckyT…). */
   passive: Record<string, number>;
   speed: number;
@@ -174,6 +180,8 @@ export interface KegState {
   killedByTeam?: Team;
   /** Wisp's sheet decoy: taunts Minis, dies after this many hits (regardless of damage). */
   decoy?: { hitsLeft: number };
+  /** Skeleton Key: the skull pulls Mini aggro inside this radius. */
+  tauntRadius?: number;
 }
 
 export interface WallState {
@@ -183,6 +191,8 @@ export interface WallState {
   cells: number[];
   allyBuff?: string;
   owner: EntityId;
+  /** Ramparts of the Old Bridge: enemy projectiles die on the stonework. */
+  blocksProjectiles?: boolean;
 }
 
 export interface ProjState {
@@ -316,6 +326,8 @@ export interface ZoneState {
   allyBuff?: string;
   /** Nav cells stamped as a movement obstacle (pod bunker); unstamped on expiry. */
   navCells?: number[];
+  /** Habitat Module: fraction of max HP restored per second to allies inside. */
+  regenPct?: number;
   /** Fx emitted when the field launches away at expiry (pod). */
   expireFx?: string;
   /* Wisp curse. */

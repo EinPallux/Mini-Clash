@@ -25,11 +25,13 @@ import {
   canAttack,
   tryCast,
   trySwap,
+  updateAugments,
   updateAutoAttack,
   updateCasts,
   updateChampionPassive,
 } from './abilities';
 import { healEntity, plantFlower } from './actions';
+import { augParam } from './augments';
 import { type BotBrain, makeBrain, thinkBots } from './bots';
 import { isHiddenFrom, updateBrushState } from './brush';
 import { applyBuff, applyBuffById, applyCc, applyFear, shieldTotal, tickBuffs } from './buffs';
@@ -213,6 +215,7 @@ export class Sim {
           draft: null,
           draftsDone: 0,
           rerolls: DRAFT.rerolls,
+          augState: {},
           passive: initPassive(def),
           duo: benchDef
             ? {
@@ -607,6 +610,7 @@ export class Sim {
       if (e.champ && !e.dead) {
         updateItemPassives(w, e);
         updateChampionPassive(w, e, dt);
+        updateAugments(w, e, dt);
         this.updatePollenTrail(e);
         const stats = championStats(e);
         e.hpMax = stats.hpMax;
@@ -746,6 +750,8 @@ export class Sim {
     e.hp = e.hpMax;
     c.energy = 100;
     c.respawnIn = 0;
+    // Second Wind is once per *life*; Undying is once per match, so it stays.
+    c.augState.secondWind = 0;
     c.feared = null;
     c.recap = null; // the recap lives on the death screen only
     if (c.duo) {
@@ -867,10 +873,13 @@ export class Sim {
 
     if (z.variant === 'dome' || z.variant === 'pod') {
       // The shell itself lives in projectiles.ts; here we only run the ally aura.
-      if (z.allyBuff) {
+      if (z.allyBuff || z.regenPct) {
         for (const u of w.champions()) {
           if (u.team !== e.team) continue;
-          if (dist(e.x, e.z, u.x, u.z) <= z.radius + u.radius) applyBuffById(u, z.allyBuff);
+          if (dist(e.x, e.z, u.x, u.z) > z.radius + u.radius) continue;
+          if (z.allyBuff) applyBuffById(u, z.allyBuff);
+          // Habitat Module: the dome patches allies up while they shelter.
+          if (z.regenPct) healEntity(owner ?? u, u, u.hpMax * z.regenPct * dt);
         }
       }
       return;
@@ -966,7 +975,14 @@ export class Sim {
     c.passive.pollenAcc += step;
     if (c.passive.pollenAcc >= p.spacing) {
       c.passive.pollenAcc = 0;
-      plantFlower(this.world, e, e.x, e.z, p.max, p.life);
+      plantFlower(
+        this.world,
+        e,
+        e.x,
+        e.z,
+        augParam(e, 'sylva.flowerCap', p.max),
+        augParam(e, 'sylva.flowerLife', p.life),
+      );
     }
   }
 

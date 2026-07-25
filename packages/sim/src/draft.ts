@@ -166,6 +166,11 @@ export function pickAugment(w: World, e: Entity, offerIndex: number, auto = fals
   c.augments.push(id);
   c.draft = null;
   c.draftsDone++;
+  // Elemental Ascension picks its flavour at pickup, off the match seed, so the
+  // re-skin is fixed for the rest of the game (and identical on every client).
+  if (AUGMENTS[id].effects.some((eff) => eff.k === 'special' && eff.id === 'elemental')) {
+    c.augState.element = w.rng.int(3);
+  }
   // A max-HP card resized the pool underneath us: grant the delta rather than
   // silently shaving a slice off the bar mid-fight (same rule as a level-up).
   const newMax = championStats(e).hpMax;
