@@ -62,11 +62,25 @@ export function applyCc(target: Entity, cc: CcSpec): void {
       break;
     }
     case 'fear': {
-      // Minis scatter (their AI reads this); champions are fear-immune for now.
-      applyBuff(target, { id: 'cc_fear', name: 'Feared', duration: cc.duration });
+      // Minis scatter (their AI reads this). Champion fear needs a flee origin —
+      // it comes through applyFear(); a bare cc_fear on a champion is a no-op marker.
+      if (target.kind === 'mini') {
+        applyBuff(target, { id: 'cc_fear', name: 'Feared', duration: cc.duration });
+      }
       break;
     }
   }
+}
+
+/** Champion fear (Wisp R): flee away from a point, controls locked (hard CC). */
+export function applyFear(target: Entity, fromX: number, fromZ: number, duration: number): void {
+  const c = target.champ;
+  if (!c || target.dead) return;
+  c.feared = { tLeft: duration, fromX, fromZ };
+  c.cast = null; // hard CC interrupts a windup/channel
+  c.recast = null;
+  applyBuff(target, { id: 'cc_fear', name: 'Feared', duration });
+  onHardCc(target);
 }
 
 /** Titan's Bastion: hard CC grants a short damage-reduction window. */
@@ -106,6 +120,11 @@ export function consumeBlock(e: Entity): boolean {
     }
   }
   return false;
+}
+
+/** Untargetable window (Wisp's Cold Spot morph): can't be picked as a new target. */
+export function isUntargetable(e: Entity): boolean {
+  return e.buffs.some((b) => b.id === 'wisp_untargetable');
 }
 
 /** Total remaining absorb across shield buffs (HUD + snapshot). */

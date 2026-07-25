@@ -134,6 +134,30 @@ export class NavGrid {
     return cells;
   }
 
+  /** Stamp a temporary circular obstacle (Boltz's droppod bunker). Returns cell indices; reverse with unstampWall. */
+  stampDisc(cx: number, cz: number, rad: number): number[] {
+    const cells: number[] = [];
+    const r = rad + CLEARANCE;
+    const c0 = this.toCol(cx - r);
+    const c1 = this.toCol(cx + r);
+    const r0 = this.toRow(cz - r);
+    const r1 = this.toRow(cz + r);
+    for (let row = r0; row <= r1; row++) {
+      for (let col = c0; col <= c1; col++) {
+        if (col < 0 || col >= this.cols || row < 0 || row >= this.rows) continue;
+        const dx = this.colX(col) - cx;
+        const dz = this.rowZ(row) - cz;
+        if (dx * dx + dz * dz > r * r) continue;
+        const i = this.idx(col, row);
+        if (this.blocked[i] === 1) continue; // never disturb static blockers
+        this.blocked[i] = this.blocked[i] === 0 ? 2 : this.blocked[i] + 1;
+        cells.push(i);
+      }
+    }
+    this.version++;
+    return cells;
+  }
+
   unstampWall(cells: number[]): void {
     for (const i of cells) {
       const v = this.blocked[i];

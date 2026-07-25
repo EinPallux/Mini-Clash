@@ -75,6 +75,8 @@ export interface ProjectileDef {
   pierces?: 'none' | 'all';
   /** Carries through targets it kills (Mortis Q overkill rewards wave-timing). */
   pierceOnKill?: boolean;
+  /** Damage multiplier vs targets carrying a buff (Wisp Boo +25% vs Chilled). */
+  bonusVsBuff?: { buff: string; mul: number };
   /** Pulse damage at fixed travel distances (skipshot); each unit hit once per projectile. */
   pulses?: { atDistance: number; radius: number; damageMul: number }[];
   /** FX timeline fired at each pulse position. */
@@ -199,6 +201,69 @@ export type Action =
       rootPerFlower: number;
       rootMax: number;
       flowerHealRadius: number;
+    }
+  /** Instant hitscan line from the caster along facing (Boltz Q Arc Zapper). */
+  | {
+      t: 'beam';
+      length: number;
+      width: number;
+      amount: ScalingValue;
+      type: DamageType;
+      /** Extra multiplier vs targets that currently hold a shield. */
+      vsShieldMul?: number;
+      /** Energy refunded once when the beam strikes an enemy champion. */
+      energyRefundOnChamp?: number;
+      fx?: string;
+    }
+  /** Deployable circular field: an energy dome or a droppod bunker (Boltz W/R). */
+  | {
+      t: 'field';
+      at: TargetPoint;
+      variant: 'dome' | 'pod';
+      radius: number;
+      duration: number;
+      /** Pops enemy projectiles crossing the shell (dome + pod). */
+      blocksProjectiles?: boolean;
+      /** Stamps a nav obstacle for the lifetime (pod bunker). */
+      blocksMovement?: boolean;
+      /** Buff refreshed on allies inside each tick (dome attack-speed aura). */
+      allyBuff?: string;
+      /** Telegraphed drop: warning now, resolve after `delay` at the locked point. */
+      delay?: number;
+      telegraphFx?: string;
+      /** Impact burst when the field lands (pod slam). */
+      impact?: {
+        amount: ScalingValue;
+        type: DamageType;
+        radius: number;
+        cc?: CcSpec;
+        fx?: string;
+      };
+    }
+  /** Cursed ground: enemy damage-over-time + debuff, Minis disabled, expiry fear (Wisp R). */
+  | {
+      t: 'curse';
+      at: TargetPoint;
+      radius: number;
+      duration: number;
+      dmgPerSec: ScalingValue;
+      type: DamageType;
+      /** Debuff refreshed on enemies inside each tick (Chill). */
+      enemyBuff?: string;
+      /** Minis inside stop fighting for anyone. */
+      disableMinis?: boolean;
+      /** Enemy champions still inside at expiry are Feared away from center this long. */
+      expireFear?: number;
+      tickFx?: string;
+    }
+  /** Blink to the aim point, optionally dropping a decoy and cloaking (Wisp W). */
+  | {
+      t: 'blink';
+      /** Destructible decoy unit dropped at the pre-blink position. */
+      decoy?: string;
+      decoyDuration?: number;
+      /** Self buff applied on arrival (invisibility). */
+      selfBuff?: string;
     };
 
 export type TargetPoint = 'aim' | 'self';
@@ -279,6 +344,8 @@ export interface ChampionVisual {
   props: PropAttachment[];
   /** Material tint overrides by mesh-name substring (palette variant). */
   tints?: Record<string, number>;
+  /** Translucent bubble helmet over the head (Boltz the astronaut). */
+  helmet?: { color: number; radius: number; y: number };
   anim: AnimMap;
   portraitColor: number;
 }

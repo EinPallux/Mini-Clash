@@ -1,7 +1,7 @@
 import { type AbilityDef, BRIDGE, type Slot, TAG_SWAP } from '@mini-clash/data';
 import { executeActions, plantFlower } from './actions';
 import { isHiddenFrom } from './brush';
-import { applyBuff, applyBuffById, applyCc } from './buffs';
+import { applyBuff, applyBuffById, applyCc, isUntargetable } from './buffs';
 import { dealDamage, structureInvulnerable } from './combat';
 import { championStats, hastedCooldown, resolveScaling } from './stats';
 import { dist, norm } from './vec';
@@ -16,6 +16,7 @@ export function canAttack(w: World, attacker: Entity, target: Entity): boolean {
   if (target.dead) return false;
   if (target.kind === 'keg') return true;
   if (target.team === attacker.team) return false;
+  if (isUntargetable(target)) return false; // Wisp Cold Spot morph window
   if (target.kind === 'champion' || target.kind === 'dummy' || target.kind === 'mini') return true;
   if (target.kind === 'tower' || target.kind === 'core') return !structureInvulnerable(w, target);
   return false;
@@ -33,6 +34,7 @@ export function tryCast(
   const c = e.champ;
   if (!c) return null;
   if (e.dead) return 'dead';
+  if (c.feared) return 'casting'; // fleeing: controls locked (Wisp R)
   if (c.duo && c.duo.morphT > 0) return 'casting'; // mid-swap: hands off the kit
 
   // Recast stage takes priority (free, instant). Multi-charge recasts chain (Grukk R).
@@ -135,6 +137,9 @@ export function commitAbility(
   const c = e.champ;
   if (!c) return;
   c.lastActionAt = w.time;
+  // Any cast breaks Sheet Slip stealth (the W re-applies it inside its own actions).
+  const iv = e.buffs.findIndex((b) => b.id === 'wisp_invis');
+  if (iv >= 0) e.buffs.splice(iv, 1);
   const [fx, fz] = norm(aimX - e.x, aimZ - e.z);
   executeActions({ w, caster: e, ability, ox: e.x, oz: e.z, aimX, aimZ, fx, fz }, ability.actions);
   w.fx(`${c.def.id}.${ability.slot}.cast`, e.x, e.z, { fx, fz, ax: aimX, az: aimZ, source: e.id });
@@ -182,6 +187,12 @@ export function updateCasts(w: World, e: Entity, dt: number, noCooldowns: boolea
     duo.energy = Math.min(100, duo.energy + 4 * dt);
     if (duo.passive.stonewallCd !== undefined)
       duo.passive.stonewallCd = Math.max(0, duo.passive.stonewallCd - dt);
+  }
+
+  // Fear (Wisp R): flee timer; movement reads c.feared, casts/attacks are locked.
+  if (c.feared) {
+    c.feared.tLeft -= dt;
+    if (c.feared.tLeft <= 0) c.feared = null;
   }
 
   if (c.recast) {
@@ -232,6 +243,7 @@ export function updateCasts(w: World, e: Entity, dt: number, noCooldowns: boolea
 export function updateAutoAttack(w: World, e: Entity, _dt: number): void {
   const c = e.champ;
   if (!c || e.dead || c.leap) return;
+  if (c.feared) return; // fleeing: no attacks
   if (c.duo && c.duo.morphT > 0) return; // mid-swap: the weapon isn't there yet
   if (c.cast && c.cast.kind !== 'aa') return;
 
@@ -254,7 +266,7 @@ export function updateAutoAttack(w: World, e: Entity, _dt: number): void {
     let mini: Entity | undefined;
     let miniHp = Number.POSITIVE_INFINITY;
     for (const u of w.enemiesOf(e.team)) {
-      if (u.kind === 'keg') continue;
+      if (u.kind === 'keg' || isUntargetable(u)) continue;
       const d = dist(e.x, e.z, u.x, u.z) - u.radius;
       if (d > acquireR) continue;
       if (u.kind === 'mini') {
@@ -317,6 +329,9 @@ function commitAutoAttack(w: World, e: Entity, targetId: number | undefined): vo
   const target = w.get(targetId);
   if (!target || !canAttack(w, e, target)) return;
   c.lastActionAt = w.time;
+  // Attacking breaks Sheet Slip stealth.
+  const iv = e.buffs.findIndex((b) => b.id === 'wisp_invis');
+  if (iv >= 0) e.buffs.splice(iv, 1);
 
   // Lucky Doubloon (Fathom entrance): consume for +40%.
   let luckyMul = 1;
@@ -344,6 +359,14 @@ function commitAutoAttack(w: World, e: Entity, targetId: number | undefined): vo
       c.passive.powderCount = 0;
       powder = true;
     }
+  }
+  // Capacitor (Boltz): a basic after `idle`s of silence carries the charge.
+  let capacitor = false;
+  if (c.def.passive.id === 'capacitor') {
+    const p = c.def.passive.params;
+    if (w.time - (c.passive.lastAtk ?? -100) >= p.idle) capacitor = true;
+    c.passive.lastAtk = w.time;
+    c.passive.charged = 0;
   }
   const [dx, dz] = norm(target.x - e.x, target.z - e.z);
   const m = c.def.attack.missile ?? { speed: 20, size: 0.15, color: 0xffffff };
@@ -376,9 +399,10 @@ function commitAutoAttack(w: World, e: Entity, targetId: number | undefined): vo
       damage: stats.ad,
       dtype: 'physical',
       powder,
+      capacitor,
       luckyMul,
-      color: powder ? 0xffa13b : m.color,
-      size: powder ? m.size * 1.6 : m.size,
+      color: powder ? 0xffa13b : capacitor ? 0xd8f4ff : m.color,
+      size: powder || capacitor ? m.size * 1.6 : m.size,
     },
   });
 }
@@ -442,6 +466,35 @@ export function applyEntrance(w: World, e: Entity): void {
       plantFlower(w, e, e.x + 0.5, e.z + 0.3, pp.max, pp.life);
       break;
     }
+    case 'eva_hop': {
+      // Jetpack micro-hop forward (ignores unit collision — it's a leap).
+      const [hx, hz] = norm(e.fx, e.fz);
+      const [tx, tz] = w.nav.nearestOpen(e.x + hx * (p.dist ?? 1), e.z + hz * (p.dist ?? 1));
+      c.leap = {
+        tLeft: p.dur ?? 0.4,
+        tTotal: p.dur ?? 0.4,
+        fromX: e.x,
+        fromZ: e.z,
+        toX: tx,
+        toZ: tz,
+        onLand: [],
+        ability: c.def.abilities.q,
+      };
+      w.fx('boltz.entrance', e.x, e.z, { source: e.id });
+      break;
+    }
+    case 'cold_spot': {
+      for (const u of [...w.enemiesOf(e.team)]) {
+        if (u.kind === 'keg') continue;
+        if (dist(e.x, e.z, u.x, u.z) <= (p.radius ?? 1.5) + u.radius) {
+          applyCc(u, { kind: 'slow', duration: p.slowDur ?? 1, strength: p.slow ?? 0.1 });
+          applyBuffById(u, 'wisp_chilled');
+        }
+      }
+      applyBuffById(e, 'wisp_untargetable');
+      w.fx('wisp.entrance', e.x, e.z, { source: e.id });
+      break;
+    }
   }
   w.fx('generic.spawn', e.x, e.z, { source: e.id });
 }
@@ -462,6 +515,7 @@ export function trySwap(w: World, e: Entity): DenyReason | null {
   // windup just cancels (swap is an identity action, not a channel).
   if (c.cast && c.cast.kind !== 'aa') return 'casting';
   if (c.leap) return 'casting';
+  if (c.feared) return 'casting';
   // Hard CC only: stuns and knock-ups. Roots leave your hands free.
   if (e.airborne > 0 || e.buffs.some((b) => b.id === 'cc_stun')) return 'casting';
 
@@ -507,4 +561,50 @@ export function powderBlast(w: World, owner: Entity, target: Entity): void {
     }
   }
   w.fx('fathom.passive.blast', target.x, target.z, { source: owner.id, target: target.id });
+}
+
+/** Capacitor charged basic (Boltz): bonus arcane on the target, arcing to one more. */
+export function capacitorArc(w: World, owner: Entity, primary: Entity): void {
+  const c = owner.champ;
+  if (!c) return;
+  const p = c.def.passive.params;
+  const bonus = (p.bonusBase ?? 0) + (p.bonusAdRatio ?? 0) * championStats(owner).ad;
+  dealDamage(w, { source: owner, label: 'passive' }, primary, bonus, 'arcane');
+  // Arc to the nearest other enemy within the chain radius.
+  let best: Entity | undefined;
+  let bestD = p.chainRadius ?? 4.5;
+  for (const u of w.enemiesOf(owner.team)) {
+    if (u.kind === 'keg' || u.id === primary.id || isUntargetable(u)) continue;
+    const d = dist(primary.x, primary.z, u.x, u.z);
+    if (d < bestD) {
+      bestD = d;
+      best = u;
+    }
+  }
+  if (best) {
+    dealDamage(w, { source: owner, label: 'passive' }, best, bonus, 'arcane');
+    w.fx('boltz.passive.charge', best.x, best.z, { source: owner.id, target: best.id });
+  }
+  w.fx('boltz.passive.charge', primary.x, primary.z, { source: owner.id, target: primary.id });
+}
+
+/** Per-tick champion passive upkeep: Capacitor telegraph + Wisp contact-chill. */
+export function updateChampionPassive(w: World, e: Entity, _dt: number): void {
+  const c = e.champ;
+  if (!c || e.dead) return;
+  if (c.def.passive.id === 'capacitor') {
+    const p = c.def.passive.params;
+    c.passive.charged = w.time - (c.passive.lastAtk ?? -100) >= p.idle ? 1 : 0;
+  }
+  if (c.def.passive.id === 'ectoplasm') {
+    const p = c.def.passive.params;
+    for (const u of w.enemiesOf(e.team)) {
+      if (u.kind === 'keg') continue;
+      if (dist(e.x, e.z, u.x, u.z) <= e.radius + u.radius) {
+        applyCc(u, { kind: 'slow', duration: p.slowDur, strength: p.slow });
+        applyBuffById(u, 'wisp_chilled');
+        w.fx('wisp.passive.chill', u.x, u.z, { source: e.id, target: u.id });
+      }
+    }
+  }
 }

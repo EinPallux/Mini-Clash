@@ -228,9 +228,11 @@ export interface FlowerSnap extends EntityBase {
   tLeft: number;
 }
 
-/** Ground aura zone (Sylva's ward). */
+/** Ground area effect: Sylva's ward, Boltz's dome/pod, Wisp's curse. */
 export interface ZoneSnap extends EntityBase {
   kind: 'zone';
+  /** Picks the client look + behaviour readout. */
+  variant: 'garden' | 'dome' | 'pod' | 'curse';
   tLeft: number;
   duration: number;
 }

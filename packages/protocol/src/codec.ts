@@ -391,6 +391,8 @@ function rareJson(e: EntitySnap): string {
         hp: e.hp,
         hpMax: e.hpMax,
         duration: e.kind === 'zone' ? e.duration : undefined,
+        // Zone variant (garden/dome/pod/curse) is static per zone — rides the rare block.
+        variant: e.kind === 'zone' ? e.variant : undefined,
       });
     case 'keg':
       return JSON.stringify({

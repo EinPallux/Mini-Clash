@@ -121,7 +121,20 @@ async function main(): Promise<void> {
     // Bounds must be measured pre-transform: quantize() rewrites positions into
     // normalized grid space and getBounds would report the quantization cube.
     const preScene = root.getDefaultScene() ?? root.listScenes()[0];
-    const bounds = preScene ? getBounds(preScene) : { min: [0, 0, 0], max: [1, 1, 1] };
+    let bounds = preScene ? getBounds(preScene) : { min: [0, 0, 0], max: [1, 1, 1] };
+
+    // Pull grid-authored meshes back onto the origin (footprint centered, base at
+    // y = 0), then re-measure so the manifest bbox describes the shipped file.
+    if (entry.recenter && preScene) {
+      const dx = -(bounds.min[0] + bounds.max[0]) / 2;
+      const dz = -(bounds.min[2] + bounds.max[2]) / 2;
+      const dy = -bounds.min[1];
+      for (const node of preScene.listChildren()) {
+        const t = node.getTranslation();
+        node.setTranslation([t[0] + dx, t[1] + dy, t[2] + dz]);
+      }
+      bounds = getBounds(preScene);
+    }
 
     // prune() can orphan secondary skins (stretched-vertex artifacts); skip it for rigged
     // files. Rigged files instead get keyframe resampling + quantization — the animation

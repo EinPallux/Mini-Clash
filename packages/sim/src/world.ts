@@ -123,6 +123,8 @@ export interface ChampState {
   aaTarget: EntityId | null;
   respawnIn: number;
   dancing: boolean;
+  /** Feared (Wisp R): fleeing away from a point, controls locked, until tLeft ≤ 0. */
+  feared: { tLeft: number; fromX: number; fromZ: number } | null;
   /** Champion-specific passive scratch (stonewallCd, powderCount, luckyT…). */
   passive: Record<string, number>;
   speed: number;
@@ -150,6 +152,8 @@ export interface KegState {
   level: number;
   /** Set when destroyed by an attack: owner-team hit detonates, enemy hit denies. */
   killedByTeam?: Team;
+  /** Wisp's sheet decoy: taunts Minis, dies after this many hits (regardless of damage). */
+  decoy?: { hitsLeft: number };
 }
 
 export interface WallState {
@@ -180,6 +184,8 @@ export interface ProjState {
   dtype: 'physical' | 'arcane';
   /** aa powder-blast round (Fathom passive). */
   powder?: boolean;
+  /** Charged Capacitor basic (Boltz passive): bonus arcane + arc to one more target. */
+  capacitor?: boolean;
   /** Lucky-doubloon bonus applied. */
   luckyMul?: number;
   color: number;
@@ -224,17 +230,34 @@ export interface FlowerState {
   tLeft: number;
 }
 
-/** Ground aura zone (Sylva's Blooming Ward). */
+/** Ground area effect: Sylva's ward (garden), Boltz's dome/pod, Wisp's curse. */
 export interface ZoneState {
   owner: EntityId;
+  variant: 'garden' | 'dome' | 'pod' | 'curse';
   tLeft: number;
   duration: number;
   radius: number;
-  /** Resolved at cast. */
-  healPerSec: number;
-  enemyDamageAmp: number;
-  cleanseSlows: boolean;
-  cleansed: Set<EntityId>;
+  /* Sylva garden (resolved at cast). */
+  healPerSec?: number;
+  enemyDamageAmp?: number;
+  cleanseSlows?: boolean;
+  cleansed?: Set<EntityId>;
+  /* Boltz dome/pod. */
+  blocksProjectiles?: boolean;
+  /** Buff refreshed on allies inside each tick (dome attack-speed aura). */
+  allyBuff?: string;
+  /** Nav cells stamped as a movement obstacle (pod bunker); unstamped on expiry. */
+  navCells?: number[];
+  /** Fx emitted when the field launches away at expiry (pod). */
+  expireFx?: string;
+  /* Wisp curse. */
+  enemyDmgPerSec?: number;
+  /** Debuff refreshed on enemies inside each tick (Chill). */
+  enemyBuff?: string;
+  disableMinis?: boolean;
+  /** Enemy champions still inside at expiry are Feared away from center this long. */
+  expireFear?: number;
+  tickFx?: string;
 }
 
 /** Bridge-mode match orchestration state (absent on training maps). */

@@ -42,7 +42,7 @@ Duo randomness means any two roles can pair — every kit must be self-sufficien
 | Grukk | 940 → 1950 | 65 → 124 | 0.78 | 3.6 | 2.2 | 30/26 → 58/52 |
 | Sylva | 705 → 1345 | 52 → 88 | 0.80 | 3.6 | 6.0 | 24/25 → 45/49 |
 | Boltz | 650 → 1330 | 60 → 122 | 0.92 | 3.6 | 6.0 | 22/22 → 44/44 |
-| Wisp | 590 → 1200 | 48 → 78 | 0.75 | 3.7 | 6.5 | 19/26 → 38/51 |
+| Wisp | 625 → 1260 | 48 → 78 | 0.75 | 3.7 | 6.5 | 21/27 → 41/52 |
 | Piper | 640 → 1300 | 54 → 96 | 0.82 | 3.6 | 5.5 | 22/24 → 44/47 |
 | Vex | 900 → 1870 | 61 → 118 | 0.85 | 3.7 | 2.0 | 29/27 → 56/53 |
 | Snowble | 1120 → 2240 | 55 → 98 | 0.68 | 3.4 | 2.0 | 34/32 → 65/61 |
@@ -142,9 +142,9 @@ Keeper of the bridge's improbable garden; kind to allies, horticulturally ruthle
 **Gunner/Specialist · v0.4 · difficulty ●●○**
 A decommissioned survey astronaut who refuses to accept the mission ended; the bridge is "anomalous terrain, requires zapping."
 
-- **Model:** `Kenney_SpaceKit/astronautA.glb` (team-visor palette). Prop: raygun assembled from `Kenney_SpaceKit` parts.
-- **Passive — Capacitor:** after 3 s without attacking, next basic deals +`25 (+30% AD)` arcane and chains to 1 extra target (visor + gun charge-glow telegraph).
-- **Q — Arc Zapper:** 30⚡ / 6 s / 6 u line. Instant tesla beam (0.15 s cast): `70 (+55% AD)` arcane, +30% vs shields; refunds 10⚡ on champion hit. *Anim:* `holding-right-shoot` snap-fire; jagged beam shader (animated noise), impact sparks + brief target electrify-outline.
+- **Model:** `Kenney_CuteCharacters/character-male-c.glb` in astronaut dress — visor palette + a procedural bubble helmet (the SpaceKit `astronautA` mesh ships unrigged, so he *wears* the suit instead of being it; see ASSET_CATALOG §4). Prop: `Kenney_SpaceKit/weapon_gun.glb` raygun (right hand).
+- **Passive — Capacitor:** after 3 s without attacking, next basic deals +`18 (+25% AD)` arcane and chains to 1 extra target within 3.5 u (visor charge-glow telegraph).
+- **Q — Arc Zapper:** 30⚡ / 6 s / 6 u line. Instant tesla beam (0.15 s cast): `60 (+48% AD)` arcane, +30% vs shielded targets; refunds 10⚡ on champion hit. Hitscan is priced below a comparable skillshot — it never misses. *Anim:* `holding-right-shoot` snap-fire; jagged beam shader (animated noise), impact sparks + brief target electrify-outline.
 - **W — Bubble Dome:** 35⚡ / 13 s / place 4 u. Projects a 2.5 u energy dome 2.5 s: blocks **enemy projectiles** at the shell (satisfying zap-pops); allies inside gain +10% AS firing out. *Anim:* `interact-left` wrist-tap; dome = fresnel hex-shield shader inflating with wobble, each blocked shot ripples it.
 - **R — Orbital Droppod:** ⏱ 85 s / 7 u target, 1.2 s delay. Calls a droppod (`Kenney_SpaceKit` rocket/pod) from orbit: `170 (+80% AD)` in 2.5 u + knock-up 0.8 s at center. The pod **stays** 4 s as a bunker (Boltz or allies stand behind it — blocks movement & projectiles), then launches away. *Anim:* Boltz aims a beacon (`pick-up` reversed), sky-streak warning line + growing shadow decal, impact shake L, landing burn ring; pod re-ignites and exits with smoke column.
 - **Entrance:** *EVA Hop* — jetpack micro-hop (0.4 s, clears 1 u, ignores unit collision — flavor mobility, not a wall-hop).
@@ -158,9 +158,9 @@ A small ghost who haunts the bridge not out of malice but because the view is ni
 
 - **Model:** `Kenney_GraveyardKit/character-ghost.glb` (translucent shader, soft emissive rim; hover bob procedural — no walk cycle needed: locomotion is float with lean).
 - **Passive — Ectoplasm:** Wisp phases through units (no unit collision, ever). Passing through an enemy chills them: 10% slow 1 s + marks them "Chilled" 3 s.
-- **Q — Boo!:** 25⚡ / 5 s / 6.5 u skillshot. Spook-bolt `75 (+60% AP)` arcane; vs Chilled targets +25% and briefly **Fears Minis** 1 s. *Anim:* inflate-face lunge (scale-pop + `emote-no` head snap); bolt = wailing face sprite-sheet with ribbon tail; hit = "BOO" glyph burst.
+- **Q — Boo!:** 25⚡ / 5 s / 6.5 u skillshot. Spook-bolt `84 (+60% AP)` arcane; vs Chilled targets +25% and briefly **Fears Minis** 1 s. *Anim:* inflate-face lunge (scale-pop + `emote-no` head snap); bolt = wailing face sprite-sheet with ribbon tail; hit = "BOO" glyph burst.
 - **W — Sheet Slip:** 35⚡ / 10 s / 3.5 u blink. Drops her sheet (decoy: stands still, taunts Minis, 1 HP-until-hit twice) and blinks invisible for 1 s (breaks on cast/attack). *Anim:* sheet prop collapses realistically (cloth-sim-lite bones); reappear = sheet whooshes back on with sparkle.
-- **R — Haunting Hour:** ⏱ 80 s / 5 u circle (3 u), 0.6 s cast. Curses the ground 4 s: enemies inside are Chilled continuously, take `45 (+30% AP)`/s, and Minis inside fight for **no one** (stand confused). At expiry, all champions still inside are Feared 1.2 s away from the center. *Anim:* Wisp spins up into the air trailing spirits; zone = desaturation + floating gravestone shadows (Graveyard props as translucent ghosts), clock-tick SFX building to the midnight gong.
+- **R — Haunting Hour:** ⏱ 80 s / 5 u circle (3 u), 0.6 s cast. Curses the ground 4 s: enemies inside are Chilled continuously, take `54 (+30% AP)`/s, and Minis inside fight for **no one** (stand confused). At expiry, all champions still inside are Feared 1.2 s away from the center. *Anim:* Wisp spins up into the air trailing spirits; zone = desaturation + floating gravestone shadows (Graveyard props as translucent ghosts), clock-tick SFX building to the midnight gong.
 - **Entrance:** *Cold Spot* — 1.5 u chill nova (10% slow 1 s) + Wisp is untargetable for the 0.35 s swap morph (only Entrance that touches the swap itself — her identity).
 - **Signature Augments:** ①**Poltergeist** (Silver): W decoy explodes when destroyed `70 (+40% AP)`. ②**Separation Anxiety** (Gold): Q pierces; every enemy hit extends R's next duration +0.5 s. ③**Midnight Society** (Prismatic): R also summons 3 ghost Minis (Graveyard skeletons, spectral shader) that fight for Wisp 6 s.
 

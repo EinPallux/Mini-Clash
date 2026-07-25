@@ -6,7 +6,7 @@ import {
   PROJECTILES,
   UNITS,
 } from '@mini-clash/data';
-import { applyBuff, applyCc } from './buffs';
+import { applyBuff, applyBuffById, applyCc, shieldTotal } from './buffs';
 import { dealDamage, displace } from './combat';
 import { championStats, hasItemPassive, resolveScaling } from './stats';
 import { dist, inCone, inRect, norm } from './vec';
@@ -477,6 +477,7 @@ function executeAction(ctx: ActionCtx, a: Action): void {
         buffs: [],
         zone: {
           owner: caster.id,
+          variant: 'garden',
           tLeft: a.duration,
           duration: a.duration,
           radius: a.radius,
@@ -497,6 +498,180 @@ function executeAction(ctx: ActionCtx, a: Action): void {
         dealDamage(w, { source: caster, label: ctx.ability.slot }, target, amount, a.type);
         applyCc(target, { kind: 'root', duration: rootDur });
       }
+      break;
+    }
+
+    case 'beam': {
+      // Instant hitscan corridor from the caster along facing (Boltz Q).
+      const amount = resolveScaling(a.amount, c.level, stats.ad, stats.ap);
+      let refunded = false;
+      for (const target of shapeTargets(
+        { ...ctx, ox: caster.x, oz: caster.z },
+        'self',
+        { kind: 'rect', length: a.length, width: a.width },
+        'enemies',
+      )) {
+        let dmg = amount;
+        if (a.vsShieldMul && shieldTotal(target) > 0) dmg *= a.vsShieldMul;
+        dealDamage(w, { source: caster, label: ctx.ability.slot }, target, dmg, a.type);
+        if (a.energyRefundOnChamp && !refunded && target.kind === 'champion' && !target.dead) {
+          refunded = true;
+          c.energy = Math.min(100, c.energy + a.energyRefundOnChamp);
+        }
+      }
+      if (a.fx) w.fx(a.fx, caster.x, caster.z, { fx: ctx.fx, fz: ctx.fz, source: caster.id });
+      break;
+    }
+
+    case 'field': {
+      const spawnField = (world: World, fx: number, fz: number): void => {
+        const src = world.get(caster.id);
+        // Impact burst (pod slam) resolves at the landing point.
+        if (a.impact) {
+          const amt = resolveScaling(
+            a.impact.amount,
+            c.level,
+            championStats(caster).ad,
+            championStats(caster).ap,
+          );
+          for (const u of [...world.enemiesOf(caster.team)]) {
+            if (u.kind === 'keg') continue;
+            if (dist(ctx.aimX, ctx.aimZ, u.x, u.z) <= a.impact.radius + u.radius) {
+              dealDamage(
+                world,
+                { source: src ?? caster, label: ctx.ability.slot },
+                u,
+                amt,
+                a.impact.type,
+              );
+              if (a.impact.cc) {
+                if (a.impact.cc.kind === 'knockback') {
+                  const [dx, dz] = norm(u.x - ctx.aimX, u.z - ctx.aimZ);
+                  displace(world, u, dx, dz, a.impact.cc.strength ?? 1);
+                } else {
+                  applyCc(u, a.impact.cc);
+                }
+              }
+            }
+          }
+          if (a.impact.fx) world.fx(a.impact.fx, ctx.aimX, ctx.aimZ, { source: caster.id });
+        }
+        const navCells = a.blocksMovement
+          ? world.nav.stampDisc(ctx.aimX, ctx.aimZ, a.radius)
+          : undefined;
+        world.add({
+          kind: 'zone',
+          srcLabel: ctx.ability.slot,
+          team: caster.team,
+          x: ctx.aimX,
+          z: ctx.aimZ,
+          fx,
+          fz,
+          radius: a.radius,
+          hp: 1,
+          hpMax: 1,
+          dead: false,
+          airborne: 0,
+          airborneTotal: 0,
+          buffs: [],
+          zone: {
+            owner: caster.id,
+            variant: a.variant,
+            tLeft: a.duration,
+            duration: a.duration,
+            radius: a.radius,
+            blocksProjectiles: a.blocksProjectiles,
+            allyBuff: a.allyBuff,
+            navCells,
+            expireFx: a.variant === 'pod' ? 'boltz.pod.launch' : undefined,
+          },
+        });
+      };
+      if (a.delay) {
+        if (a.telegraphFx) w.fx(a.telegraphFx, ctx.aimX, ctx.aimZ, { source: caster.id });
+        w.schedule(a.delay, (world) => {
+          const src = world.get(caster.id);
+          if (!src || src.dead) return;
+          spawnField(world, ctx.fx, ctx.fz);
+        });
+      } else {
+        spawnField(w, ctx.fx, ctx.fz);
+      }
+      break;
+    }
+
+    case 'curse': {
+      w.add({
+        kind: 'zone',
+        srcLabel: ctx.ability.slot,
+        team: caster.team,
+        x: ctx.aimX,
+        z: ctx.aimZ,
+        fx: ctx.fx,
+        fz: ctx.fz,
+        radius: a.radius,
+        hp: 1,
+        hpMax: 1,
+        dead: false,
+        airborne: 0,
+        airborneTotal: 0,
+        buffs: [],
+        zone: {
+          owner: caster.id,
+          variant: 'curse',
+          tLeft: a.duration,
+          duration: a.duration,
+          radius: a.radius,
+          enemyDmgPerSec: resolveScaling(a.dmgPerSec, c.level, stats.ad, stats.ap),
+          enemyBuff: a.enemyBuff,
+          disableMinis: a.disableMinis,
+          expireFear: a.expireFear,
+          tickFx: a.tickFx,
+        },
+      });
+      break;
+    }
+
+    case 'blink': {
+      // Drop the decoy at the pre-blink position, then teleport to the aim point.
+      if (a.decoy) {
+        const unit = UNITS[a.decoy];
+        if (unit) {
+          const ent = w.add({
+            kind: 'keg',
+            srcLabel: ctx.ability.slot,
+            team: caster.team,
+            x: caster.x,
+            z: caster.z,
+            fx: caster.fx,
+            fz: caster.fz,
+            radius: unit.radius,
+            hp: unit.hp,
+            hpMax: unit.hp,
+            dead: false,
+            airborne: 0,
+            airborneTotal: 0,
+            buffs: [],
+            keg: {
+              def: unit,
+              owner: caster.id,
+              ownerPlayer: c.player,
+              fuseLeft: a.decoyDuration ?? 3,
+              tossPhase: 1,
+              ad: stats.ad,
+              level: c.level,
+              decoy: { hitsLeft: 2 },
+            },
+          });
+          w.fx('wisp.decoy.place', ent.x, ent.z, { source: caster.id, target: ent.id });
+        }
+      }
+      const [tx, tz] = w.nav.nearestOpen(ctx.aimX, ctx.aimZ);
+      caster.x = tx;
+      caster.z = tz;
+      c.path = [];
+      c.order = null;
+      if (a.selfBuff) applyBuffById(caster, a.selfBuff);
       break;
     }
   }

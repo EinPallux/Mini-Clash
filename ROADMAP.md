@@ -84,13 +84,13 @@ Scope discipline: if a phase runs hot, cut **content quantity** (champions, augm
 - **Duo dealing** in champion select (paired card deal, per-slot rerolls/bench per GAME_DESIGN §7.1) + **Tag Swap** in match (shared HP pool, per-champ Energy/CDs, morph transition, swap-speed burst, CC/channel locks) + **Entrances** for all 8 champions (unique micro-effects, fully animated).
 - Duo HUD (active/bench portraits, swap radial, bench-readiness glints), duo kill cards, Tab/summary duo stats; Training gets a duo-config panel.
 - **Bots swap** competently (tier-appropriate: Energy cycling, counter-pivots, entrance weaving).
-- **Champions +2:** Boltz (the astronaut rig job), Wisp.
+- ~~**Champions +2:** Boltz (the astronaut rig job), Wisp.~~ ✅ *Both shipped complete (kits, entrances, FX, cues, tests). The "astronaut rig job" was closed by removing it: `astronautA` ships unrigged, and rather than bolt a Blender weight-transfer step onto a pure gltf-transform pipeline for one champion, Boltz wears the suit on a Kenney-Skinned body (visor palette + procedural bubble helmet + SpaceKit raygun) and animates like every other Kenney champion — ASSET_CATALOG §4 records the delta. Roster now 8, which also closes the duo-deal duplicate gap.*
 
 **Acceptance:**
 - [ ] Every champion pair (28 duos of 8) playable; shared-HP math, buff carryover and edge cases (swap during projectile flight, during R channels, at death frame) covered by sim unit tests.
 - [ ] Elite bots measurably outperform swap-disabled Elite bots (harness A/B > 55% winrate) — proof swaps are *used well*, not just used.
 - [ ] Swap feel: input→morph start ≤ 50 ms online at 80 ms RTT (predicted); no HP-bar pops or portrait flicker.
-- [ ] Balance harness re-run: all duos within winrate rails; shared-HP pool formula tuned.
+- [ ] Balance harness re-run: all duos within winrate rails; shared-HP pool formula tuned. *(First-pass tuning done for the two new champions off ~150 mixed matches: Boltz 73% → 60% after pricing in his hitscan beam; Wisp buffed (HP/armor/Boo/R) — her KDA moved 4.7/7.7 → 6.1/6.8 into mid-pack but her winrate hasn't followed yet, and that run's 65% team-0 skew makes a low-n read unreliable. The band verdict belongs to the nightly sweep, where the v0.2 residuals are also parked.)*
 
 ## v0.5 — Power Surge
 

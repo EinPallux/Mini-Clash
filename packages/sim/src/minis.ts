@@ -179,6 +179,19 @@ function acquire(
   e: Entity,
   spec: NonNullable<MiniState['def']['mini']>,
 ): Entity | undefined {
+  // Wisp's sheet decoy taunts nearby Minis — it wins target priority outright.
+  let decoy: Entity | undefined;
+  let dDecoy = spec.aggroRange;
+  for (const u of w.units()) {
+    if (u.team === e.team || !u.keg?.decoy) continue;
+    const d = dist(e.x, e.z, u.x, u.z) - u.radius;
+    if (d <= dDecoy) {
+      dDecoy = d;
+      decoy = u;
+    }
+  }
+  if (decoy) return decoy;
+
   const ram = spec.kind === 'ram';
   let bestMini: Entity | undefined;
   let bestChamp: Entity | undefined;

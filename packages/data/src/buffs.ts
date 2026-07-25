@@ -42,4 +42,29 @@ export const BUFFS: Record<string, BuffDef> = {
     duration: 1.0,
     decayingMsBonus: 0.2,
   },
+  // Boltz — Bubble Dome: allies inside fire faster (refreshed each tick they stay).
+  boltz_dome: {
+    id: 'boltz_dome',
+    name: 'Overshielded',
+    duration: 0.3,
+    mul: { attackSpeed: 1.1 },
+  },
+  // Wisp — Chilled mark: no stats of its own; Boo hits it harder and R renews it.
+  wisp_chilled: {
+    id: 'wisp_chilled',
+    name: 'Chilled',
+    duration: 3.0,
+  },
+  // Wisp — Sheet Slip: invisible for a beat (the sim drops it on cast/attack).
+  wisp_invis: {
+    id: 'wisp_invis',
+    name: 'Slipped Away',
+    duration: 1.0,
+  },
+  // Wisp entrance Cold Spot: untargetable through the 0.35 s swap morph.
+  wisp_untargetable: {
+    id: 'wisp_untargetable',
+    name: 'Cold Spot',
+    duration: 0.35,
+  },
 };

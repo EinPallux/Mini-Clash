@@ -1,6 +1,7 @@
 import {
   BRIDGE,
   CHAMPIONS,
+  type ChampionDef,
   type MapDef,
   SHATTERBRIDGE_MAP,
   TICK_DT,
@@ -25,11 +26,12 @@ import {
   trySwap,
   updateAutoAttack,
   updateCasts,
+  updateChampionPassive,
 } from './abilities';
 import { healEntity, plantFlower } from './actions';
 import { type BotBrain, makeBrain, thinkBots } from './bots';
 import { isHiddenFrom, updateBrushState } from './brush';
-import { applyBuff, applyBuffById, applyCc, shieldTotal, tickBuffs } from './buffs';
+import { applyBuff, applyBuffById, applyCc, applyFear, shieldTotal, tickBuffs } from './buffs';
 import { dealDamage } from './combat';
 import { levelUpChamp, updateIncome, updateOrbs } from './economy';
 import { tryBuy, tryBuyRelic, trySell, tryUseRelic, updateItemPassives } from './items';
@@ -52,6 +54,20 @@ const MAPS: Record<string, MapDef> = {
   [TRAINING_MAP.id]: TRAINING_MAP,
   [SHATTERBRIDGE_MAP.id]: SHATTERBRIDGE_MAP,
 };
+
+/** Fresh passive scratch for a champion (what the sim + snapshot start with). */
+function initPassive(def: ChampionDef): Record<string, number> {
+  switch (def.passive.id) {
+    case 'stonewall':
+      return { stonewallCd: 0 };
+    case 'powder_rounds':
+      return { powderCount: 0 };
+    case 'capacitor':
+      return { charged: 0, lastAtk: -100 };
+    default:
+      return {};
+  }
+}
 
 export class Sim {
   readonly world: World;
@@ -189,15 +205,15 @@ export class Sim {
           aaTarget: null,
           respawnIn: 0,
           dancing: false,
-          passive: def.passive.id === 'stonewall' ? { stonewallCd: 0 } : { powderCount: 0 },
+          feared: null,
+          passive: initPassive(def),
           duo: benchDef
             ? {
                 def: benchDef,
                 energy: 100,
                 cds: { q: 0, w: 0, r: 0 },
                 aaCd: 0,
-                passive:
-                  benchDef.passive.id === 'stonewall' ? { stonewallCd: 0 } : { powderCount: 0 },
+                passive: initPassive(benchDef),
                 swapCd: 0,
                 morphT: 0,
               }
@@ -424,7 +440,8 @@ export class Sim {
         c.path = [];
         c.aaTarget = null;
         c.dancing = false;
-        c.passive = def.passive.id === 'stonewall' ? { stonewallCd: 0 } : { powderCount: 0 };
+        c.feared = null;
+        c.passive = initPassive(def);
         e.radius = def.stats.radius;
         e.buffs = [];
         const stats = championStats(e);
@@ -530,6 +547,7 @@ export class Sim {
       tickBuffs(e, dt);
       if (e.champ && !e.dead) {
         updateItemPassives(w, e);
+        updateChampionPassive(w, e, dt);
         this.updatePollenTrail(e);
         const stats = championStats(e);
         e.hpMax = stats.hpMax;
@@ -666,6 +684,7 @@ export class Sim {
     e.hp = e.hpMax;
     c.energy = 100;
     c.respawnIn = 0;
+    c.feared = null;
     c.recap = null; // the recap lives on the death screen only
     if (c.duo) {
       c.duo.energy = 100;
@@ -707,9 +726,21 @@ export class Sim {
 
     if (e.dead) {
       // Destroyed by an attack: owner team detonates it, enemy denies it.
-      if (keg.killedByTeam === undefined || keg.killedByTeam === e.team) this.detonateKeg(e);
-      else {
+      // Decoys and markers never explode — they just leave.
+      if (!keg.decoy && (keg.killedByTeam === undefined || keg.killedByTeam === e.team)) {
+        this.detonateKeg(e);
+      } else {
         w.fx('generic.death', e.x, e.z, { target: e.id });
+        w.remove(e.id);
+      }
+      return;
+    }
+
+    // The sheet decoy just times out (no fuse, no bang).
+    if (keg.decoy) {
+      keg.fuseLeft -= dt;
+      if (keg.fuseLeft <= 0) {
+        w.fx('wisp.decoy.break', e.x, e.z, { target: e.id });
         w.remove(e.id);
       }
       return;
@@ -767,16 +798,59 @@ export class Sim {
     const w = this.world;
     z.tLeft -= dt;
     if (z.tLeft <= 0) {
-      w.remove(e.id);
+      this.expireZone(e, z);
       return;
     }
     const owner = w.get(z.owner);
+
+    if (z.variant === 'dome' || z.variant === 'pod') {
+      // The shell itself lives in projectiles.ts; here we only run the ally aura.
+      if (z.allyBuff) {
+        for (const u of w.champions()) {
+          if (u.team !== e.team) continue;
+          if (dist(e.x, e.z, u.x, u.z) <= z.radius + u.radius) applyBuffById(u, z.allyBuff);
+        }
+      }
+      return;
+    }
+
+    if (z.variant === 'curse') {
+      if (z.tickFx && this.world.tick % 15 === 0) w.fx(z.tickFx, e.x, e.z, { source: z.owner });
+      for (const u of [...w.enemiesOf(e.team)]) {
+        if (u.kind === 'keg') continue;
+        if (dist(e.x, e.z, u.x, u.z) > z.radius + u.radius) continue;
+        if (z.enemyDmgPerSec) {
+          dealDamage(
+            w,
+            { source: owner ?? e, label: e.srcLabel },
+            u,
+            z.enemyDmgPerSec * dt,
+            'arcane',
+          );
+        }
+        if (z.enemyBuff) applyBuffById(u, z.enemyBuff);
+        // Minis inside stop fighting for anyone — the cursed ground confuses them.
+        if (z.disableMinis && u.mini) {
+          applyBuff(u, {
+            id: 'cc_confused',
+            name: 'Confused',
+            duration: 0.25,
+            mul: { moveSpeed: 0 },
+          });
+          u.mini.targetId = null;
+          u.mini.attacking = false;
+        }
+      }
+      return;
+    }
+
+    // Sylva's garden.
     for (const u of w.champions()) {
       const inside = dist(e.x, e.z, u.x, u.z) <= z.radius + u.radius;
       if (!inside) continue;
       if (u.team === e.team) {
-        healEntity(owner ?? u, u, z.healPerSec * dt);
-        if (z.cleanseSlows && !z.cleansed.has(u.id)) {
+        healEntity(owner ?? u, u, (z.healPerSec ?? 0) * dt);
+        if (z.cleanseSlows && z.cleansed && !z.cleansed.has(u.id)) {
           z.cleansed.add(u.id);
           u.buffs = u.buffs.filter((b) => !b.id.startsWith('cc_slow'));
         }
@@ -785,10 +859,29 @@ export class Sim {
           id: 'zone_dampen',
           name: 'Dampened',
           duration: 0.25,
-          damageAmp: z.enemyDamageAmp,
+          damageAmp: z.enemyDamageAmp ?? 0,
         });
       }
     }
+  }
+
+  /** Zone teardown: unstamp nav, fire the exit beat, apply expiry effects. */
+  private expireZone(e: Entity, z: NonNullable<Entity['zone']>): void {
+    const w = this.world;
+    if (z.navCells) w.nav.unstampWall(z.navCells);
+    // The midnight gong: everyone still standing in the curse is Feared away.
+    if (z.expireFear) {
+      w.fx('wisp.r.gong', e.x, e.z, { source: z.owner });
+      for (const u of w.champions()) {
+        if (u.team === e.team) continue;
+        if (dist(e.x, e.z, u.x, u.z) <= z.radius + u.radius) {
+          applyFear(u, e.x, e.z, z.expireFear);
+          w.fx('wisp.fear', u.x, u.z, { source: u.id });
+        }
+      }
+    }
+    if (z.expireFx) w.fx(z.expireFx, e.x, e.z, { source: z.owner });
+    w.remove(e.id);
   }
 
   /** Sylva's Pollen Trail: plant a flower every N units walked. */
@@ -1021,7 +1114,13 @@ export class Sim {
       return { ...base, kind: 'flower', tLeft: e.flower.tLeft };
     }
     if (e.zone) {
-      return { ...base, kind: 'zone', tLeft: e.zone.tLeft, duration: e.zone.duration };
+      return {
+        ...base,
+        kind: 'zone',
+        variant: e.zone.variant,
+        tLeft: e.zone.tLeft,
+        duration: e.zone.duration,
+      };
     }
     if (e.wall) {
       return {

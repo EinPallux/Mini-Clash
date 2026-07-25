@@ -13,6 +13,10 @@ const POWDER = 0x646b78;
 const GOLD = 0xffd077;
 const ALLY = 0x3ba7ff;
 const GHOST = 0x9fe8ff;
+const ELEC = 0x8fd8ff; // Boltz tesla blue
+const CHILL = 0x9fd8ff; // Wisp chill
+const GHOSTC = 0xbfe8ff; // Wisp spook-white
+const VOID = 0x8a5fb0; // Wisp curse purple
 
 export const FX: Record<string, FxTimeline> = {
   /* ------------------------------- Rook ------------------------------- */
@@ -1229,6 +1233,456 @@ export const FX: Record<string, FxTimeline> = {
       {
         time: 0,
         op: { t: 'ring', at: 'origin', color: 0x8ade6a, radius: 2, width: 0.1, life: 0.4 },
+      },
+    ],
+  },
+
+  /* ------------------------------ Boltz ------------------------------ */
+  'boltz.aa.fire': {
+    id: 'boltz.aa.fire',
+    events: [
+      { time: 0, op: { t: 'sound', cue: 'boltz_aa', volume: 0.6 } },
+      {
+        time: 0,
+        op: {
+          t: 'burst',
+          at: 'self',
+          count: 6,
+          color: ELEC,
+          size: 0.08,
+          speed: 4.5,
+          spread: 18,
+          life: 0.16,
+          shape: 'spark',
+        },
+      },
+    ],
+  },
+  'boltz.aa.hit': {
+    id: 'boltz.aa.hit',
+    events: [
+      { time: 0, op: { t: 'flash', at: 'target', color: ELEC, life: 0.07 } },
+      {
+        time: 0,
+        op: {
+          t: 'burst',
+          at: 'target',
+          count: 7,
+          color: ELEC,
+          color2: 0xffffff,
+          size: 0.08,
+          speed: 3.6,
+          life: 0.2,
+          shape: 'spark',
+        },
+      },
+      { time: 0, op: { t: 'sound', cue: 'boltz_zap_hit', volume: 0.55 } },
+    ],
+  },
+  'boltz.passive.charge': {
+    // Capacitor primed: the chained shot cracks between targets.
+    id: 'boltz.passive.charge',
+    events: [
+      { time: 0, op: { t: 'sound', cue: 'boltz_charge', volume: 0.7 } },
+      {
+        time: 0,
+        op: {
+          t: 'burst',
+          at: 'target',
+          count: 12,
+          color: ELEC,
+          color2: 0xffffff,
+          size: 0.1,
+          speed: 5,
+          up: 1.4,
+          life: 0.3,
+          shape: 'spark',
+        },
+      },
+      { time: 0, op: { t: 'ring', at: 'target', color: ELEC, radius: 1, width: 0.1, life: 0.28 } },
+    ],
+  },
+  'boltz.q.windup': {
+    id: 'boltz.q.windup',
+    events: [{ time: 0, op: { t: 'sound', cue: 'boltz_charge', volume: 0.5 } }],
+  },
+  'boltz.q.cast': {
+    id: 'boltz.q.cast',
+    events: [{ time: 0, op: { t: 'flash', at: 'self', color: ELEC, life: 0.08 } }],
+  },
+  'boltz.q.beam': {
+    id: 'boltz.q.beam',
+    events: [
+      { time: 0, op: { t: 'sound', cue: 'boltz_zap' } },
+      {
+        time: 0,
+        op: { t: 'ribbonSweep', at: 'self', color: ELEC, radius: 6, angleDeg: 12, life: 0.18 },
+      },
+      {
+        time: 0,
+        op: {
+          t: 'burst',
+          at: 'self',
+          count: 18,
+          color: ELEC,
+          color2: 0xffffff,
+          size: 0.1,
+          speed: 8,
+          spread: 8,
+          life: 0.25,
+          shape: 'spark',
+        },
+      },
+      {
+        time: 0,
+        op: { t: 'light', at: 'self', color: ELEC, intensity: 2.6, radius: 5, life: 0.14 },
+      },
+      { time: 0.02, op: { t: 'shake', power: 's' } },
+    ],
+  },
+  'boltz.w.cast': {
+    id: 'boltz.w.cast',
+    events: [
+      { time: 0, op: { t: 'sound', cue: 'boltz_dome_up' } },
+      { time: 0, op: { t: 'ring', at: 'aim', color: ELEC, radius: 2.5, width: 0.16, life: 2.5 } },
+      {
+        time: 0,
+        op: { t: 'light', at: 'aim', color: ELEC, intensity: 1.8, radius: 5, life: 0.4 },
+      },
+    ],
+  },
+  'boltz.dome.block': {
+    // A projectile pops on the shell — the signature zap.
+    id: 'boltz.dome.block',
+    events: [
+      { time: 0, op: { t: 'sound', cue: 'boltz_dome_pop', volume: 0.5 } },
+      {
+        time: 0,
+        op: {
+          t: 'burst',
+          at: 'origin',
+          count: 8,
+          color: ELEC,
+          color2: 0xffffff,
+          size: 0.09,
+          speed: 4,
+          life: 0.22,
+          shape: 'spark',
+        },
+      },
+    ],
+  },
+  'boltz.r.windup': {
+    id: 'boltz.r.windup',
+    events: [{ time: 0, op: { t: 'sound', cue: 'boltz_pod_warn', volume: 0.7 } }],
+  },
+  'boltz.r.cast': {
+    id: 'boltz.r.cast',
+    events: [{ time: 0, op: { t: 'flash', at: 'self', color: ELEC, life: 0.1 } }],
+  },
+  'boltz.r.telegraph': {
+    id: 'boltz.r.telegraph',
+    events: [
+      { time: 0, op: { t: 'sound', cue: 'boltz_pod_warn' } },
+      {
+        time: 0,
+        op: { t: 'decal', at: 'aim', kind: 'scorch', color: 0xff7a3c, radius: 2.5, life: 1.3 },
+      },
+      {
+        time: 0,
+        op: { t: 'ring', at: 'aim', color: 0xff7a3c, radius: 2.5, width: 0.16, life: 1.2 },
+      },
+    ],
+  },
+  'boltz.r.impact': {
+    id: 'boltz.r.impact',
+    events: [
+      { time: 0, op: { t: 'sound', cue: 'boltz_pod_land' } },
+      { time: 0, op: { t: 'flash', at: 'aim', color: 0xffffff, life: 0.08 } },
+      { time: 0, op: { t: 'ring', at: 'aim', color: 0xffb14b, radius: 2.5, life: 0.4 } },
+      // The pod body itself belongs to the zone actor (it has to survive the full
+      // 4 s bunker and launch away) — a prop here would render a second one.
+      {
+        time: 0,
+        op: {
+          t: 'burst',
+          at: 'aim',
+          count: 40,
+          color: 0xffb14b,
+          color2: DUST,
+          size: 0.2,
+          speed: 8,
+          up: 3,
+          life: 0.6,
+          gravity: 8,
+          shape: 'shard',
+        },
+      },
+      {
+        time: 0,
+        op: { t: 'decal', at: 'aim', kind: 'scorch', color: 0x3a352c, radius: 2.5, life: 4 },
+      },
+      {
+        time: 0,
+        op: { t: 'light', at: 'aim', color: 0xffb14b, intensity: 4, radius: 7, life: 0.2 },
+      },
+      { time: 0, op: { t: 'shake', power: 'l' } },
+      { time: 0, op: { t: 'hitstop', ms: 60 } },
+    ],
+  },
+  'boltz.pod.launch': {
+    id: 'boltz.pod.launch',
+    events: [
+      { time: 0, op: { t: 'sound', cue: 'boltz_pod_launch' } },
+      {
+        time: 0,
+        op: {
+          t: 'burst',
+          at: 'origin',
+          count: 26,
+          color: 0xffb14b,
+          color2: DUST,
+          size: 0.16,
+          speed: 5,
+          up: 5,
+          life: 0.7,
+          gravity: 3,
+          shape: 'puff',
+        },
+      },
+      {
+        time: 0,
+        op: { t: 'light', at: 'origin', color: 0xffb14b, intensity: 2.4, radius: 5, life: 0.4 },
+      },
+    ],
+  },
+  'boltz.entrance': {
+    id: 'boltz.entrance',
+    events: [
+      { time: 0, op: { t: 'sound', cue: 'boltz_hop', volume: 0.7 } },
+      {
+        time: 0,
+        op: {
+          t: 'burst',
+          at: 'self',
+          count: 12,
+          color: ELEC,
+          color2: 0xffffff,
+          size: 0.1,
+          speed: 3,
+          up: 2,
+          life: 0.4,
+          shape: 'spark',
+        },
+      },
+    ],
+  },
+
+  /* ------------------------------ Wisp ------------------------------ */
+  'wisp.aa.fire': {
+    id: 'wisp.aa.fire',
+    events: [{ time: 0, op: { t: 'sound', cue: 'wisp_aa', volume: 0.5 } }],
+  },
+  'wisp.aa.hit': {
+    id: 'wisp.aa.hit',
+    events: [
+      { time: 0, op: { t: 'flash', at: 'target', color: GHOSTC, life: 0.07 } },
+      {
+        time: 0,
+        op: {
+          t: 'burst',
+          at: 'target',
+          count: 6,
+          color: GHOSTC,
+          size: 0.08,
+          speed: 3,
+          life: 0.22,
+          shape: 'spark',
+        },
+      },
+      { time: 0, op: { t: 'sound', cue: 'wisp_aa_hit', volume: 0.45 } },
+    ],
+  },
+  'wisp.passive.chill': {
+    id: 'wisp.passive.chill',
+    events: [
+      { time: 0, op: { t: 'sound', cue: 'wisp_chill', volume: 0.4 } },
+      {
+        time: 0,
+        op: {
+          t: 'burst',
+          at: 'target',
+          count: 8,
+          color: CHILL,
+          color2: 0xffffff,
+          size: 0.08,
+          speed: 1.6,
+          up: 1.6,
+          life: 0.4,
+          shape: 'puff',
+        },
+      },
+    ],
+  },
+  'wisp.q.windup': {
+    id: 'wisp.q.windup',
+    events: [{ time: 0, op: { t: 'sound', cue: 'wisp_boo_charge', volume: 0.5 } }],
+  },
+  'wisp.q.cast': {
+    id: 'wisp.q.cast',
+    events: [
+      { time: 0, op: { t: 'sound', cue: 'wisp_boo' } },
+      {
+        time: 0,
+        op: {
+          t: 'burst',
+          at: 'self',
+          count: 12,
+          color: GHOSTC,
+          color2: 0xffffff,
+          size: 0.09,
+          speed: 3.2,
+          spread: 0.6,
+          life: 0.3,
+          shape: 'puff',
+        },
+      },
+    ],
+  },
+  'wisp.w.cast': {
+    id: 'wisp.w.cast',
+    events: [
+      { time: 0, op: { t: 'sound', cue: 'wisp_slip' } },
+      {
+        time: 0,
+        op: {
+          t: 'burst',
+          at: 'self',
+          count: 16,
+          color: GHOSTC,
+          size: 0.1,
+          speed: 3,
+          spread: 4,
+          life: 0.35,
+          shape: 'puff',
+        },
+      },
+      { time: 0, op: { t: 'flash', at: 'self', color: 0xffffff, life: 0.12 } },
+    ],
+  },
+  'wisp.decoy.place': {
+    id: 'wisp.decoy.place',
+    events: [{ time: 0, op: { t: 'sound', cue: 'wisp_slip', volume: 0.4 } }],
+  },
+  'wisp.decoy.break': {
+    id: 'wisp.decoy.break',
+    events: [
+      { time: 0, op: { t: 'sound', cue: 'wisp_aa_hit', volume: 0.5 } },
+      {
+        time: 0,
+        op: {
+          t: 'burst',
+          at: 'self',
+          count: 18,
+          color: 0xe8f2ff,
+          size: 0.12,
+          speed: 3.4,
+          up: 1.6,
+          life: 0.4,
+          shape: 'puff',
+        },
+      },
+    ],
+  },
+  'wisp.r.windup': {
+    id: 'wisp.r.windup',
+    events: [{ time: 0, op: { t: 'sound', cue: 'wisp_curse_start', volume: 0.7 } }],
+  },
+  'wisp.r.cast': {
+    id: 'wisp.r.cast',
+    events: [
+      { time: 0, op: { t: 'sound', cue: 'wisp_curse' } },
+      { time: 0, op: { t: 'ring', at: 'aim', color: VOID, radius: 3, width: 0.18, life: 4 } },
+      {
+        time: 0,
+        op: { t: 'decal', at: 'aim', kind: 'scorch', color: 0x2a1f38, radius: 3, life: 4 },
+      },
+      {
+        time: 0,
+        op: { t: 'light', at: 'aim', color: VOID, intensity: 1.8, radius: 6, life: 4 },
+      },
+    ],
+  },
+  'wisp.r.tick': {
+    id: 'wisp.r.tick',
+    events: [
+      { time: 0, op: { t: 'sound', cue: 'wisp_curse_tick', volume: 0.4 } },
+      {
+        time: 0,
+        op: {
+          t: 'burst',
+          at: 'origin',
+          count: 10,
+          color: VOID,
+          color2: CHILL,
+          size: 0.09,
+          speed: 2,
+          up: 2.4,
+          spread: 3,
+          life: 0.5,
+          shape: 'puff',
+        },
+      },
+    ],
+  },
+  'wisp.r.gong': {
+    // The midnight gong: everyone left inside is Feared away.
+    id: 'wisp.r.gong',
+    events: [
+      { time: 0, op: { t: 'sound', cue: 'wisp_gong' } },
+      { time: 0, op: { t: 'ring', at: 'origin', color: VOID, radius: 3, width: 0.24, life: 0.7 } },
+      { time: 0, op: { t: 'shake', power: 'm' } },
+    ],
+  },
+  'wisp.fear': {
+    id: 'wisp.fear',
+    events: [
+      {
+        time: 0,
+        op: {
+          t: 'burst',
+          at: 'self',
+          count: 10,
+          color: VOID,
+          color2: 0xffffff,
+          size: 0.09,
+          speed: 2.4,
+          up: 2,
+          life: 0.4,
+          shape: 'spark',
+        },
+      },
+    ],
+  },
+  'wisp.entrance': {
+    id: 'wisp.entrance',
+    events: [
+      { time: 0, op: { t: 'sound', cue: 'wisp_chill', volume: 0.6 } },
+      { time: 0, op: { t: 'ring', at: 'self', color: CHILL, radius: 1.5, width: 0.12, life: 0.6 } },
+      {
+        time: 0,
+        op: {
+          t: 'burst',
+          at: 'self',
+          count: 14,
+          color: CHILL,
+          color2: 0xffffff,
+          size: 0.1,
+          speed: 2.6,
+          up: 1.8,
+          life: 0.45,
+          shape: 'puff',
+        },
       },
     ],
   },

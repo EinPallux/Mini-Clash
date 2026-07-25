@@ -1,8 +1,25 @@
-import { powderBlast } from './abilities';
+import { capacitorArc, powderBlast } from './abilities';
 import { applyCc } from './buffs';
 import { dealDamage, displace } from './combat';
 import { dist, norm } from './vec';
 import type { Entity, World } from './world';
+
+/** Boltz's dome/pod pops enemy projectiles crossing the shell. Returns true if consumed. */
+function poppedByField(w: World, e: Entity): boolean {
+  const p = e.proj;
+  if (!p) return false;
+  for (const z of w.entities) {
+    if (z.dead || z.kind !== 'zone' || !z.zone?.blocksProjectiles) continue;
+    if (z.team === e.team) continue; // allies fire out of their own dome
+    if (dist(e.x, e.z, z.x, z.z) <= z.zone.radius + e.radius) {
+      w.fx('boltz.dome.block', e.x, e.z, { source: z.zone.owner });
+      e.dead = true;
+      w.remove(e.id);
+      return true;
+    }
+  }
+  return false;
+}
 
 export function updateProjectile(w: World, e: Entity, dt: number): void {
   const p = e.proj;
@@ -18,6 +35,8 @@ export function updateProjectile(w: World, e: Entity, dt: number): void {
   e.x += p.dirX * step;
   e.z += p.dirZ * step;
   p.traveled += step;
+
+  if (poppedByField(w, e)) return;
 
   const def = p.def;
   if (def?.pulses) {
@@ -48,7 +67,10 @@ export function updateProjectile(w: World, e: Entity, dt: number): void {
       if (u.kind === 'keg' || p.hitIds.has(u.id)) continue;
       if (dist(e.x, e.z, u.x, u.z) <= e.radius + u.radius) {
         p.hitIds.add(u.id);
-        dealDamage(w, { source: owner ?? e, label: e.srcLabel }, u, p.damage, p.dtype);
+        // Wisp Boo bites harder into Chilled targets.
+        const bvb = p.def?.bonusVsBuff;
+        const mul = bvb && u.buffs.some((b) => b.id === bvb.buff) ? bvb.mul : 1;
+        dealDamage(w, { source: owner ?? e, label: e.srcLabel }, u, p.damage * mul, p.dtype);
         if (p.def?.cc && !u.dead) applyCc(u, p.def.cc);
         const carriedThrough = p.def?.pierceOnKill && u.dead;
         if (p.def?.pierces !== 'all' && !carriedThrough) {
@@ -83,6 +105,8 @@ function updateHoming(w: World, e: Entity, dt: number): void {
   e.z += p.dirZ * step;
   p.traveled += step;
 
+  if (poppedByField(w, e)) return;
+
   if (
     target &&
     !target.dead &&
@@ -108,6 +132,7 @@ function updateHoming(w: World, e: Entity, dt: number): void {
       powderBlast(w, owner, target);
       displace(w, target, p.dirX, p.dirZ, owner.champ?.def.passive.params.push ?? 0.5);
     }
+    if (p.capacitor && owner) capacitorArc(w, owner, target);
     e.dead = true;
     w.remove(e.id);
     return;

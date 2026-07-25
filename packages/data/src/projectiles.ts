@@ -72,4 +72,22 @@ export const PROJECTILES: Record<string, ProjectileDef> = {
       spin: 9,
     },
   },
+
+  wisp_q_boo: {
+    id: 'wisp_q_boo',
+    speed: 13,
+    radius: 0.3,
+    maxRange: 6.5,
+    // A wailing spook-bolt: extra bite against Chilled targets, and it startles Minis.
+    bonusVsBuff: { buff: 'wisp_chilled', mul: 1.25 },
+    damage: { amount: { base: 84, perLevel: 7, apRatio: 0.6 }, type: 'arcane' },
+    cc: { kind: 'fear', duration: 1 },
+    visual: {
+      kind: 'orb',
+      size: 0.32,
+      color: 0xd8f4ff,
+      trail: { color: 0x8fb8d8, width: 0.2, life: 0.4 },
+      spin: 4,
+    },
+  },
 };

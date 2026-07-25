@@ -28,9 +28,11 @@ export function stateHash(sim: Sim): string {
       parts.push(c.level, r(c.energy), r(c.cds.q), r(c.cds.w), r(c.cds.r), r(c.aaCd), c.def.id);
       parts.push(r(c.gold), c.kills, c.deaths, c.assists, c.streak, c.items.join(','));
       parts.push(c.relic ? `${c.relic.def.id}:${r(c.relic.cd)}` : '-');
+      parts.push(c.feared ? r(c.feared.tLeft) : -1);
+      if (c.duo) parts.push(c.duo.def.id, r(c.duo.swapCd), r(c.duo.morphT), r(c.duo.energy));
       for (const b of e.buffs) parts.push(b.id, r(b.tLeft), b.stacks, r(b.shieldLeft ?? 0));
     }
-    if (e.keg) parts.push(r(e.keg.fuseLeft));
+    if (e.keg) parts.push(r(e.keg.fuseLeft), e.keg.decoy?.hitsLeft ?? -1);
     if (e.wall) parts.push(r(e.wall.tLeft));
     if (e.proj) parts.push(r(e.proj.traveled), e.proj.pulsesFired);
     if (e.dummy) parts.push(r(e.dummy.windowDmg), e.dummy.active ? 1 : 0);
@@ -38,7 +40,15 @@ export function stateHash(sim: Sim): string {
     if (e.tower) parts.push(r(e.tower.shotCd), e.tower.ramp, e.tower.aggro ?? -1);
     if (e.core) parts.push(r(e.core.pulseCd), e.core.invulnerable ? 1 : 0);
     if (e.flower) parts.push(e.flower.owner, r(e.flower.tLeft));
-    if (e.zone) parts.push(e.zone.owner, r(e.zone.tLeft), r(e.zone.healPerSec));
+    if (e.zone) {
+      parts.push(
+        e.zone.owner,
+        e.zone.variant,
+        r(e.zone.tLeft),
+        r(e.zone.healPerSec ?? 0),
+        r(e.zone.enemyDmgPerSec ?? 0),
+      );
+    }
   }
   const s = parts.join('|');
   let h = 5381;

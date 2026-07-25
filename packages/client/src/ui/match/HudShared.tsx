@@ -6,7 +6,8 @@ import { type HudChampion, useHud } from '../../game/hudStore';
 
 const SLOT_KEYS: Record<Slot, string> = { q: 'Q', w: 'W', r: 'R' };
 
-/** game-icons.net glyphs (CC BY 3.0 — see CREDITS.md), recolored via CSS mask. */
+/** game-icons.net glyphs (CC BY 3.0 — see CREDITS.md), recolored via CSS mask.
+ * Boltz's and Wisp's six are original project glyphs drawn in the same language. */
 export const SLOT_ICONS: Record<string, Record<Slot, string>> = {
   rook: { q: 'sword-clash', w: 'brick-wall', r: 'tower-fall' },
   fathom: { q: 'cannon-ball', w: 'barrel', r: 'galleon' },
@@ -14,6 +15,8 @@ export const SLOT_ICONS: Record<string, Record<Slot, string>> = {
   rattle: { q: 'thrown-daggers', w: 'skull-staff', r: 'backstab' },
   grukk: { q: 'barbed-spear', w: 'shouting', r: 'quake-stomp' },
   sylva: { q: 'thorny-vine', w: 'flower-emblem', r: 'vine-whip' },
+  boltz: { q: 'arc-beam', w: 'energy-dome', r: 'drop-pod' },
+  wisp: { q: 'boo-face', w: 'sheet-decoy', r: 'midnight-gong' },
 };
 
 export function AbilitySlot({ slot, champ }: { slot: Slot; champ: string }): React.ReactElement {

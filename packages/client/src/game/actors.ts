@@ -60,23 +60,27 @@ function softGlow(): THREE.Texture {
 
 /** Fade a rig's materials in/out (brush concealment). Materials are per-instance clones. */
 class Fader {
-  private mats: THREE.MeshToonMaterial[] = [];
+  /** Each material keeps its authored opacity (Wisp's spectral 0.55) as the ceiling. */
+  private mats: { mat: THREE.MeshToonMaterial; base: number }[] = [];
   private level = 1;
   constructor(root: THREE.Object3D) {
     root.traverse((o) => {
       const m = o as THREE.Mesh;
       if (!m.isMesh) return;
       const list = Array.isArray(m.material) ? m.material : [m.material];
-      for (const x of list) this.mats.push(x as THREE.MeshToonMaterial);
+      for (const x of list) {
+        const mat = x as THREE.MeshToonMaterial;
+        this.mats.push({ mat, base: mat.transparent ? mat.opacity : 1 });
+      }
     });
   }
   update(target: number, dt: number): void {
     const next = this.level + (target - this.level) * Math.min(1, dt * 10);
     if (Math.abs(next - this.level) < 0.002) return;
     this.level = next;
-    for (const m of this.mats) {
-      m.transparent = next < 0.995;
-      m.opacity = next;
+    for (const { mat, base } of this.mats) {
+      mat.transparent = next < 0.995 || base < 0.995;
+      mat.opacity = next * base;
     }
   }
 }
@@ -141,6 +145,8 @@ class ChampionActor implements Actor {
    * puff hides the switch; the whole 0.35 s reads as one squash-and-pop. */
   private morphT = 0;
   private morphScale = 1;
+  /** Boltz's bubble helmet — glows while the Capacitor is primed. */
+  private helmet: THREE.Mesh | null = null;
 
   private ctx: ActorCtx;
 
@@ -157,9 +163,15 @@ class ChampionActor implements Actor {
 
   private buildModel(): void {
     if (this.model) this.root.remove(this.model);
+    this.helmet = null; // rebuilt below only if the (possibly new) champion wears one
     // White tint forces per-instance material clones — flash/fade must never leak
     // across duplicate champions in an 8-player match.
-    const { root: model, clips } = instantiate(this.def.visual.model, { tint: 0xffffff });
+    // Wisp is a ghost: her body renders spectral (translucent + rim-lit) by design.
+    const spectral = this.def.visual.model === 'graveyard/ghost';
+    const { root: model, clips } = instantiate(this.def.visual.model, {
+      tint: 0xffffff,
+      spectral,
+    });
     const scale = normScale(this.def.visual.model, CHAMP_HEIGHT, this.def.visual.scale);
     this.model = model;
     this.root.add(model);
@@ -181,6 +193,36 @@ class ChampionActor implements Actor {
       }
       socket.add(propRoot);
     }
+
+    // Bubble helmet (Boltz): a translucent visor dome riding the head bone.
+    // `radius`/`y` are authored in WORLD units, so undo the rig's normalization
+    // scale — otherwise a 1.96× champion wears a 1.6 u snow globe.
+    const helm = this.def.visual.helmet;
+    if (helm) {
+      const bubble = new THREE.Mesh(
+        new THREE.SphereGeometry(helm.radius, 18, 14),
+        new THREE.MeshPhongMaterial({
+          color: helm.color,
+          transparent: true,
+          opacity: 0.34,
+          // Viewed from a top-down camera the specular hotspot lands dead centre,
+          // so a hot highlight would blow the whole dome to white — keep it dim.
+          shininess: 24,
+          specular: 0x5a7a92,
+          emissive: new THREE.Color(helm.color).multiplyScalar(0.3),
+          depthWrite: false,
+          side: THREE.DoubleSide,
+        }),
+      );
+      // Rides the model root, not the head bone: bone transforms are driven by
+      // the clips (and differ per rig family), so a root-anchored dome is the one
+      // placement that is identical in every animation state.
+      bubble.scale.setScalar(1 / scale);
+      bubble.position.y = helm.y / scale;
+      model.add(bubble);
+      this.helmet = bubble;
+    }
+
     this.anim.play('spawn', { pop: 0.5 });
   }
 
@@ -298,11 +340,23 @@ class ChampionActor implements Actor {
       this.idleFor = 0;
     }
 
+    // Capacitor primed (Boltz): the visor charges up as the telegraph.
+    if (this.helmet) {
+      const mat = this.helmet.material as THREE.MeshPhongMaterial;
+      const charged = (snap.passive.charged ?? 0) > 0.5 && !snap.dead;
+      const target = charged ? 0.62 + Math.sin(performance.now() / 130) * 0.16 : 0.32;
+      mat.opacity += (target - mat.opacity) * Math.min(1, dt * 8);
+      mat.emissive = mat.emissive ?? new THREE.Color();
+      mat.emissive.setHex(charged ? 0x8fd8ff : 0x000000);
+    }
+
     this.anim.update(dt);
     this.flasher.update(dt);
     // Brush concealment: your own (and allied) champions go translucent while hidden.
     // Enemies never reach this path — the sim omits them from snapshots entirely.
-    this.fader.update(snap.inBrush && !snap.dead ? 0.55 : 1, dt);
+    // Wisp's Sheet Slip cloaks her the same way (visible to her own team only).
+    const cloaked = snap.buffs.some((b) => b.id === 'wisp_invis');
+    this.fader.update((snap.inBrush || cloaked) && !snap.dead ? 0.4 : 1, dt);
   }
 
   updateBar(frac: number, dt: number, camera: THREE.Camera): void {
@@ -386,13 +440,18 @@ class KegActor implements Actor {
   private modelKey: string;
   private baseScale: number;
   private bob = 0;
+  private isDecoy = false;
 
   constructor(snap: EntitySnap & { kind: 'keg' }, scene: THREE.Scene) {
-    // Data-driven body: powder keg, Rattle's skull marker, … (UnitDef.visual).
+    // Data-driven body: powder keg, Rattle's skull marker, Wisp's sheet decoy…
     const vis = UNITS[snap.unitId]?.visual;
     this.modelKey = vis?.model ?? 'pirate/barrel';
-    const { root: model } = instantiate(this.modelKey, { tint: vis?.tint ?? 0xffffff });
-    this.baseScale = normScale(this.modelKey, 0.85, vis?.scale ?? 1);
+    this.isDecoy = snap.unitId === 'wisp_decoy';
+    const { root: model } = instantiate(this.modelKey, {
+      tint: vis?.tint ?? 0xffffff,
+      spectral: this.isDecoy,
+    });
+    this.baseScale = normScale(this.modelKey, this.isDecoy ? 1.45 : 0.85, vis?.scale ?? 1);
     model.scale.setScalar(this.baseScale);
     this.model = model;
     this.root.add(model);
@@ -423,6 +482,12 @@ class KegActor implements Actor {
       this.spark.intensity = blink * (0.8 + urgency * 2.2);
       const s = 1 + Math.sin(performance.now() / (150 - urgency * 110)) * 0.05 * (1 + urgency);
       this.model.scale.setScalar(this.baseScale * s);
+    } else if (this.isDecoy) {
+      // The abandoned sheet: hovers in place, facing where Wisp was — dead still
+      // except for a slow haunt-drift. Convincing exactly because it does nothing.
+      this.bob += dt;
+      this.model.position.y = 0.18 + Math.sin(this.bob * 1.6) * 0.06;
+      this.model.rotation.y = Math.atan2(snap.fx, snap.fz) + Math.sin(this.bob * 0.8) * 0.08;
     } else {
       // Marker bodies (Rattle's skull) hover and slow-spin instead of ticking.
       this.bob += dt;
@@ -1088,19 +1153,35 @@ class FlowerActor implements Actor {
 
 /* ----------------------------------- Zone ----------------------------------- */
 
+/** Per-variant look: Sylva's garden, Boltz's dome + pod bunker, Wisp's cursed ground. */
+const ZONE_STYLE = {
+  garden: { ring: 0x8ade6a, disc: 0x5da84b, discOpacity: 0.16 },
+  dome: { ring: 0x8fd8ff, disc: 0x8fd8ff, discOpacity: 0.1 },
+  pod: { ring: 0xffb14b, disc: 0xff9a3c, discOpacity: 0.12 },
+  curse: { ring: 0x8a5fb0, disc: 0x3a2450, discOpacity: 0.3 },
+} as const;
+
 class ZoneActor implements Actor {
   kind = 'zone' as const;
   root = new THREE.Group();
   private ring: THREE.Mesh;
   private disc: THREE.Mesh;
+  /** Boltz W: the hex shell that pops projectiles, plus its facet wireframe. */
+  private shell: THREE.Mesh | null = null;
+  private facets: THREE.Mesh | null = null;
+  /** Boltz R: the physical bunker that lands, holds, then launches away. */
+  private pod: THREE.Group | null = null;
+  private variant: NonNullable<EntitySnap & { kind: 'zone' }>['variant'];
   private t = 0;
 
   constructor(snap: EntitySnap & { kind: 'zone' }, scene: THREE.Scene) {
     const r = snap.radius;
+    this.variant = snap.variant ?? 'garden';
+    const style = ZONE_STYLE[this.variant] ?? ZONE_STYLE.garden;
     this.ring = new THREE.Mesh(
       new THREE.RingGeometry(r - 0.14, r, 48),
       new THREE.MeshBasicMaterial({
-        color: 0x8ade6a,
+        color: style.ring,
         transparent: true,
         opacity: 0.85,
         blending: THREE.AdditiveBlending,
@@ -1114,10 +1195,12 @@ class ZoneActor implements Actor {
     this.disc = new THREE.Mesh(
       new THREE.CircleGeometry(r - 0.14, 48),
       new THREE.MeshBasicMaterial({
-        color: 0x5da84b,
+        color: style.disc,
         transparent: true,
-        opacity: 0.16,
-        blending: THREE.AdditiveBlending,
+        opacity: style.discOpacity,
+        // The curse darkens its ground instead of glowing — normal blending reads
+        // as a shadow, which is the whole point of "the lights just went out".
+        blending: this.variant === 'curse' ? THREE.NormalBlending : THREE.AdditiveBlending,
         depthWrite: false,
       }),
     );
@@ -1125,6 +1208,44 @@ class ZoneActor implements Actor {
     this.disc.position.y = 0.05;
     this.disc.renderOrder = 39;
     this.root.add(this.ring, this.disc);
+
+    if (this.variant === 'dome') {
+      // Faceted energy shield. Additive + DoubleSide stacks front and back faces,
+      // so the fill has to stay very low or it reads as a solid white ball; the
+      // facet wireframe on top is what actually sells "hex shield".
+      this.shell = new THREE.Mesh(
+        new THREE.IcosahedronGeometry(r, 1),
+        new THREE.MeshBasicMaterial({
+          color: 0x8fd8ff,
+          transparent: true,
+          opacity: 0.07,
+          blending: THREE.AdditiveBlending,
+          depthWrite: false,
+          side: THREE.DoubleSide,
+        }),
+      );
+      this.shell.position.y = r * 0.55;
+      this.shell.scale.y = 0.7;
+      this.facets = new THREE.Mesh(
+        new THREE.IcosahedronGeometry(r * 1.005, 1),
+        new THREE.MeshBasicMaterial({
+          color: 0xd8f4ff,
+          transparent: true,
+          opacity: 0.45,
+          blending: THREE.AdditiveBlending,
+          depthWrite: false,
+          wireframe: true,
+        }),
+      );
+      this.shell.add(this.facets);
+      this.root.add(this.shell);
+    } else if (this.variant === 'pod') {
+      const { root: pod } = instantiate('space/rocket-pod');
+      pod.scale.setScalar(normScale('space/rocket-pod', 2.2, 1));
+      this.pod = pod;
+      this.root.add(pod);
+    }
+
     this.root.position.set(snap.x, 0, snap.z);
     scene.add(this.root);
   }
@@ -1134,12 +1255,42 @@ class ZoneActor implements Actor {
     if (snap.kind !== 'zone') return;
     this.t += dt;
     this.root.position.set(re.x, 0, re.z);
-    this.root.rotation.y += dt * 0.5;
     const closing = Math.min(1, Math.max(0, snap.tLeft) / 0.5);
+    const age = snap.duration - snap.tLeft;
+
+    if (this.variant === 'dome' && this.shell) {
+      // Inflate with a wobble on arrival, deflate as it expires.
+      const inflate = Math.min(1, age / 0.25);
+      const wobble = 1 + Math.sin(this.t * 9) * 0.03 * inflate;
+      this.shell.scale.set(inflate * wobble, 0.7 * inflate * wobble, inflate * wobble);
+      this.shell.rotation.y += dt * 0.6;
+      // Additive over the bright sand clips fast (and DoubleSide doubles it), so
+      // the volume fill stays whisper-thin — the facet lines carry the read.
+      (this.shell.material as THREE.MeshBasicMaterial).opacity =
+        (0.045 + Math.sin(this.t * 5) * 0.015) * closing;
+      if (this.facets) {
+        (this.facets.material as THREE.MeshBasicMaterial).opacity =
+          (0.42 + Math.sin(this.t * 5) * 0.12) * closing;
+      }
+    } else if (this.variant === 'pod' && this.pod) {
+      // Slams the last few metres on arrival (the zone spawns exactly at impact),
+      // rocks itself settled, then re-ignites and launches on the final beat.
+      const slam = Math.min(1, age / 0.12);
+      const settle = Math.min(1, age / 0.4);
+      this.pod.rotation.z = Math.sin(this.t * 9) * 0.06 * (1 - settle);
+      this.pod.position.y =
+        snap.tLeft < 0.5 ? (0.5 - snap.tLeft) * 14 : (1 - slam) * (1 - slam) * 6;
+      this.pod.rotation.y += dt * 0.25;
+    } else {
+      this.root.rotation.y += dt * 0.5;
+    }
+
     (this.ring.material as THREE.MeshBasicMaterial).opacity =
       (0.7 + Math.sin(this.t * 4) * 0.15) * closing;
     (this.disc.material as THREE.MeshBasicMaterial).opacity =
-      (0.14 + Math.sin(this.t * 2.3) * 0.05) * closing;
+      ((ZONE_STYLE[this.variant] ?? ZONE_STYLE.garden).discOpacity +
+        Math.sin(this.t * 2.3) * 0.04) *
+      closing;
   }
 
   flash(): void {}

@@ -13,6 +13,13 @@ export interface AssetEntry {
   keepClips?: string[];
   /** Animation-library files whose clips graft onto this model's rig (KayKit path). */
   mergeAnims?: string[];
+  /**
+   * Recenter the scene on its horizontal footprint, base at y = 0. Some packs
+   * (SpaceKit) author meshes at their position in a showcase grid rather than at
+   * the origin, which would place every instance metres away from where the game
+   * puts it. Opt-in so already-tuned centered models never shift.
+   */
+  recenter?: boolean;
 }
 
 /** KayKit Rig_Medium clip subset the champion state machine uses. */
@@ -146,6 +153,34 @@ export const ASSET_MANIFEST: AssetEntry[] = [
     key: 'graveyard/gravestone',
     src: 'Kenney_GraveyardKit/GLB format/gravestone-bevel.glb',
     group: 'champion',
+  },
+
+  // v0.4 champions — Boltz (astronaut dress on the Kenney-Skinned rig) + Wisp (ghost)
+  {
+    key: 'chars/character-male-c',
+    src: 'Kenney_CuteCharacters/GLB format/character-male-c.glb',
+    group: 'champion',
+    keepClips: CHAR_CLIPS,
+  },
+  {
+    key: 'graveyard/ghost',
+    src: 'Kenney_GraveyardKit/GLB format/character-ghost.glb',
+    group: 'champion',
+    keepClips: CHAR_CLIPS,
+  },
+  // SpaceKit meshes are authored at their showcase-grid position, not the origin.
+  {
+    key: 'space/weapon-gun',
+    src: 'Kenney_SpaceKit/GLTF format/weapon_gun.glb',
+    group: 'champion',
+    recenter: true,
+  },
+  // Boltz R bunker: the droppod that lands, shields, then launches away.
+  {
+    key: 'space/rocket-pod',
+    src: 'Kenney_SpaceKit/GLTF format/rocket_baseA.glb',
+    group: 'champion',
+    recenter: true,
   },
 
   // Dummy body

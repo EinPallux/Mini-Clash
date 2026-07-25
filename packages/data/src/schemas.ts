@@ -181,6 +181,55 @@ const action: z.ZodType<unknown> = z.lazy(() =>
       rootMax: z.number().positive(),
       flowerHealRadius: z.number().positive(),
     }),
+    z.object({
+      t: z.literal('beam'),
+      length: z.number().positive(),
+      width: z.number().positive(),
+      amount: scaling,
+      type: z.enum(['physical', 'arcane']),
+      vsShieldMul: z.number().positive().optional(),
+      energyRefundOnChamp: z.number().min(0).optional(),
+      fx: z.string().optional(),
+    }),
+    z.object({
+      t: z.literal('field'),
+      at: targetPoint,
+      variant: z.enum(['dome', 'pod']),
+      radius: z.number().positive(),
+      duration: z.number().positive(),
+      blocksProjectiles: z.boolean().optional(),
+      blocksMovement: z.boolean().optional(),
+      allyBuff: z.string().optional(),
+      delay: z.number().positive().optional(),
+      telegraphFx: z.string().optional(),
+      impact: z
+        .object({
+          amount: scaling,
+          type: z.enum(['physical', 'arcane']),
+          radius: z.number().positive(),
+          cc: cc.optional(),
+          fx: z.string().optional(),
+        })
+        .optional(),
+    }),
+    z.object({
+      t: z.literal('curse'),
+      at: targetPoint,
+      radius: z.number().positive(),
+      duration: z.number().positive(),
+      dmgPerSec: scaling,
+      type: z.enum(['physical', 'arcane']),
+      enemyBuff: z.string().optional(),
+      disableMinis: z.boolean().optional(),
+      expireFear: z.number().positive().optional(),
+      tickFx: z.string().optional(),
+    }),
+    z.object({
+      t: z.literal('blink'),
+      decoy: z.string().optional(),
+      decoyDuration: z.number().positive().optional(),
+      selfBuff: z.string().optional(),
+    }),
   ]),
 );
 
@@ -191,6 +240,7 @@ export const projectileSchema = z.object({
   maxRange: z.number().positive(),
   pierces: z.enum(['none', 'all']).optional(),
   pierceOnKill: z.boolean().optional(),
+  bonusVsBuff: z.object({ buff: z.string().min(1), mul: z.number().positive() }).optional(),
   pulses: z
     .array(
       z.object({
@@ -305,6 +355,9 @@ export const championSchema = z.object({
       }),
     ),
     tints: z.record(z.string(), z.number()).optional(),
+    helmet: z
+      .object({ color: z.number(), radius: z.number().positive(), y: z.number() })
+      .optional(),
     anim: z.record(
       z.string(),
       z.object({ clip: z.string(), speed: z.number().optional(), loop: z.boolean().optional() }),

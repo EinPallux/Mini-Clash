@@ -15,6 +15,8 @@ Ability, item and relic icons from **game-icons.net**, recolored:
 
 License: [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/) — https://game-icons.net
 
+Boltz's and Wisp's six ability glyphs ("Arc beam", "Energy dome", "Drop pod", "Boo face", "Sheet decoy", "Midnight gong") are **original to Mini Clash**, drawn to match the set above.
+
 ## Fonts (SIL Open Font License 1.1)
 
 - **Oswald** — Vernon Adams, Kalapi Gajjar, Cyreal

@@ -137,6 +137,17 @@ export const UNITS: Record<string, UnitDef> = {
     behavior: 'destructible',
     visual: { model: 'dungeon/skull', scale: 0.8 },
   },
+  wisp_decoy: {
+    id: 'wisp_decoy',
+    name: "Wisp's Sheet",
+    // Survives exactly two hits (KegState.decoy caps it) — HP is nominal.
+    hp: 2,
+    armor: 0,
+    ward: 0,
+    radius: 0.45,
+    behavior: 'destructible',
+    visual: { model: 'graveyard/ghost', scale: 1, tint: 0xe8f2ff },
+  },
   powder_keg: {
     id: 'powder_keg',
     name: 'Powder Keg',

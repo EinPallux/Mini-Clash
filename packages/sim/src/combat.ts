@@ -58,6 +58,21 @@ export function dealDamage(
     return 0;
   }
 
+  // Wisp's sheet decoy: any hit strips one charge; it pops after two, damage irrelevant.
+  if (target.keg?.decoy) {
+    const d = target.keg.decoy;
+    d.hitsLeft -= 1;
+    target.hp = Math.max(0, d.hitsLeft);
+    w.emit({ t: 'damage', target: target.id, amount: 1, dtype, x: target.x, z: target.z });
+    if (d.hitsLeft <= 0) {
+      target.hp = 0;
+      target.keg.killedByTeam = ctx.source.team;
+      w.fx('wisp.decoy.break', target.x, target.z, { target: target.id });
+      kill(w, target, ctx.source);
+    }
+    return 1;
+  }
+
   let amount = raw;
 
   // Executioner's Edge + damage-amp buffs (Grukk's Toll, Sylva's dampen zone).

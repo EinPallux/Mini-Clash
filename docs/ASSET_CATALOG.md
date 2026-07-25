@@ -21,7 +21,7 @@ Attribution is not required but we do it anyway: maintain `CREDITS.md` (create a
 | `Kenney_Minidungeon` `character-human/orc` | 2 | Skinned, 32 clips | Grukk (orc); human = hub shopkeeper |
 | `Kenney_GraveyardKit` characters (ghost, vampire, zombie, skeleton, keeper) | 5 | Node-rig, 32 clips | Wisp, Vex; zombie/skeleton/keeper = future champions & Haunting-Hour summons |
 | `KayKit_Skeletons_1.1` (Mage, Rogue, Warrior, Minion) + `Rig_Medium` animation library | 4 + 26 clips | Skinned, retarget library | Mortis, Rattle; Warrior/Minion = future champion + summons |
-| `Kenney_SpaceKit` `astronautA/B` | 2 | Static (needs rig-share) | Boltz — re-skin onto the Kenney-Skinned rig in pipeline (§5) |
+| `Kenney_SpaceKit` `astronautA/B` | 2 | Static (unrigged — **not shipped**) | Superseded: Boltz is a Kenney-Skinned body in an astronaut dress (see §4) |
 | `Kenney_CubePets` | 24 animals | Own rigs, 8 clips each | Chomp + Piper's STAMPEDE + hub companion cosmetics (post-1.0) |
 
 ### Environment & structures
@@ -67,7 +67,7 @@ Sourcing checklist (every new asset): license verified at source → URL + autho
 - **Kenney rigs share clip vocabulary** (`idle, walk, sprint, die, attack-melee-right/left, holding-*-shoot, interact-*, pick-up, emote-*`…): one animation-graph template covers all Kenney-based champions and Minis; per-champion config only remaps/retimes.
 - **Skinned vs node rigs:** Cute/Minidungeon/MiniArena = skinned (2 skins per file — body + accessory); Blocky/Graveyard = rigid node hierarchies (animate node TRS — cheap, perfect for Mini crowds). The animation system must support both transparently (see TECHNICAL_ARCHITECTURE §Animation).
 - **KayKit Rig_Medium:** characters ship without embedded clips; the `Animations/gltf/Rig_Medium/*.glb` library retargets by bone-name match (same rig). Combat clips beyond the free library (Throw, Use_Item, Hit, Death, Spawn cover our needs) — verify coverage per kit during v0.2; fall back to procedural cast poses if a clip is missing.
-- **astronautA/B are unrigged**: pipeline step transfers the Cute-Characters skeleton + weights (auto-weight in Blender headless step) — treat as the one "custom rig" task of v0.4.
+- **astronautA/B are unrigged** (0 skins, 0 clips) — and stay that way. The planned Blender headless weight-transfer was dropped in v0.4: it adds a binary art-tool dependency to a pipeline that is otherwise pure gltf-transform, for one champion. **Boltz instead wears the astronaut rather than being it**: `chars/character-male-c` (Kenney-Skinned, full 17-clip vocabulary) + visor palette + a procedural bubble-helmet dome (`ChampionVisual.helmet`) + the SpaceKit raygun at `handRight`. He reads as an astronaut, animates like every other Kenney champion, and costs the pipeline nothing. The droppod (`space/rocket-pod` = `rocket_baseA`) is a static prop, which is all it needs to be.
 - **Snowble & Golem & pets:** procedural/hand-keyed rigs authored in-engine (three-bone stacks, boids for bats, etc.) — no external animation dependency.
 
 ## 5. Asset pipeline (tooling contract)
