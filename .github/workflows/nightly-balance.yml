@@ -1,0 +1,54 @@
+name: Nightly balance sweep
+
+# The big-n harness read the balance annotations point at (ROADMAP v0.2
+# acceptance): 210 mixed-tier matches across three seed shards, aggregated
+# into a winrate table on the run summary. Reports the 40–60% band; goes red
+# only when matches fail to finish.
+on:
+  schedule:
+    - cron: '0 3 * * *'
+  workflow_dispatch:
+    inputs:
+      matches:
+        description: 'Matches per shard'
+        default: '70'
+        required: false
+
+jobs:
+  shard:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        seed: [1000, 2000, 3000]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Run ${{ github.event.inputs.matches || '70' }} mixed matches (seed ${{ matrix.seed }})
+        run: >
+          node scripts/botmatch.mjs
+          --matches ${{ github.event.inputs.matches || '70' }}
+          --mixed --seed ${{ matrix.seed }}
+          --json shard-${{ matrix.seed }}.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: balance-shard-${{ matrix.seed }}
+          path: shard-${{ matrix.seed }}.json
+          retention-days: 30
+
+  aggregate:
+    needs: shard
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: balance-shard-*
+          merge-multiple: true
+      - name: Combined winrate table
+        run: node scripts/balance-aggregate.mjs shard-*.json | tee -a "$GITHUB_STEP_SUMMARY"

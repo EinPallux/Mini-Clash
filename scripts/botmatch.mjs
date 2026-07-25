@@ -20,6 +20,7 @@ const TIER_B = opt('vs', TIER_A);
 const BASE_SEED = Number(opt('seed', '42'));
 const MIXED = args.includes('--mixed');
 const CAP_MIN = Number(opt('cap', '25'));
+const JSON_OUT = opt('json', '');
 
 const outDir = 'test-results';
 mkdirSync(outDir, { recursive: true });
@@ -136,5 +137,21 @@ for (const [id, s] of [...champStats.entries()].sort()) {
   console.info(
     `  ${id.padEnd(8)} games ${String(s.games).padStart(3)}  win ${((100 * s.wins) / s.games).toFixed(0).padStart(3)}%  avg KDA ${(s.k / s.games).toFixed(1)}/${(s.d / s.games).toFixed(1)}/${(s.a / s.games).toFixed(1)}`,
   );
+}
+if (JSON_OUT) {
+  const champs = {};
+  for (const [id, st] of champStats.entries()) champs[id] = st;
+  writeFileSync(
+    JSON_OUT,
+    JSON.stringify({
+      seed: BASE_SEED,
+      matches: done.length,
+      requested: MATCHES,
+      avgMins: avg,
+      t0wins,
+      champs,
+    }),
+  );
+  console.info(`json summary → ${JSON_OUT}`);
 }
 if (done.length < MATCHES) process.exitCode = 1;

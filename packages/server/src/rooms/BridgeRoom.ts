@@ -1,7 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import { QUICK_CHAT } from '@mini-clash/data';
 import { SnapshotEncoder } from '@mini-clash/protocol';
-import { Sim } from '@mini-clash/sim';
+import { Sim, stateHash } from '@mini-clash/sim';
 import type { Client } from 'colyseus';
 import { Room } from 'colyseus';
 import { log } from '../log';
@@ -242,6 +242,11 @@ export class BridgeRoom extends Room {
       // 20 Hz downstream from a 30 Hz sim: send on 2 of every 3 ticks.
       if (tickIndex % 3 !== 0) this.broadcastSnapshots();
       if (tickIndex % 30 === 0) this.sweepAfk();
+      // Desync spot-checks (ROADMAP v0.3 acceptance): a state-hash line every
+      // 30 s — replays/rejoins of the same match must reproduce these exactly.
+      if (tickIndex % 900 === 0) {
+        log.info({ room: this.roomId, tick: tickIndex, hash: stateHash(sim) }, 'state hash');
+      }
       if (sim.world.match?.over && !this.match.overAt) {
         this.match.overAt = Date.now();
         log.info(
