@@ -102,16 +102,16 @@ Scope discipline: if a phase runs hot, cut **content quantity** (champions, augm
 **Promise:** the draft that makes match #200 different from match #199 — complete with its full catalog, presentation, bot competence and discovery rules.
 
 **Ships:**
-- **Draft system** at levels 3/6/9 (no-pause overlay, 45 s, keys 1–3, reroll token, auto-pick) with rarity presentation (prismatic shimmer moment) per UI_UX §9.
-- **Catalog complete:** 48 generic (AUGMENTS.md) + 3 signatures × 10 champions — every augment passing the visibility mandate (distinct on-field VFX), implemented as effect-graph patches.
-- Pity odds, offer composition rules, enemy-augment discovery (field + Tab), augments in kill cards/summary/history.
-- **Bots draft** via utility affinities; **Champions +2:** Piper, Vex (their signatures land with them).
+- ~~**Draft system** at levels 3/6/9 (no-pause overlay, 45 s, keys 1–3, reroll token, auto-pick) with rarity presentation (prismatic shimmer moment) per UI_UX §9.~~ ✅ *The dock is bottom-centre, the match never stops behind it, and the 45 s timer is a conic ring that turns hot under 10 s. Auto-pick at 0 says **COACH CHOSE** on the confirmation slab instead of **ACQUIRED**. The Training Grounds draft too, with a trainer button to deal one on demand at any level.*
+- ~~**Catalog complete:** 48 generic (AUGMENTS.md) + 3 signatures × 10 champions — every augment passing the visibility mandate (distinct on-field VFX), implemented as effect-graph patches.~~ ✅ *78 cards, all behavioural. "Effect-graph patches" landed as a data-patch vocabulary (stat/damage/onBasic/castMod/ultPower/param/duo/economy) plus 32 named `special` behaviours hooked into the systems they belong to — the same shape champion passives already used, rather than a second graph runtime nobody else speaks.*
+- ~~Pity odds, offer composition rules, enemy-augment discovery (field + Tab), augments in kill cards/summary/history.~~ ✅ *Discovery is server-side: a client is never sent an enemy card it has not seen, so it cannot render one.*
+- ~~**Bots draft** via utility affinities; **Champions +2:** Piper, Vex (their signatures land with them).~~ ✅
 
 **Acceptance:**
 - [ ] All 78 augments implemented, each visually identifiable in a blind 10-augment screenshot quiz (internal QA gate — the mandate is testable).
 - [ ] Harness: no generic augment > 65% pick-when-offered or > 56% win-delta; report auto-generated per run.
-- [ ] Draft under fire: picking mid-teamfight never eats a game input; auto-pick fires exactly at 0.
-- [ ] Sim tests: patch stacking (3 augments × duo × items) has no orphaned modifiers after death/swap/sell.
+- [x] Draft under fire: picking mid-teamfight never eats a game input; auto-pick fires exactly at 0. *(`scripts/shot-draft.mjs` holds W and casts Q with the dock open in a real browser: the champion moved **4.50 u** and Q went to **5.9 s** cooldown — the overlay's key handler never calls `preventDefault`, so game input passes straight through. Auto-pick is asserted tick-exact in `augments.test.ts`, along with the `auto` flag that makes the HUD say "coach chose" only on a genuine timeout — a bot picking early is a decision, not a timeout.)*
+- [x] Sim tests: patch stacking (3 augments × duo × items) has no orphaned modifiers after death/swap/sell. *(Three augments + an item on a duo: the resolved stat line is captured, then the seat swaps and swaps back, dies and respawns, sells the item and drops the cards — and returns to exactly the naked champion, with no `aug_` buffs left on the entity. The shared HP pool reads identically on both sides of the swap, which is the symmetry the Tag Team pool was built on. Augment state lives in its own `augState` bag precisely so a swap cannot carry a `[duo]` card off with the outgoing half.)*
 
 ## v0.6 — The Living Bridge
 

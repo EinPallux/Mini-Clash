@@ -603,6 +603,81 @@ describe('augment effects', () => {
     expect(broken).toEqual([]);
   });
 
+  it(
+    'patch stacking survives death, swap and sell without orphaning a modifier',
+    { timeout: 30_000 },
+    () => {
+      // ROADMAP v0.5 acceptance: 3 augments x duo x items, and the resolved
+      // stat line has to be reproducible from the inputs at every step.
+      const sim = bridge('rook', 'fathom');
+      const e = me(sim);
+      const c = e.champ;
+      if (!c) throw new Error('no champ');
+      c.gold = 20_000;
+      for (const id of ['whetted_edges', 'stoneskin', 'thick_hide']) grant(sim, id);
+      sim.applyIntents([msg({ t: 'buy', itemId: 'iron_plate' })]);
+      run(sim, 0.2);
+      expect(c.items.length).toBe(1);
+
+      const line = (): string => {
+        const s2 = championStats(e);
+        return [s2.ad, s2.armor, s2.ward, s2.hpMax, s2.attackSpeed]
+          .map((v) => Math.round(v * 100) / 100)
+          .join('|');
+      };
+      const withAll = line();
+      const bare = (() => {
+        const held = [...c.augments];
+        const items = [...c.items];
+        c.augments = [];
+        c.items = [];
+        const l = line();
+        c.augments = held;
+        c.items = items;
+        return l;
+      })();
+      expect(withAll).not.toBe(bare);
+
+      // 1. A swap must not move the seat's cards: they belong to the seat, not
+      //    to whichever half is on stage. The shared HP pool is symmetric, so
+      //    it must read identically on both sides of the round trip.
+      const poolBefore = championStats(e).hpMax;
+      sim.applyIntents([msg({ t: 'swap' })]);
+      run(sim, 0.6);
+      expect(c.augments).toHaveLength(3);
+      expect(championStats(e).hpMax).toBeCloseTo(poolBefore, 3);
+      run(sim, 10); // the 9 s swap cooldown has to expire before we come back
+      sim.applyIntents([msg({ t: 'swap' })]);
+      run(sim, 0.6);
+      expect(line()).toBe(withAll);
+
+      // 2. Dying and respawning must not duplicate or drop a modifier.
+      const foe = sim.world.entities.find((x) => x.champ?.player === 2);
+      if (!foe) throw new Error('no foe');
+      for (let i = 0; i < 3; i++) dealDamage(sim.world, { source: foe }, e, 99_999, 'physical');
+      run(sim, 1);
+      expect(e.dead).toBe(true);
+      run(sim, 25);
+      expect(e.dead).toBe(false);
+      expect(c.augments).toHaveLength(3);
+      expect(line()).toBe(withAll);
+
+      // 3. Selling the item removes exactly the item's contribution.
+      sim.applyIntents([msg({ t: 'sell', itemId: 'iron_plate' })]);
+      run(sim, 0.2);
+      expect(c.items).toHaveLength(0);
+      const augOnly = line();
+      expect(augOnly).not.toBe(withAll);
+      expect(augOnly).not.toBe(bare);
+
+      // 4. And dropping the cards returns us exactly to the naked champion.
+      c.augments = [];
+      expect(line()).toBe(bare);
+      // No stray buffs are left behind by any of it.
+      expect(e.buffs.filter((b) => b.id.startsWith('aug_'))).toEqual([]);
+    },
+  );
+
   it('every generic augment can be granted without throwing', () => {
     const broken: string[] = [];
     for (const def of GENERIC_AUGMENTS) {

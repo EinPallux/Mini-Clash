@@ -31,7 +31,7 @@ mkdirSync(outDir, { recursive: true });
 const driverPath = join(outDir, '.botmatch-driver.mjs');
 writeFileSync(
   driverPath,
-  `export { Sim } from '@mini-clash/sim';\nexport { CHAMPION_LIST } from '@mini-clash/data';\n`,
+  `export { Sim } from '@mini-clash/sim';\nexport { AUGMENTS, CHAMPION_LIST } from '@mini-clash/data';\n`,
 );
 const esbuild = await import('esbuild');
 const bundlePath = join(outDir, '.botmatch-bundle.mjs');
@@ -50,7 +50,7 @@ await esbuild.build({
     '@mini-clash/protocol': join(process.cwd(), 'packages/protocol/src/index.ts'),
   },
 });
-const { Sim, CHAMPION_LIST } = await import(`file://${process.cwd()}/${bundlePath}`);
+const { Sim, AUGMENTS, CHAMPION_LIST } = await import(`file://${process.cwd()}/${bundlePath}`);
 
 const TIERS = ['recruit', 'veteran', 'elite'];
 // Tiny deterministic LCG for roster shuffles (harness-side only; sim stays seeded).
@@ -130,6 +130,16 @@ const swapCounts = [];
 const duoSwaps = { win: [], loss: [] };
 /** Winrate per duo PAIRING — the thing that actually varies between teams. */
 const duoStats = new Map();
+/**
+ * Augment report (ROADMAP v0.5 acceptance): per card, how often it was taken
+ * when it appeared in an offer set, and the winrate of the seats that took it
+ * against the winrate of the seats that were offered it and passed.
+ */
+const augStats = new Map();
+const augRow = (id) =>
+  augStats.get(id) ??
+  augStats.set(id, { offered: 0, taken: 0, tookGames: 0, tookWins: 0, passGames: 0, passWins: 0 })
+    .get(id);
 
 for (let m = 0; m < MATCHES; m++) {
   const cfg = rosterFor(BASE_SEED + m * 7919);
@@ -137,6 +147,8 @@ for (let m = 0; m < MATCHES; m++) {
   // Count swaps per seat from the sim's own fx stream (`duo.swap`, source = entity).
   const swapsByPlayer = new Map();
   const playerOfEntity = new Map();
+  /** player -> set of augment ids that were ever put in front of them. */
+  const offeredTo = new Map();
   const t0 = performance.now();
   let over = null;
   let ticks = 0;
@@ -152,6 +164,13 @@ for (let m = 0; m < MATCHES; m++) {
       if (ev.t === 'fx' && ev.key === 'duo.swap' && ev.source !== undefined) {
         const pid = playerOfEntity.get(ev.source);
         if (pid !== undefined) swapsByPlayer.set(pid, (swapsByPlayer.get(pid) ?? 0) + 1);
+      }
+      // Offers are counted once per (player, card) so a reroll cannot inflate
+      // the denominator for a card that was shown twice to the same seat.
+      if (ev.t === 'draftOpen' || ev.t === 'draftReroll') {
+        const seen = offeredTo.get(ev.player) ?? new Set();
+        for (const id of ev.offers) seen.add(id);
+        offeredTo.set(ev.player, seen);
       }
     }
     if (playerOfEntity.size === 0) {
@@ -194,6 +213,21 @@ for (let m = 0; m < MATCHES; m++) {
       ds.k += c.kills;
       ds.d += c.deaths;
       duoStats.set(key, ds);
+    }
+    // Augment report: every card this seat saw, and whether they took it.
+    const took = new Set(c.augments);
+    const won = !!over && over.over.winner === e.team;
+    for (const id of offeredTo.get(c.player) ?? []) {
+      const row = augRow(id);
+      row.offered++;
+      if (took.has(id)) {
+        row.taken++;
+        row.tookGames++;
+        if (won) row.tookWins++;
+      } else {
+        row.passGames++;
+        if (won) row.passWins++;
+      }
     }
     swapCounts.push(swapsByPlayer.get(c.player) ?? 0);
     if (over) {
@@ -248,6 +282,66 @@ if (duoStats.size > 0) {
     );
   }
 }
+/* ------------------------- Augment report (v0.5) ------------------------- */
+// Rails from the ROADMAP acceptance line: pick-when-offered <= 65% and
+// win-delta <= 56% for GENERIC cards. Signatures are excluded by design —
+// they are built for one kit and are supposed to be near-auto-picks there.
+const AUG_PICK_CAP = 0.65;
+const AUG_WIN_CAP = 0.56;
+if (augStats.size > 0) {
+  const rows = [...augStats.entries()]
+    .map(([id, r]) => {
+      const def = AUGMENTS[id];
+      return {
+        id,
+        name: def?.name ?? id,
+        generic: def ? def.category !== 'signature' : true,
+        rarity: def?.rarity ?? '?',
+        offered: r.offered,
+        pick: r.offered > 0 ? r.taken / r.offered : 0,
+        // Win-delta is the winrate of seats that TOOK it. With n this small a
+        // took-vs-passed difference is mostly noise, so the rail is on the
+        // absolute rate, which is what the acceptance line names.
+        win: r.tookGames > 0 ? r.tookWins / r.tookGames : 0,
+        n: r.tookGames,
+      };
+    })
+    .sort((a, b) => b.pick - a.pick);
+  const generics = rows.filter((r) => r.generic);
+  const sigs = rows.filter((r) => !r.generic);
+  const sigPick = sigs.length
+    ? (100 * sigs.reduce((t, r) => t + r.pick, 0)) / sigs.length
+    : 0;
+  console.info(
+    `\n  augment report — ${augStats.size}/${Object.keys(AUGMENTS).length} cards seen ` +
+      `(rails apply to the ${generics.length} generics: pick <= 65%, win <= 56%)`,
+  );
+  console.info(
+    `  signatures: ${sigs.length} seen, ${sigPick.toFixed(0)}% average pick-when-offered ` +
+      '— near-auto-pick is the design, they are built for that one kit',
+  );
+  const MIN_N = 8;
+  const flagged = generics.filter(
+    (r) => (r.offered >= MIN_N && r.pick > AUG_PICK_CAP) || (r.n >= MIN_N && r.win > AUG_WIN_CAP),
+  );
+  console.info('  generics, most-taken first:');
+  for (const r of generics.slice(0, 14)) {
+    const thin = r.offered < MIN_N ? ' (thin)' : '';
+    console.info(
+      `  ${r.name.padEnd(22)} ${r.rarity.padEnd(9)} offered ${String(r.offered).padStart(3)}  pick ${(100 * r.pick).toFixed(0).padStart(3)}%  win ${(100 * r.win).toFixed(0).padStart(3)}% (n ${r.n})${thin}`,
+    );
+  }
+  if (flagged.length > 0) {
+    console.info(
+      `  ⚠ over the rails (n>=${MIN_N}): ${flagged
+        .map((r) => `${r.name} ${(100 * r.pick).toFixed(0)}%/${(100 * r.win).toFixed(0)}%`)
+        .join(', ')}`,
+    );
+  } else {
+    console.info(`  ✓ no generic card over the rails at n>=${MIN_N}`);
+  }
+}
+
 if (JSON_OUT) {
   const champs = {};
   for (const [id, st] of champStats.entries()) champs[id] = st;
@@ -260,6 +354,7 @@ if (JSON_OUT) {
       avgMins: avg,
       t0wins,
       champs,
+      augments: Object.fromEntries(augStats),
     }),
   );
   console.info(`json summary → ${JSON_OUT}`);

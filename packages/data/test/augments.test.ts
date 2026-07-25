@@ -4,6 +4,7 @@ import {
   AUGMENTS,
   CHAMPION_LIST,
   DRAFT,
+  FX,
   GENERIC_AUGMENTS,
   SIGNATURE_AUGMENTS,
   signaturesFor,
@@ -91,5 +92,53 @@ describe('augment catalog', () => {
 
   it('lookups resolve', () => {
     for (const a of AUGMENT_LIST) expect(AUGMENTS[a.id]).toBe(a);
+  });
+
+  it('every behavioural augment has its own on-field tell (the visibility mandate)', () => {
+    // The written `visual` line is checked above; this locks the *timeline*
+    // behind it. Anything the sim emits for an augment has to exist here, or
+    // the card fires invisibly and fails review by definition.
+    const required = [
+      // Generic behaviours.
+      'augment.silver',
+      'augment.gold',
+      'augment.prismatic',
+      'augment.chain',
+      'augment.mirror',
+      'augment.echo',
+      'augment.element.flame',
+      'augment.element.frost',
+      'augment.element.storm',
+      'augment.deathblossom',
+      'augment.thorns',
+      'augment.secondwind',
+      'augment.star.bank',
+      'augment.star.break',
+      'augment.undying',
+      'augment.slipstream',
+      'augment.ghost',
+      'augment.ghost.swing',
+      // Signature behaviours.
+      'augment.counterweight',
+      'augment.castle',
+      'augment.chainshot',
+      'augment.debt',
+      'augment.execute',
+      'augment.nettle',
+      'augment.poltergeist',
+      'augment.share',
+      'augment.silence',
+      'augment.society',
+      'augment.waltz',
+      'augment.wall.block',
+    ];
+    const missing = required.filter((k) => !FX[k]);
+    expect(missing).toEqual([]);
+    // Each tell has to actually put something on screen, not just exist.
+    for (const k of required) {
+      expect(FX[k].events.length, k).toBeGreaterThan(0);
+      const visible = FX[k].events.some((e) => e.op.t !== 'sound');
+      expect(visible, `${k} is sound-only — the mandate is visual`).toBe(true);
+    }
   });
 });

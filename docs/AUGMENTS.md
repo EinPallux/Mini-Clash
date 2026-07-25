@@ -44,7 +44,7 @@ Tags: `[duo]` both champions · `[active]` fielded champion only · `[Q]/[W]/[R]
 ### 3.3 Offense — Prismatic
 | # | Augment | Effect |
 |---|---|---|
-| 15 | Elemental Ascension | `[duo]` choose flame/frost/storm at pickup: all abilities re-skinned to that element and gain its rider (burn 3%/2 s · slow 15% · 8% Energy refund on hit). The full-kit recolor is the flex |
+| 15 | Elemental Ascension | `[duo]` your kit takes on an element rolled from the match seed at pickup — flame, frost or storm: all abilities re-skinned to it and gaining its rider (burn 3%/2 s · slow 15% · 8% Energy refund on hit). The full-kit recolor is the flex. *(Rolled rather than chosen: the pick has to resolve identically on every client, and a mid-match sub-choice would need its own overlay. Revisit if the draft ever grows one.)* |
 | 16 | Deathblossom | `[duo]` champion takedowns detonate the victim: 120 (+20% AD +20% AP) in 2.5 u petal-nova |
 | 17 | Mirror Strike | `[Q]` Q casts twice: second cast auto-aims the nearest other enemy (mirror-image trail) |
 
