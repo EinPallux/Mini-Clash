@@ -8,7 +8,9 @@ import {
 } from '@mini-clash/data';
 import { applyBuff, applyBuffById, applyCc, shieldTotal } from './buffs';
 import { dealDamage, displace } from './combat';
-import { championStats, hasItemPassive, resolveScaling } from './stats';
+import { healEntity } from './heal';
+import { launchPetDash } from './pets';
+import { championStats, resolveScaling } from './stats';
 import { dist, inCone, inRect, norm } from './vec';
 import type { Entity, World } from './world';
 
@@ -332,6 +334,26 @@ function executeAction(ctx: ActionCtx, a: Action): void {
         onLand: [],
         ability: ctx.ability,
       };
+      // Vex dissolves into bats: nothing can pick him as a target mid-waltz.
+      if (a.untargetable) {
+        applyBuff(caster, {
+          id: 'wisp_untargetable',
+          name: 'Untargetable',
+          duration: a.duration,
+        });
+      }
+      if (a.healOnLand) {
+        const missing = Math.max(0, caster.hpMax - caster.hp);
+        const amt =
+          a.healOnLand.base +
+          (a.healOnLand.perLevel ?? 0) * (c.level - 1) +
+          (a.healOnLand.missingHpFrac ?? 0) * missing;
+        const casterId = caster.id;
+        w.schedule(a.duration, (world) => {
+          const src = world.get(casterId);
+          if (src && !src.dead) healEntity(src, src, amt);
+        });
+      }
       grantDashCharges(w, caster);
       if (a.amount && a.type) {
         const amount = resolveScaling(a.amount, c.level, stats.ad, stats.ap);
@@ -514,9 +536,13 @@ function executeAction(ctx: ActionCtx, a: Action): void {
         let dmg = amount;
         if (a.vsShieldMul && shieldTotal(target) > 0) dmg *= a.vsShieldMul;
         dealDamage(w, { source: caster, label: ctx.ability.slot }, target, dmg, a.type);
-        if (a.energyRefundOnChamp && !refunded && target.kind === 'champion' && !target.dead) {
-          refunded = true;
-          c.energy = Math.min(100, c.energy + a.energyRefundOnChamp);
+        if (target.kind === 'champion') {
+          if (a.energyRefundOnChamp && !refunded && !target.dead) {
+            refunded = true;
+            c.energy = Math.min(100, c.energy + a.energyRefundOnChamp);
+          }
+          // Vex's lash primes a lunging follow-up basic.
+          if (a.onChampBuffSelf) applyBuffById(caster, a.onChampBuffSelf);
         }
       }
       if (a.fx) w.fx(a.fx, caster.x, caster.z, { fx: ctx.fx, fz: ctx.fz, source: caster.id });
@@ -629,6 +655,99 @@ function executeAction(ctx: ActionCtx, a: Action): void {
           tickFx: a.tickFx,
         },
       });
+      break;
+    }
+
+    case 'petDash': {
+      const [dx, dz] = norm(ctx.aimX - caster.x, ctx.aimZ - caster.z);
+      launchPetDash(w, caster, dx, dz, {
+        distance: a.distance,
+        width: a.width,
+        damage: resolveScaling(a.amount, c.level, stats.ad, stats.ap),
+        dtype: a.type,
+        stealMs: a.stealMs,
+      });
+      break;
+    }
+
+    case 'pickup': {
+      const unit = UNITS[a.unit];
+      if (!unit) throw new Error(`unknown unit '${a.unit}'`);
+      const ent = w.add({
+        kind: 'pickup',
+        srcLabel: ctx.ability.slot,
+        team: caster.team,
+        x: ctx.aimX,
+        z: ctx.aimZ,
+        fx: 1,
+        fz: 0,
+        radius: unit.radius,
+        hp: 1,
+        hpMax: 1,
+        dead: false,
+        airborne: 0,
+        airborneTotal: 0,
+        buffs: [],
+        pickup: {
+          def: unit,
+          owner: caster.id,
+          ownerPlayer: c.player,
+          tLeft: a.duration,
+          heal: resolveScaling(a.heal, c.level, stats.ad, stats.ap),
+          ownerFallbackFrac: a.ownerFallbackFrac ?? 0.5,
+          empowersPet: a.empowersPet ?? false,
+          tossPhase: 0.001,
+        },
+      });
+      w.fx('piper.w.toss', ent.x, ent.z, { source: caster.id, target: ent.id });
+      break;
+    }
+
+    case 'waves': {
+      // A stampede: N pulses through the same shape. Anyone caught by every wave
+      // eats the finisher — the reward for reading the whole cone, not one edge.
+      const amount = resolveScaling(a.amount, c.level, stats.ad, stats.ap);
+      const hits = new Map<number, number>();
+      const casterId = caster.id;
+      const frozen: ActionCtx = { ...ctx };
+      for (let i = 0; i < a.count; i++) {
+        const isLast = i === a.count - 1;
+        w.schedule((a.startDelay ?? 0) + a.interval * i, (world) => {
+          const src = world.get(casterId);
+          if (!src || src.dead) return;
+          const here: ActionCtx = { ...frozen, w: world, ox: src.x, oz: src.z };
+          if (a.waveFx)
+            world.fx(a.waveFx, src.x, src.z, { fx: frozen.fx, fz: frozen.fz, source: casterId });
+          for (const target of shapeTargets(here, 'self', a.shape, 'enemies')) {
+            dealDamage(world, { source: src, label: frozen.ability.slot }, target, amount, a.type);
+            if (a.cc) applyCc(target, a.cc);
+            const n = (hits.get(target.id) ?? 0) + 1;
+            hits.set(target.id, n);
+            if (isLast && a.ccOnAllWaves && n >= a.count && target.kind === 'champion') {
+              applyCc(target, a.ccOnAllWaves);
+            }
+          }
+        });
+      }
+      break;
+    }
+
+    case 'invite': {
+      // Crimson Banquet: everyone in the circle becomes a guest. The amp and the
+      // heal bonus live on the caster's passive scratch, keyed to the buff.
+      const guests = shapeTargets(ctx, a.at, a.shape, 'enemies').filter(
+        (u) => u.kind === 'champion',
+      );
+      for (const g of guests) {
+        applyBuffById(g, a.buff);
+        w.fx('vex.r.invite', g.x, g.z, { source: caster.id, target: g.id });
+      }
+      c.passive.inviteAmp = a.damageAmp;
+      c.passive.inviteHeal = a.healPct;
+      if (a.resetSlotOnGuestDeath) {
+        c.passive.guestResetSlot =
+          a.resetSlotOnGuestDeath === 'q' ? 0 : a.resetSlotOnGuestDeath === 'w' ? 1 : 2;
+      }
       break;
     }
 
@@ -789,19 +908,4 @@ export function plantFlower(
   w.fx('sylva.flower.plant', ent.x, ent.z, { source: owner.id });
 }
 
-/** All champion-sourced healing funnels here (Lifebloom Idol hooks). */
-export function healEntity(healer: Entity, target: Entity, amount: number): void {
-  if (target.dead) return;
-  let total = amount;
-  const lb = hasItemPassive(healer, 'lifebloom');
-  if (lb) {
-    total *= 1 + lb.healPower;
-    applyBuff(target, {
-      id: 'item_lifebloom_ms',
-      name: 'Lifebloom',
-      duration: lb.duration,
-      mul: { moveSpeed: 1 + lb.ms },
-    });
-  }
-  target.hp = Math.min(target.hpMax, target.hp + total);
-}
+export { healEntity } from './heal';

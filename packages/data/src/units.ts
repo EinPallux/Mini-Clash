@@ -137,6 +137,56 @@ export const UNITS: Record<string, UnitDef> = {
     behavior: 'destructible',
     visual: { model: 'dungeon/skull', scale: 0.8 },
   },
+  chomp: {
+    id: 'chomp',
+    name: 'Chomp',
+    // Untargetable companion — no HP bar, no damage taken. Balance lives in his
+    // fetch cooldown (docs/CHAMPIONS.md §4 Piper).
+    hp: 1,
+    armor: 0,
+    ward: 0,
+    radius: 0.3,
+    behavior: 'pet',
+    visual: {
+      model: 'pets/fox',
+      scale: 1,
+      anim: {
+        idle: { clip: 'idle', loop: true },
+        run: { clip: 'run', loop: true },
+        walk: { clip: 'walk', loop: true },
+        attack: { clip: 'eat', speed: 1.4 },
+      },
+    },
+  },
+  chomp_dog: {
+    id: 'chomp_dog',
+    name: 'Second Good Boy',
+    hp: 1,
+    armor: 0,
+    ward: 0,
+    radius: 0.3,
+    behavior: 'pet',
+    visual: {
+      model: 'pets/dog',
+      scale: 1,
+      anim: {
+        idle: { clip: 'idle', loop: true },
+        run: { clip: 'run', loop: true },
+        walk: { clip: 'walk', loop: true },
+        attack: { clip: 'eat', speed: 1.4 },
+      },
+    },
+  },
+  piper_snack: {
+    id: 'piper_snack',
+    name: 'Snack',
+    hp: 1,
+    armor: 0,
+    ward: 0,
+    radius: 0.55,
+    behavior: 'pickup',
+    visual: { model: 'dungeon/plate-full', scale: 1 },
+  },
   wisp_decoy: {
     id: 'wisp_decoy',
     name: "Wisp's Sheet",

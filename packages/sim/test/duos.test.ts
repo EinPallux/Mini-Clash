@@ -4,8 +4,9 @@ import { describe, expect, it } from 'vitest';
 import { Sim } from '../src';
 
 /**
- * ROADMAP v0.4 acceptance: every champion pair (28 duos of 8) is playable, and
- * the shared-HP pool is symmetric — swapping never moves your health bar.
+ * ROADMAP v0.4 acceptance, kept roster-driven: EVERY champion pair is playable
+ * and the shared-HP pool is symmetric — swapping never moves your health bar.
+ * 8 champions was 28 pairs; 10 is 45. The sweep grows with the roster on its own.
  */
 
 const ALL = CHAMPION_LIST.map((c) => c.id);
@@ -54,12 +55,15 @@ function expectedPool(a: string, b: string, level: number): number {
   return (sa.hp + sa.hpPerLevel * lv + (sb.hp + sb.hpPerLevel * lv)) / 2;
 }
 
-describe('all 28 duos', () => {
+describe('all duo pairings', () => {
   const pairs = allPairs();
 
-  it('enumerates exactly 28 pairs from the 8-champion roster', () => {
-    expect(ALL.length).toBe(8);
-    expect(pairs.length).toBe(28);
+  it('enumerates every unordered pair of the live roster', () => {
+    expect(ALL.length).toBeGreaterThanOrEqual(8);
+    expect(pairs.length).toBe((ALL.length * (ALL.length - 1)) / 2);
+    // No pair appears twice, in either order.
+    const seen = new Set(pairs.map(([a, b]) => [a, b].sort().join('|')));
+    expect(seen.size).toBe(pairs.length);
   });
 
   it('every pair plays: both kits cast, both entrances fire, nothing throws', () => {

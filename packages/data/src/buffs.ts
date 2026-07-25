@@ -67,4 +67,43 @@ export const BUFFS: Record<string, BuffDef> = {
     name: 'Cold Spot',
     duration: 0.35,
   },
+  // Vex — Crimson Lash primes a lunging basic attack.
+  vex_lunge: {
+    id: 'vex_lunge',
+    name: 'Lash Primed',
+    duration: 3,
+  },
+  // Vex — Crimson Banquet: an invited guest takes more from him and feeds him harder.
+  vex_invited: {
+    id: 'vex_invited',
+    name: 'Invited',
+    duration: 3,
+  },
+  // Vex entrance Fashionably Late.
+  vex_entrance_ms: {
+    id: 'vex_entrance_ms',
+    name: 'Fashionably Late',
+    duration: 1,
+    mul: { moveSpeed: 1.15 },
+  },
+  // Piper Q: Chomp trots a stolen snack home.
+  piper_snack_ms: {
+    id: 'piper_snack_ms',
+    name: 'Snack Thief',
+    duration: 2,
+    add: { moveSpeed: 0.4 },
+  },
+  piper_snack_stolen: {
+    id: 'piper_snack_stolen',
+    name: 'Snack Stolen',
+    duration: 2,
+    add: { moveSpeed: -0.4 },
+  },
+  // Piper entrance Treat Time.
+  piper_treat: {
+    id: 'piper_treat',
+    name: 'Treat Time',
+    duration: 1.5,
+    mul: { moveSpeed: 1.08 },
+  },
 };

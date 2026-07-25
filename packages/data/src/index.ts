@@ -4,9 +4,11 @@ export { BOLTZ } from './champions/boltz';
 export { FATHOM } from './champions/fathom';
 export { GRUKK } from './champions/grukk';
 export { MORTIS } from './champions/mortis';
+export { PIPER } from './champions/piper';
 export { RATTLE } from './champions/rattle';
 export { ROOK } from './champions/rook';
 export { SYLVA } from './champions/sylva';
+export { VEX } from './champions/vex';
 export { WISP } from './champions/wisp';
 export * from './constants';
 export { FX } from './fx';
@@ -32,9 +34,11 @@ import { BOLTZ } from './champions/boltz';
 import { FATHOM } from './champions/fathom';
 import { GRUKK } from './champions/grukk';
 import { MORTIS } from './champions/mortis';
+import { PIPER } from './champions/piper';
 import { RATTLE } from './champions/rattle';
 import { ROOK } from './champions/rook';
 import { SYLVA } from './champions/sylva';
+import { VEX } from './champions/vex';
 import { WISP } from './champions/wisp';
 import type { ChampionDef } from './types';
 
@@ -47,6 +51,8 @@ export const CHAMPIONS: Record<string, ChampionDef> = {
   [SYLVA.id]: SYLVA,
   [BOLTZ.id]: BOLTZ,
   [WISP.id]: WISP,
+  [PIPER.id]: PIPER,
+  [VEX.id]: VEX,
 };
 export const CHAMPION_LIST: ChampionDef[] = [
   ROOK,
@@ -57,4 +63,6 @@ export const CHAMPION_LIST: ChampionDef[] = [
   SYLVA,
   BOLTZ,
   WISP,
+  PIPER,
+  VEX,
 ];

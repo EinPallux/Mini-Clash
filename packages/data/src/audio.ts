@@ -631,6 +631,154 @@ export const SOUND_CUES: Record<string, SynthCue> = {
     ],
   },
 
+  /* Piper — yips, whistles and a lot of hooves */
+  piper_nip: {
+    id: 'piper_nip',
+    layers: [
+      { wave: 'square', freq: 980, freqEnd: 640, attack: 0.001, decay: 0.05, volume: 0.1 },
+      { wave: 'noise', freq: 1, attack: 0.001, decay: 0.04, volume: 0.06, lowpass: 4200 },
+    ],
+  },
+  piper_yip: {
+    id: 'piper_yip',
+    layers: [
+      { wave: 'triangle', freq: 720, freqEnd: 1180, attack: 0.004, decay: 0.09, volume: 0.14 },
+      {
+        wave: 'triangle',
+        freq: 980,
+        freqEnd: 640,
+        attack: 0.004,
+        decay: 0.08,
+        volume: 0.1,
+        delay: 0.08,
+      },
+    ],
+  },
+  piper_chomp: {
+    id: 'piper_chomp',
+    layers: [
+      { wave: 'square', freq: 260, freqEnd: 120, attack: 0.001, decay: 0.11, volume: 0.18 },
+      { wave: 'noise', freq: 1, attack: 0.001, decay: 0.08, volume: 0.12, lowpass: 1800 },
+    ],
+  },
+  piper_crunch: {
+    id: 'piper_crunch',
+    layers: [
+      { wave: 'noise', freq: 1, attack: 0.001, decay: 0.12, volume: 0.16, lowpass: 2600 },
+      { wave: 'triangle', freq: 520, freqEnd: 880, attack: 0.004, decay: 0.14, volume: 0.12 },
+    ],
+  },
+  piper_whistle_short: {
+    id: 'piper_whistle_short',
+    layers: [{ wave: 'sine', freq: 1180, freqEnd: 1560, attack: 0.005, decay: 0.12, volume: 0.12 }],
+  },
+  piper_whistle: {
+    id: 'piper_whistle',
+    layers: [
+      {
+        wave: 'sine',
+        freq: 880,
+        freqEnd: 1760,
+        attack: 0.02,
+        decay: 0.35,
+        volume: 0.18,
+        slide: 'exp',
+      },
+      { wave: 'sine', freq: 1320, attack: 0.02, decay: 0.2, volume: 0.08, delay: 0.2 },
+    ],
+  },
+  piper_fetch: {
+    id: 'piper_fetch',
+    layers: [
+      { wave: 'triangle', freq: 620, freqEnd: 980, attack: 0.004, decay: 0.12, volume: 0.12 },
+      { wave: 'noise', freq: 1, attack: 0.004, decay: 0.1, volume: 0.07, lowpass: 3200 },
+    ],
+  },
+  piper_snack_grab: {
+    id: 'piper_snack_grab',
+    layers: [
+      { wave: 'sine', freq: 740, freqEnd: 1180, attack: 0.002, decay: 0.1, volume: 0.12 },
+      { wave: 'square', freq: 1480, attack: 0.002, decay: 0.06, volume: 0.06, delay: 0.06 },
+    ],
+  },
+  piper_toss: {
+    id: 'piper_toss',
+    layers: [
+      { wave: 'triangle', freq: 340, freqEnd: 620, attack: 0.005, decay: 0.16, volume: 0.13 },
+    ],
+  },
+  piper_rumble: {
+    id: 'piper_rumble',
+    layers: [
+      { wave: 'noise', freq: 1, attack: 0.08, decay: 0.6, volume: 0.2, lowpass: 260 },
+      { wave: 'sine', freq: 62, freqEnd: 48, attack: 0.06, decay: 0.6, volume: 0.2 },
+    ],
+  },
+  piper_stampede: {
+    id: 'piper_stampede',
+    layers: [
+      { wave: 'noise', freq: 1, attack: 0.005, decay: 0.45, volume: 0.36, lowpass: 420 },
+      { wave: 'sine', freq: 78, freqEnd: 40, attack: 0.004, decay: 0.4, volume: 0.3 },
+      { wave: 'square', freq: 140, freqEnd: 70, attack: 0.002, decay: 0.2, volume: 0.14 },
+    ],
+  },
+
+  /* Vex — velvet, blood and bats */
+  vex_lash_wind: {
+    id: 'vex_lash_wind',
+    layers: [{ wave: 'noise', freq: 1, attack: 0.02, decay: 0.1, volume: 0.09, lowpass: 2200 }],
+  },
+  vex_lash: {
+    id: 'vex_lash',
+    layers: [
+      { wave: 'noise', freq: 1, attack: 0.001, decay: 0.14, volume: 0.2, lowpass: 3000 },
+      {
+        wave: 'sawtooth',
+        freq: 420,
+        freqEnd: 130,
+        attack: 0.001,
+        decay: 0.12,
+        volume: 0.16,
+        slide: 'exp',
+      },
+    ],
+  },
+  vex_lunge: {
+    id: 'vex_lunge',
+    layers: [{ wave: 'noise', freq: 1, attack: 0.002, decay: 0.09, volume: 0.12, lowpass: 2600 }],
+  },
+  vex_bats: {
+    id: 'vex_bats',
+    layers: [
+      { wave: 'noise', freq: 1, attack: 0.01, decay: 0.3, volume: 0.16, lowpass: 5200 },
+      { wave: 'square', freq: 2400, freqEnd: 1600, attack: 0.005, decay: 0.14, volume: 0.06 },
+      {
+        wave: 'square',
+        freq: 1900,
+        freqEnd: 2600,
+        attack: 0.005,
+        decay: 0.12,
+        volume: 0.05,
+        delay: 0.07,
+      },
+    ],
+  },
+  vex_goblet: {
+    id: 'vex_goblet',
+    layers: [
+      { wave: 'sine', freq: 1320, freqEnd: 1180, attack: 0.001, decay: 0.4, volume: 0.14 },
+      { wave: 'triangle', freq: 2640, attack: 0.001, decay: 0.22, volume: 0.06 },
+    ],
+  },
+  vex_banquet: {
+    id: 'vex_banquet',
+    layers: [
+      { wave: 'sawtooth', freq: 110, freqEnd: 82, attack: 0.04, decay: 0.7, volume: 0.18 },
+      { wave: 'sine', freq: 165, attack: 0.04, decay: 0.6, volume: 0.12 },
+      { wave: 'triangle', freq: 330, attack: 0.06, decay: 0.5, volume: 0.08, delay: 0.12 },
+    ],
+  },
+
   /* Bridge structures & match beats */
   tower_fire: {
     id: 'tower_fire',

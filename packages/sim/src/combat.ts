@@ -81,6 +81,11 @@ export function dealDamage(
     if (ex && target.hp / target.hpMax < ex.threshold) amount *= 1 + ex.bonus;
     const amp = championStats(ctx.source).damageAmp;
     if (amp !== 0) amount *= 1 + amp;
+    // Crimson Banquet: guests pay more at Vex's table.
+    const inviteAmp = srcChamp.passive.inviteAmp ?? 0;
+    if (inviteAmp > 0 && target.buffs.some((b) => b.id === 'vex_invited')) {
+      amount *= 1 + inviteAmp;
+    }
   }
   // Ram Minis siege: bonus vs structures, resilience vs tower fire (both from data).
   if (ctx.source.mini && (target.kind === 'tower' || target.kind === 'core')) {
@@ -287,6 +292,26 @@ export function dealDamage(
       if (ph) applyCc(target, { kind: 'slow', duration: ph.duration, strength: ph.slow });
     }
   }
+  // Vex — Red Ledger: abilities that bite champions pay him back in blood.
+  if (srcChamp && tag === 'ability' && target.kind === 'champion' && !ctx.source.dead) {
+    if (srcChamp.def.passive.id === 'red_ledger') {
+      const p = srcChamp.def.passive.params;
+      let pct = (p.pctBase + p.pctPerLevel * (srcChamp.level - 1)) / 100;
+      if (ctx.source.hp / ctx.source.hpMax < p.lowHp) pct *= p.lowMul;
+      // A guest at the Banquet feeds him harder still.
+      if (target.buffs.some((b) => b.id === 'vex_invited')) {
+        pct = Math.max(pct, srcChamp.passive.inviteHeal ?? 0);
+      }
+      const healed = Math.min(ctx.source.hpMax - ctx.source.hp, dealt * pct);
+      if (healed > 0) {
+        ctx.source.hp += healed;
+        w.fx('vex.passive.drain', ctx.source.x, ctx.source.z, {
+          source: ctx.source.id,
+          target: target.id,
+        });
+      }
+    }
+  }
   if (srcChamp && tag === 'ability') {
     const sw = hasItemPassive(ctx.source, 'stormweaver');
     if (sw) srcChamp.energy = Math.min(100, srcChamp.energy + sw.energy);
@@ -372,6 +397,19 @@ export function kill(w: World, target: Entity, by?: Entity): void {
       .slice(0, 3)
       .map((r) => ({ ...r, amount: Math.round(r.amount) }));
     dead.dmgLog.length = 0;
+  }
+
+  // Crimson Banquet: a guest leaving the table resets Bat Waltz.
+  if (target.kind === 'champion' && target.buffs.some((b) => b.id === 'vex_invited')) {
+    for (const u of w.champions()) {
+      const uc = u.champ;
+      if (!uc || uc.def.passive.id !== 'red_ledger') continue;
+      if (u.team === target.team) continue;
+      const slot = uc.passive.guestResetSlot;
+      if (slot === undefined) continue;
+      uc.cds[slot === 0 ? 'q' : slot === 1 ? 'w' : 'r'] = 0;
+      w.fx('vex.r.guest', u.x, u.z, { source: u.id });
+    }
   }
 
   // Kill-watch refunds (Rattle's Marrow Harvest): any watcher of this death cashes in.

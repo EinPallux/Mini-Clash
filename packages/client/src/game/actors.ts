@@ -1299,6 +1299,142 @@ class ZoneActor implements Actor {
   }
 }
 
+/* ---------------------------------- Pet ------------------------------------ */
+
+/** Chomp: trots, sprints on errands, and pops when he's been fed. */
+class PetActor implements Actor {
+  kind = 'pet' as const;
+  root = new THREE.Group();
+  private model: THREE.Group;
+  private anim: AnimGraph | null = null;
+  private glow: THREE.Sprite;
+  private yaw: number;
+  private lastX: number;
+  private lastZ: number;
+  private baseScale: number;
+
+  constructor(snap: EntitySnap & { kind: 'pet' }, scene: THREE.Scene) {
+    const def = UNITS[snap.unitId];
+    const key = def?.visual.model ?? 'pets/fox';
+    const { root: model, clips } = instantiate(key, { tint: 0xffffff });
+    this.baseScale = normScale(key, 0.75, def?.visual.scale ?? 1);
+    model.scale.setScalar(this.baseScale);
+    this.model = model;
+    this.root.add(model);
+    if (def?.visual.anim && clips.length > 0) {
+      this.anim = new AnimGraph(model, clips, def.visual.anim, this.baseScale);
+    }
+    // "He's been fed" tell: a warm halo the enemy can read before the next bite.
+    const mat = new THREE.SpriteMaterial({
+      map: softGlow(),
+      color: 0xf2c46a,
+      transparent: true,
+      opacity: 0,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    });
+    this.glow = new THREE.Sprite(mat);
+    this.glow.scale.setScalar(1.3);
+    this.glow.position.y = 0.4;
+    this.root.add(this.glow);
+    this.yaw = Math.atan2(snap.fx, snap.fz);
+    this.lastX = snap.x;
+    this.lastZ = snap.z;
+    this.root.position.set(snap.x, 0, snap.z);
+    scene.add(this.root);
+  }
+
+  update(re: RenderEntity, dt: number): void {
+    const snap = re.snap;
+    if (snap.kind !== 'pet') return;
+    this.root.position.set(re.x, 0, re.z);
+    const speed = dt > 0 ? Math.hypot(re.x - this.lastX, re.z - this.lastZ) / dt : 0;
+    this.lastX = re.x;
+    this.lastZ = re.z;
+
+    const targetYaw = Math.atan2(re.fx, re.fz);
+    let d = targetYaw - this.yaw;
+    while (d > Math.PI) d -= Math.PI * 2;
+    while (d < -Math.PI) d += Math.PI * 2;
+    this.yaw += d * Math.min(1, dt * 12);
+    this.model.rotation.y = this.yaw;
+
+    if (this.anim) {
+      this.anim.setBase(speed > 4 ? 'run' : speed > 0.3 ? 'walk' : 'idle', 1);
+      this.anim.update(dt);
+    }
+    // Little bounce while sprinting an errand — he is having a great time.
+    this.model.position.y = snap.busy ? Math.abs(Math.sin(performance.now() / 90)) * 0.12 : 0;
+    this.glow.material.opacity = snap.empowered
+      ? 0.4 + Math.sin(performance.now() / 220) * 0.15
+      : 0;
+    if (snap.empowered) this.model.scale.setScalar(this.baseScale * 1.12);
+    else if (this.model.scale.x !== this.baseScale) this.model.scale.setScalar(this.baseScale);
+  }
+
+  flash(): void {}
+  dispose(scene: THREE.Scene): void {
+    scene.remove(this.root);
+  }
+}
+
+/* --------------------------------- Pickup ---------------------------------- */
+
+/** Piper's tossed snack: arcs in, then bobs invitingly until someone takes it. */
+class PickupActor implements Actor {
+  kind = 'pickup' as const;
+  root = new THREE.Group();
+  private model: THREE.Group;
+  private glow: THREE.Sprite;
+  private bob = 0;
+
+  constructor(snap: EntitySnap & { kind: 'pickup' }, scene: THREE.Scene) {
+    const def = UNITS[snap.unitId];
+    const key = def?.visual.model ?? 'dungeon/plate-full';
+    const { root: model } = instantiate(key);
+    model.scale.setScalar(normScale(key, 0.4, def?.visual.scale ?? 1));
+    this.model = model;
+    this.root.add(model);
+    const mat = new THREE.SpriteMaterial({
+      map: softGlow(),
+      color: 0xf2c46a,
+      transparent: true,
+      opacity: 0.5,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    });
+    this.glow = new THREE.Sprite(mat);
+    this.glow.scale.setScalar(1.5);
+    this.glow.position.y = 0.35;
+    this.root.add(this.glow);
+    this.root.position.set(snap.x, 0, snap.z);
+    scene.add(this.root);
+  }
+
+  update(re: RenderEntity, dt: number): void {
+    const snap = re.snap;
+    if (snap.kind !== 'pickup') return;
+    this.bob += dt;
+    this.root.position.set(re.x, 0, re.z);
+    if (snap.tossPhase !== undefined && snap.tossPhase < 1) {
+      this.model.position.y = Math.sin(snap.tossPhase * Math.PI) * 1.5;
+      this.model.rotation.x += dt * 7;
+    } else {
+      this.model.position.y = 0.18 + Math.sin(this.bob * 3.4) * 0.06;
+      this.model.rotation.y += dt * 1.4;
+      this.model.rotation.x = 0;
+    }
+    // Urgency as the fox tax approaches.
+    const urgency = 1 - Math.min(1, Math.max(0, snap.tLeft) / 2);
+    this.glow.material.opacity = 0.4 + Math.sin(this.bob * (6 + urgency * 10)) * 0.2;
+  }
+
+  flash(): void {}
+  dispose(scene: THREE.Scene): void {
+    scene.remove(this.root);
+  }
+}
+
 /* --------------------------------- Manager --------------------------------- */
 
 export class ActorManager {
@@ -1410,6 +1546,10 @@ export class ActorManager {
         return new FlowerActor(snap, this.scene);
       case 'zone':
         return new ZoneActor(snap, this.scene);
+      case 'pet':
+        return new PetActor(snap, this.scene);
+      case 'pickup':
+        return new PickupActor(snap, this.scene);
       default:
         return new ProjectileActor(snap as EntitySnap & { kind: 'projectile' }, this.scene);
     }

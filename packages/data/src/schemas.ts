@@ -134,6 +134,14 @@ const action: z.ZodType<unknown> = z.lazy(() =>
       amount: scaling.optional(),
       type: z.enum(['physical', 'arcane']).optional(),
       tipPull: z.object({ zone: z.number().positive(), pull: z.number().positive() }).optional(),
+      untargetable: z.boolean().optional(),
+      healOnLand: z
+        .object({
+          base: z.number(),
+          perLevel: z.number().optional(),
+          missingHpFrac: z.number().optional(),
+        })
+        .optional(),
     }),
     z.object({
       t: z.literal('placeMarker'),
@@ -189,6 +197,7 @@ const action: z.ZodType<unknown> = z.lazy(() =>
       type: z.enum(['physical', 'arcane']),
       vsShieldMul: z.number().positive().optional(),
       energyRefundOnChamp: z.number().min(0).optional(),
+      onChampBuffSelf: z.string().optional(),
       fx: z.string().optional(),
     }),
     z.object({
@@ -229,6 +238,45 @@ const action: z.ZodType<unknown> = z.lazy(() =>
       decoy: z.string().optional(),
       decoyDuration: z.number().positive().optional(),
       selfBuff: z.string().optional(),
+    }),
+    z.object({
+      t: z.literal('petDash'),
+      distance: z.number().positive(),
+      width: z.number().positive(),
+      amount: scaling,
+      type: z.enum(['physical', 'arcane']),
+      stealMs: z
+        .object({ amount: z.number().positive(), duration: z.number().positive() })
+        .optional(),
+    }),
+    z.object({
+      t: z.literal('pickup'),
+      unit: z.string().min(1),
+      heal: scaling,
+      duration: z.number().positive(),
+      ownerFallbackFrac: z.number().min(0).max(1).optional(),
+      empowersPet: z.boolean().optional(),
+    }),
+    z.object({
+      t: z.literal('waves'),
+      shape,
+      count: z.number().int().positive(),
+      interval: z.number().positive(),
+      startDelay: z.number().min(0).optional(),
+      amount: scaling,
+      type: z.enum(['physical', 'arcane']),
+      cc: cc.optional(),
+      ccOnAllWaves: cc.optional(),
+      waveFx: z.string().optional(),
+    }),
+    z.object({
+      t: z.literal('invite'),
+      at: targetPoint,
+      shape,
+      buff: z.string().min(1),
+      damageAmp: z.number(),
+      healPct: z.number().min(0).max(1),
+      resetSlotOnGuestDeath: z.enum(['q', 'w', 'r']).optional(),
     }),
   ]),
 );
@@ -373,7 +421,7 @@ export const unitSchema = z.object({
   armor: z.number().min(0),
   ward: z.number().min(0),
   radius: z.number().positive(),
-  behavior: z.enum(['dummy', 'destructible', 'mini']),
+  behavior: z.enum(['dummy', 'destructible', 'mini', 'pet', 'pickup']),
   resetAfter: z.number().positive().optional(),
   mini: z
     .object({

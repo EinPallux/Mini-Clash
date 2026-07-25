@@ -32,6 +32,8 @@ const KINDS = [
   'orb',
   'flower',
   'zone',
+  'pet',
+  'pickup',
 ] as const;
 type Kind = (typeof KINDS)[number];
 const KIND_INDEX = new Map<string, number>(KINDS.map((k, i) => [k, i]));
@@ -220,6 +222,13 @@ function encVital(w: Writer, e: EntitySnap): void {
     case 'zone':
       w.u16(clampU16(q10(e.tLeft)));
       break;
+    case 'pet':
+      w.u8((e.busy ? 1 : 0) | (e.empowered ? 2 : 0));
+      break;
+    case 'pickup':
+      w.u16(clampU16(q10(e.tLeft)));
+      w.u8(clampU8((e.tossPhase ?? 1) * 200));
+      break;
     case 'dummy':
       w.u16(clampU16(e.hp));
       w.u16(clampU16(e.dps));
@@ -395,6 +404,8 @@ function rareJson(e: EntitySnap): string {
         variant: e.kind === 'zone' ? e.variant : undefined,
       });
     case 'keg':
+    case 'pet':
+    case 'pickup':
       return JSON.stringify({
         unitId: e.unitId,
         team: e.team,
@@ -421,6 +432,8 @@ function blocksFor(kind: Kind): number {
     case 'projectile':
     case 'keg':
     case 'dummy':
+    case 'pet':
+    case 'pickup':
       return B_POS | B_VITAL | B_RARE;
     case 'tower':
     case 'core':
@@ -767,6 +780,16 @@ export class SnapshotDecoder {
       case 'flower':
       case 'zone':
         e.tLeft = r.u16() / 10;
+        break;
+      case 'pet': {
+        const f = r.u8();
+        e.busy = (f & 1) !== 0;
+        e.empowered = (f & 2) !== 0;
+        break;
+      }
+      case 'pickup':
+        e.tLeft = r.u16() / 10;
+        e.tossPhase = r.u8() / 200;
         break;
       case 'dummy': {
         e.hp = r.u16();

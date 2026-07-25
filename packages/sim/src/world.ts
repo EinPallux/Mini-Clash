@@ -230,6 +230,54 @@ export interface FlowerState {
   tLeft: number;
 }
 
+/**
+ * A persistent companion (Chomp). Untargetable and undamageable by design — the
+ * balance lever is his fetch cooldown, not his health (docs/CHAMPIONS.md §4).
+ */
+export interface PetState {
+  def: UnitDef;
+  owner: EntityId;
+  ownerPlayer: PlayerId;
+  /** Seconds until the next automatic fetch. */
+  fetchCd: number;
+  /** Next fetch deals double and slows (fed by an unclaimed Snack Toss). */
+  empowered: boolean;
+  /** Orbit phase around the owner, advanced deterministically by tick. */
+  orbit: number;
+  /** Current errand: nip a target, or ride a Q dash down a line. */
+  errand:
+    | { kind: 'idle' }
+    | { kind: 'fetch'; target: EntityId; tLeft: number }
+    | {
+        kind: 'dash';
+        dirX: number;
+        dirZ: number;
+        traveled: number;
+        maxDist: number;
+        width: number;
+        damage: number;
+        dtype: 'physical' | 'arcane';
+        hitIds: Set<EntityId>;
+        stealMs?: { amount: number; duration: number };
+        returning: boolean;
+      };
+}
+
+/** A dropped snack: the first ally to touch it eats it (Piper W). */
+export interface PickupState {
+  def: UnitDef;
+  owner: EntityId;
+  ownerPlayer: PlayerId;
+  tLeft: number;
+  /** Resolved heal at cast time. */
+  heal: number;
+  /** Unclaimed: the pet eats it and the owner heals this fraction instead. */
+  ownerFallbackFrac: number;
+  empowersPet: boolean;
+  /** Toss arc phase 0..1. */
+  tossPhase: number;
+}
+
 /** Ground area effect: Sylva's ward (garden), Boltz's dome/pod, Wisp's curse. */
 export interface ZoneState {
   owner: EntityId;
@@ -304,7 +352,9 @@ export interface Entity {
     | 'core'
     | 'orb'
     | 'flower'
-    | 'zone';
+    | 'zone'
+    | 'pet'
+    | 'pickup';
   team: Team;
   x: number;
   z: number;
@@ -328,6 +378,8 @@ export interface Entity {
   core?: CoreState;
   flower?: FlowerState;
   zone?: ZoneState;
+  pet?: PetState;
+  pickup?: PickupState;
   /** Recap attribution for spawned damage-dealers (projectiles, kegs): the
    * casting ability's slot, threaded to dealDamage when this entity hits. */
   srcLabel?: string;

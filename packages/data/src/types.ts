@@ -164,6 +164,10 @@ export type Action =
       amount?: ScalingValue;
       type?: DamageType;
       tipPull?: { zone: number; pull: number };
+      /** Untargetable for the duration (Vex dissolves into bats). */
+      untargetable?: boolean;
+      /** Heal on landing; `missingHpFrac` scales off HP already lost. */
+      healOnLand?: { base: number; perLevel?: number; missingHpFrac?: number };
     }
   /** Spawn a destructible marker (Rattle's skull) and remember it in passive scratch. */
   | { t: 'placeMarker'; marker: string; unit: string; duration: number }
@@ -213,6 +217,8 @@ export type Action =
       vsShieldMul?: number;
       /** Energy refunded once when the beam strikes an enemy champion. */
       energyRefundOnChamp?: number;
+      /** Self-buff applied when the beam catches a champion (Vex's lunge primer). */
+      onChampBuffSelf?: string;
       fx?: string;
     }
   /** Deployable circular field: an energy dome or a droppod bunker (Boltz W/R). */
@@ -264,6 +270,51 @@ export type Action =
       decoyDuration?: number;
       /** Self buff applied on arrival (invisibility). */
       selfBuff?: string;
+    }
+  /** Send the caster's pet down a line as a skillshot (Piper Q). */
+  | {
+      t: 'petDash';
+      distance: number;
+      width: number;
+      amount: ScalingValue;
+      type: DamageType;
+      /** Flat Move Speed stolen from the first champion hit. */
+      stealMs?: { amount: number; duration: number };
+    }
+  /** Droppable pickup that heals the first ally to touch it (Piper W). */
+  | {
+      t: 'pickup';
+      unit: string;
+      heal: ScalingValue;
+      duration: number;
+      /** Unclaimed: the pet eats it and the owner heals this fraction instead. */
+      ownerFallbackFrac?: number;
+      /** The owner's pet's next fetch is empowered. */
+      empowersPet?: boolean;
+    }
+  /** Repeated area pulses in one shape; a victim caught by every wave takes `ccOnAllWaves`. */
+  | {
+      t: 'waves';
+      shape: AreaShape;
+      count: number;
+      interval: number;
+      startDelay?: number;
+      amount: ScalingValue;
+      type: DamageType;
+      cc?: CcSpec;
+      ccOnAllWaves?: CcSpec;
+      waveFx?: string;
+    }
+  /** Mark enemies in a shape as "guests": the caster hits and heals harder against them. */
+  | {
+      t: 'invite';
+      at: TargetPoint;
+      shape: AreaShape;
+      buff: string;
+      damageAmp: number;
+      healPct: number;
+      /** A guest dying refunds this ability slot entirely. */
+      resetSlotOnGuestDeath?: Slot;
     };
 
 export type TargetPoint = 'aim' | 'self';
@@ -380,8 +431,8 @@ export interface UnitDef {
   armor: number;
   ward: number;
   radius: number;
-  /** Dummies clamp at 1 HP and reset; destructibles die. */
-  behavior: 'dummy' | 'destructible' | 'mini';
+  /** Dummies clamp at 1 HP and reset; destructibles die; pets are untargetable companions. */
+  behavior: 'dummy' | 'destructible' | 'mini' | 'pet' | 'pickup';
   /** Seconds of no damage before a dummy resets to full and closes its DPS window. */
   resetAfter?: number;
   /** Destructibles that explode (powder keg): fires on death OR after `delay` seconds. Scales off owner stats. */

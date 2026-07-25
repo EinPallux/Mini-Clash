@@ -17,6 +17,10 @@ const ELEC = 0x8fd8ff; // Boltz tesla blue
 const CHILL = 0x9fd8ff; // Wisp chill
 const GHOSTC = 0xbfe8ff; // Wisp spook-white
 const VOID = 0x8a5fb0; // Wisp curse purple
+const FOX = 0xe8944a; // Chomp orange
+const SNACK = 0xf2c46a; // Piper's snacks
+const CRIMSON = 0xb0304a; // Vex blood
+const PETAL = 0xff6f8a; // Vex rose petals
 
 export const FX: Record<string, FxTimeline> = {
   /* ------------------------------- Rook ------------------------------- */
@@ -1681,6 +1685,360 @@ export const FX: Record<string, FxTimeline> = {
           speed: 2.6,
           up: 1.8,
           life: 0.45,
+          shape: 'puff',
+        },
+      },
+    ],
+  },
+
+  /* ------------------------------ Piper ------------------------------ */
+  'piper.pet.nip': {
+    id: 'piper.pet.nip',
+    events: [
+      { time: 0, op: { t: 'sound', cue: 'piper_nip', volume: 0.5 } },
+      {
+        time: 0,
+        op: {
+          t: 'burst',
+          at: 'target',
+          count: 7,
+          color: FOX,
+          color2: 0xffffff,
+          size: 0.08,
+          speed: 3,
+          life: 0.22,
+          shape: 'spark',
+        },
+      },
+    ],
+  },
+  'piper.pet.empowered': {
+    id: 'piper.pet.empowered',
+    events: [
+      { time: 0, op: { t: 'sound', cue: 'piper_chomp', volume: 0.7 } },
+      { time: 0, op: { t: 'ring', at: 'target', color: FOX, radius: 1.1, life: 0.3 } },
+      {
+        time: 0,
+        op: {
+          t: 'burst',
+          at: 'target',
+          count: 16,
+          color: FOX,
+          color2: SNACK,
+          size: 0.12,
+          speed: 4.4,
+          up: 1.6,
+          life: 0.35,
+          shape: 'spark',
+        },
+      },
+    ],
+  },
+  'piper.q.windup': {
+    id: 'piper.q.windup',
+    events: [{ time: 0, op: { t: 'sound', cue: 'piper_whistle_short', volume: 0.6 } }],
+  },
+  'piper.q.cast': {
+    id: 'piper.q.cast',
+    events: [{ time: 0, op: { t: 'sound', cue: 'piper_fetch' } }],
+  },
+  'piper.q.dash': {
+    id: 'piper.q.dash',
+    events: [
+      {
+        time: 0,
+        op: {
+          t: 'burst',
+          at: 'origin',
+          count: 10,
+          color: DUST,
+          size: 0.1,
+          speed: 2.6,
+          spread: 40,
+          life: 0.3,
+          shape: 'puff',
+        },
+      },
+    ],
+  },
+  'piper.q.steal': {
+    id: 'piper.q.steal',
+    events: [
+      { time: 0, op: { t: 'sound', cue: 'piper_snack_grab', volume: 0.7 } },
+      {
+        time: 0,
+        op: {
+          t: 'burst',
+          at: 'target',
+          count: 12,
+          color: SNACK,
+          color2: 0xffffff,
+          size: 0.1,
+          speed: 3,
+          up: 2,
+          life: 0.4,
+          shape: 'spark',
+        },
+      },
+    ],
+  },
+  'piper.w.cast': {
+    id: 'piper.w.cast',
+    events: [{ time: 0, op: { t: 'sound', cue: 'piper_toss', volume: 0.7 } }],
+  },
+  'piper.w.toss': {
+    id: 'piper.w.toss',
+    events: [{ time: 0, op: { t: 'ring', at: 'origin', color: SNACK, radius: 0.7, life: 0.3 } }],
+  },
+  'piper.w.eaten': {
+    id: 'piper.w.eaten',
+    events: [
+      { time: 0, op: { t: 'sound', cue: 'piper_crunch' } },
+      {
+        time: 0,
+        op: {
+          t: 'burst',
+          at: 'origin',
+          count: 16,
+          color: 0xff86b0,
+          color2: SNACK,
+          size: 0.1,
+          speed: 2.6,
+          up: 2.2,
+          life: 0.45,
+          shape: 'spark',
+        },
+      },
+    ],
+  },
+  'piper.w.foxtax': {
+    id: 'piper.w.foxtax',
+    events: [
+      { time: 0, op: { t: 'sound', cue: 'piper_crunch', volume: 0.6 } },
+      {
+        time: 0,
+        op: {
+          t: 'burst',
+          at: 'origin',
+          count: 10,
+          color: FOX,
+          size: 0.09,
+          speed: 2,
+          up: 1.6,
+          life: 0.4,
+          shape: 'puff',
+        },
+      },
+    ],
+  },
+  'piper.r.windup': {
+    id: 'piper.r.windup',
+    events: [
+      { time: 0, op: { t: 'sound', cue: 'piper_whistle' } },
+      { time: 0.35, op: { t: 'shake', power: 's' } },
+    ],
+  },
+  'piper.r.cast': {
+    id: 'piper.r.cast',
+    events: [{ time: 0, op: { t: 'sound', cue: 'piper_rumble' } }],
+  },
+  'piper.r.wave': {
+    // One wave of the menagerie: a dust wall and a lot of hooves.
+    id: 'piper.r.wave',
+    events: [
+      { time: 0, op: { t: 'sound', cue: 'piper_stampede' } },
+      {
+        time: 0,
+        op: { t: 'ribbonSweep', at: 'self', color: DUST, radius: 8, angleDeg: 55, life: 0.4 },
+      },
+      {
+        time: 0,
+        op: {
+          t: 'burst',
+          at: 'self',
+          count: 34,
+          color: DUST,
+          color2: 0xd8c8a8,
+          size: 0.18,
+          speed: 7,
+          spread: 55,
+          up: 2.4,
+          life: 0.55,
+          gravity: 7,
+          shape: 'puff',
+        },
+      },
+      { time: 0, op: { t: 'shake', power: 'm' } },
+    ],
+  },
+  'piper.entrance': {
+    id: 'piper.entrance',
+    events: [
+      { time: 0, op: { t: 'sound', cue: 'piper_yip', volume: 0.7 } },
+      { time: 0, op: { t: 'ring', at: 'self', color: FOX, radius: 1.6, width: 0.1, life: 0.5 } },
+    ],
+  },
+
+  /* ------------------------------- Vex ------------------------------- */
+  'vex.q.windup': {
+    id: 'vex.q.windup',
+    events: [{ time: 0, op: { t: 'sound', cue: 'vex_lash_wind', volume: 0.6 } }],
+  },
+  'vex.q.cast': {
+    id: 'vex.q.cast',
+    events: [{ time: 0, op: { t: 'flash', at: 'self', color: CRIMSON, life: 0.08 } }],
+  },
+  'vex.q.lash': {
+    id: 'vex.q.lash',
+    events: [
+      { time: 0, op: { t: 'sound', cue: 'vex_lash' } },
+      {
+        time: 0,
+        op: { t: 'ribbonSweep', at: 'self', color: CRIMSON, radius: 4, angleDeg: 22, life: 0.2 },
+      },
+      {
+        time: 0,
+        op: {
+          t: 'burst',
+          at: 'self',
+          count: 18,
+          color: CRIMSON,
+          color2: PETAL,
+          size: 0.11,
+          speed: 6,
+          spread: 20,
+          life: 0.4,
+          gravity: 3,
+          shape: 'shard',
+        },
+      },
+    ],
+  },
+  'vex.q.lunge': {
+    id: 'vex.q.lunge',
+    events: [
+      { time: 0, op: { t: 'sound', cue: 'vex_lunge', volume: 0.6 } },
+      {
+        time: 0,
+        op: {
+          t: 'burst',
+          at: 'self',
+          count: 10,
+          color: CRIMSON,
+          size: 0.09,
+          speed: 3.4,
+          life: 0.25,
+          shape: 'shard',
+        },
+      },
+    ],
+  },
+  'vex.w.cast': {
+    id: 'vex.w.cast',
+    events: [
+      { time: 0, op: { t: 'sound', cue: 'vex_bats' } },
+      {
+        time: 0,
+        op: {
+          t: 'burst',
+          at: 'self',
+          count: 26,
+          color: 0x2a1420,
+          color2: CRIMSON,
+          size: 0.13,
+          speed: 4,
+          up: 2.4,
+          spread: 360,
+          life: 0.5,
+          shape: 'shard',
+        },
+      },
+    ],
+  },
+  'vex.r.windup': {
+    id: 'vex.r.windup',
+    events: [{ time: 0, op: { t: 'sound', cue: 'vex_goblet', volume: 0.7 } }],
+  },
+  'vex.r.cast': {
+    id: 'vex.r.cast',
+    events: [
+      { time: 0, op: { t: 'sound', cue: 'vex_banquet' } },
+      { time: 0, op: { t: 'ring', at: 'self', color: CRIMSON, radius: 4, width: 0.2, life: 3 } },
+      {
+        time: 0,
+        op: { t: 'decal', at: 'self', kind: 'scorch', color: 0x59101f, radius: 4, life: 3 },
+      },
+      {
+        time: 0,
+        op: { t: 'light', at: 'self', color: CRIMSON, intensity: 2.2, radius: 6, life: 1.2 },
+      },
+    ],
+  },
+  'vex.r.invite': {
+    id: 'vex.r.invite',
+    events: [
+      {
+        time: 0,
+        op: {
+          t: 'burst',
+          at: 'target',
+          count: 14,
+          color: CRIMSON,
+          color2: PETAL,
+          size: 0.1,
+          speed: 2.4,
+          up: 2.6,
+          life: 0.6,
+          shape: 'spark',
+        },
+      },
+    ],
+  },
+  'vex.r.guest': {
+    id: 'vex.r.guest',
+    events: [
+      { time: 0, op: { t: 'sound', cue: 'vex_goblet' } },
+      {
+        time: 0,
+        op: { t: 'ring', at: 'self', color: PETAL, radius: 1.4, width: 0.12, life: 0.45 },
+      },
+    ],
+  },
+  'vex.passive.drain': {
+    id: 'vex.passive.drain',
+    events: [
+      {
+        time: 0,
+        op: {
+          t: 'burst',
+          at: 'self',
+          count: 6,
+          color: CRIMSON,
+          size: 0.08,
+          speed: 1.4,
+          up: 2.2,
+          life: 0.4,
+          shape: 'spark',
+        },
+      },
+    ],
+  },
+  'vex.entrance': {
+    id: 'vex.entrance',
+    events: [
+      { time: 0, op: { t: 'sound', cue: 'vex_bats', volume: 0.6 } },
+      {
+        time: 0,
+        op: {
+          t: 'burst',
+          at: 'self',
+          count: 16,
+          color: 0x2a1420,
+          color2: CRIMSON,
+          size: 0.11,
+          speed: 3,
+          up: 2,
+          life: 0.5,
           shape: 'puff',
         },
       },

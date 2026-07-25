@@ -38,6 +38,7 @@ import { tryBuy, tryBuyRelic, trySell, tryUseRelic, updateItemPassives } from '.
 import { spawnWave, updateMini } from './minis';
 import { applySeparation, updateMovement } from './movement';
 import { NavGrid } from './navgrid';
+import { spawnPet, updatePet, updatePickup } from './pets';
 import { updateProjectile } from './projectiles';
 import { Pcg32 } from './rng';
 import { championStats, hastedCooldown, resolveScaling } from './stats';
@@ -235,6 +236,8 @@ export class Sim {
         e.hp = e.hpMax;
       }
       applySpawnEffects(w, e);
+      // Beastmasters arrive with their companion already at heel.
+      if (def.passive.id === 'best_friend') spawnPet(w, e, 'chomp');
     }
 
     for (const d of map.dummies) {
@@ -568,6 +571,8 @@ export class Sim {
       else if (e.dummy) this.updateDummy(e, dt);
       else if (e.flower) this.updateFlower(e, dt);
       else if (e.zone) this.updateZone(e, dt);
+      else if (e.pet) updatePet(w, e, dt);
+      else if (e.pickup) updatePickup(w, e, dt);
     }
 
     // 6. Buffs, item passives, regen, income, respawns, brush.
@@ -1140,6 +1145,24 @@ export class Sim {
     }
     if (e.flower) {
       return { ...base, kind: 'flower', tLeft: e.flower.tLeft };
+    }
+    if (e.pet) {
+      return {
+        ...base,
+        kind: 'pet',
+        unitId: e.pet.def.id,
+        busy: e.pet.errand.kind !== 'idle',
+        empowered: e.pet.empowered,
+      };
+    }
+    if (e.pickup) {
+      return {
+        ...base,
+        kind: 'pickup',
+        unitId: e.pickup.def.id,
+        tLeft: Math.max(0, e.pickup.tLeft),
+        tossPhase: e.pickup.tossPhase < 1 ? e.pickup.tossPhase : undefined,
+      };
     }
     if (e.zone) {
       return {

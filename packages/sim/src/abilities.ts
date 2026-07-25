@@ -3,6 +3,7 @@ import { executeActions, plantFlower } from './actions';
 import { isHiddenFrom } from './brush';
 import { applyBuff, applyBuffById, applyCc, isUntargetable } from './buffs';
 import { dealDamage, structureInvulnerable } from './combat';
+import { petsOf, spawnPet } from './pets';
 import { championStats, hastedCooldown, resolveScaling } from './stats';
 import { dist, norm } from './vec';
 import type { Entity, World } from './world';
@@ -342,7 +343,23 @@ function commitAutoAttack(w: World, e: Entity, targetId: number | undefined): vo
   }
 
   if (c.def.attack.kind === 'melee') {
-    const reach = stats.range + 0.6; // forgiveness vs moving targets
+    let reach = stats.range + 0.6; // forgiveness vs moving targets
+    // Crimson Lash primes a lunge: the next basic closes 2 u to reach its mark.
+    const lunge = e.buffs.findIndex((b) => b.id === 'vex_lunge');
+    if (lunge >= 0) {
+      e.buffs.splice(lunge, 1);
+      const gap = dist(e.x, e.z, target.x, target.z) - target.radius;
+      if (gap > reach - 0.4) {
+        const [lx, lz] = norm(target.x - e.x, target.z - e.z);
+        const step = Math.min(2, gap - (stats.range - 0.2));
+        const [nx, nz] = w.nav.nearestOpen(e.x + lx * step, e.z + lz * step);
+        e.x = nx;
+        e.z = nz;
+        c.path = [];
+        w.fx('vex.q.lunge', e.x, e.z, { source: e.id, target: target.id });
+      }
+      reach += 2;
+    }
     if (dist(e.x, e.z, target.x, target.z) - target.radius <= reach) {
       dealDamage(w, { source: e, tag: 'aa' }, target, stats.ad * luckyMul, 'physical');
       w.fx('generic.melee.hit', target.x, target.z, { source: e.id, target: target.id });
@@ -483,6 +500,29 @@ export function applyEntrance(w: World, e: Entity): void {
       w.fx('boltz.entrance', e.x, e.z, { source: e.id });
       break;
     }
+    case 'treat_time': {
+      // Chomp yips at whoever looks like they need it most.
+      let sore: Entity | undefined;
+      let soreFrac = Number.POSITIVE_INFINITY;
+      for (const u of w.champions()) {
+        if (u.team !== e.team || u.id === e.id) continue;
+        if (dist(e.x, e.z, u.x, u.z) > (p.radius ?? 5)) continue;
+        const f = u.hp / u.hpMax;
+        if (f < soreFrac) {
+          soreFrac = f;
+          sore = u;
+        }
+      }
+      applyBuffById(sore ?? e, 'piper_treat');
+      w.fx('piper.entrance', e.x, e.z, { source: e.id });
+      break;
+    }
+    case 'fashionably_late': {
+      applyBuffById(e, 'vex_entrance_ms');
+      applyBuff(e, { id: 'entrance_free_q', name: 'Fashionably Late', duration: p.window ?? 2 });
+      w.fx('vex.entrance', e.x, e.z, { source: e.id });
+      break;
+    }
     case 'cold_spot': {
       for (const u of [...w.enemiesOf(e.team)]) {
         if (u.kind === 'keg') continue;
@@ -588,10 +628,15 @@ export function capacitorArc(w: World, owner: Entity, primary: Entity): void {
   w.fx('boltz.passive.charge', primary.x, primary.z, { source: owner.id, target: primary.id });
 }
 
-/** Per-tick champion passive upkeep: Capacitor telegraph + Wisp contact-chill. */
+/** Per-tick champion passive upkeep: Capacitor telegraph, Wisp chill, pet presence. */
 export function updateChampionPassive(w: World, e: Entity, _dt: number): void {
   const c = e.champ;
   if (!c || e.dead) return;
+  // Companions follow the *fielded* champion: swapping to Piper whistles Chomp
+  // back onto the deck, swapping away sends him off it (updatePet retires him).
+  if (c.def.passive.id === 'best_friend' && petsOf(w, e).length === 0) {
+    spawnPet(w, e, 'chomp');
+  }
   if (c.def.passive.id === 'capacitor') {
     const p = c.def.passive.params;
     c.passive.charged = w.time - (c.passive.lastAtk ?? -100) >= p.idle ? 1 : 0;

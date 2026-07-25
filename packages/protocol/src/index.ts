@@ -245,6 +245,25 @@ export interface ZoneSnap extends EntityBase {
   duration: number;
 }
 
+/** Piper's companion: untargetable, undamageable, always on stage. */
+export interface PetSnap extends EntityBase {
+  kind: 'pet';
+  unitId: string;
+  /** Running an errand (fetch or Q dash) rather than orbiting. */
+  busy: boolean;
+  /** Fed by an unclaimed snack — the next fetch hits twice as hard. */
+  empowered: boolean;
+}
+
+/** A dropped snack waiting for an ally (Piper W). */
+export interface PickupSnap extends EntityBase {
+  kind: 'pickup';
+  unitId: string;
+  tLeft: number;
+  /** Toss arc phase 0..1 while it is still in the air. */
+  tossPhase?: number;
+}
+
 export type EntitySnap =
   | ChampionSnap
   | DummySnap
@@ -256,7 +275,9 @@ export type EntitySnap =
   | CoreSnap
   | OrbSnap
   | FlowerSnap
-  | ZoneSnap;
+  | ZoneSnap
+  | PetSnap
+  | PickupSnap;
 
 /* --------------------------------- Events --------------------------------- */
 
