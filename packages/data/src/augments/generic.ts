@@ -219,7 +219,7 @@ export const GENERIC_AUGMENTS: AugmentDef[] = [
     description: 'Q casts twice — the second seeks a different enemy on its own.',
     visual: 'A mirror-image of you fires the second cast.',
     tags: ['burst'],
-    effects: [{ k: 'castMod', slot: 'q', mode: 'mirror', power: 1 }],
+    effects: [{ k: 'castMod', slot: 'q', mode: 'mirror', power: 1, delay: 0.25 }],
   },
 
   /* ------------------------- 3.4 Defense — Silver ------------------------- */

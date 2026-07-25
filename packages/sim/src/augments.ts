@@ -283,7 +283,8 @@ export function castModFor(e: Entity, slot: Slot): CastMod | null {
     return {
       mode: eff.mode,
       power: eff.power,
-      delay: eff.delay ?? 1,
+      // A beat, not a second — "casts twice" should read as one action.
+      delay: eff.delay ?? 0.25,
       spreadDeg: eff.spreadDeg ?? 11,
     };
   }
