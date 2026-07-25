@@ -23,6 +23,86 @@ export const SOUND_CUES: Record<string, SynthCue> = {
     layers: [{ wave: 'sine', freq: 960, freqEnd: 720, attack: 0.001, decay: 0.09, volume: 0.13 }],
   },
 
+  /* Power Surge draft (AUGMENTS §1) — the hand fans out, and a prismatic sings. */
+  draft_open: {
+    id: 'draft_open',
+    layers: [
+      // Three cards riffling onto the dock, one per offer.
+      { wave: 'noise', freq: 1, attack: 0.001, decay: 0.07, volume: 0.13, lowpass: 6200 },
+      {
+        wave: 'noise',
+        freq: 1,
+        attack: 0.001,
+        decay: 0.07,
+        volume: 0.12,
+        lowpass: 5600,
+        delay: 0.07,
+      },
+      {
+        wave: 'noise',
+        freq: 1,
+        attack: 0.001,
+        decay: 0.08,
+        volume: 0.11,
+        lowpass: 5000,
+        delay: 0.14,
+      },
+      // A rising triad under them so the set announces itself.
+      { wave: 'triangle', freq: 587, attack: 0.003, decay: 0.16, volume: 0.16 },
+      { wave: 'triangle', freq: 740, attack: 0.003, decay: 0.16, volume: 0.15, delay: 0.07 },
+      { wave: 'triangle', freq: 988, attack: 0.003, decay: 0.26, volume: 0.16, delay: 0.14 },
+      { wave: 'sine', freq: 294, freqEnd: 392, attack: 0.02, decay: 0.34, volume: 0.1 },
+    ],
+  },
+  /** A prismatic is in the hand: the chase-card sting (bigger, longer, shimmering). */
+  draft_prismatic: {
+    id: 'draft_prismatic',
+    layers: [
+      { wave: 'noise', freq: 1, attack: 0.001, decay: 0.09, volume: 0.12, lowpass: 6400 },
+      {
+        wave: 'sine',
+        freq: 392,
+        freqEnd: 1568,
+        attack: 0.02,
+        decay: 0.42,
+        volume: 0.16,
+        slide: 'exp',
+      },
+      // Bell stack — a major add-9 so it reads as "rare", not "level up".
+      { wave: 'sine', freq: 784, attack: 0.004, decay: 0.6, volume: 0.16, delay: 0.1 },
+      { wave: 'sine', freq: 988, attack: 0.004, decay: 0.62, volume: 0.13, delay: 0.14 },
+      { wave: 'sine', freq: 1175, attack: 0.004, decay: 0.66, volume: 0.12, delay: 0.18 },
+      { wave: 'sine', freq: 1760, attack: 0.004, decay: 0.7, volume: 0.09, delay: 0.22 },
+      // Top sparkle, panned in time rather than space (mono bank).
+      { wave: 'triangle', freq: 2349, attack: 0.002, decay: 0.2, volume: 0.07, delay: 0.34 },
+      { wave: 'triangle', freq: 3136, attack: 0.002, decay: 0.24, volume: 0.06, delay: 0.44 },
+    ],
+  },
+  /** The card lands on you: a stamp with a bright confirming ping (silver/gold). */
+  augment_take: {
+    id: 'augment_take',
+    layers: [
+      { wave: 'square', freq: 300, freqEnd: 190, attack: 0.001, decay: 0.09, volume: 0.2 },
+      { wave: 'noise', freq: 1, attack: 0.001, decay: 0.06, volume: 0.1, lowpass: 3600 },
+      { wave: 'triangle', freq: 1046, freqEnd: 1568, attack: 0.002, decay: 0.2, volume: 0.16 },
+      { wave: 'sine', freq: 2093, attack: 0.002, decay: 0.16, volume: 0.07, delay: 0.08 },
+    ],
+  },
+  /** Taking a prismatic: the stamp blooms into a chord instead of a ping. */
+  augment_prismatic: {
+    id: 'augment_prismatic',
+    layers: [
+      { wave: 'square', freq: 300, freqEnd: 170, attack: 0.001, decay: 0.11, volume: 0.2 },
+      { wave: 'sine', freq: 131, freqEnd: 98, attack: 0.01, decay: 0.7, volume: 0.2 },
+      { wave: 'sine', freq: 523, attack: 0.004, decay: 0.6, volume: 0.16, delay: 0.05 },
+      { wave: 'sine', freq: 659, attack: 0.004, decay: 0.62, volume: 0.14, delay: 0.09 },
+      { wave: 'sine', freq: 784, attack: 0.004, decay: 0.64, volume: 0.13, delay: 0.13 },
+      { wave: 'sine', freq: 1046, attack: 0.004, decay: 0.7, volume: 0.12, delay: 0.17 },
+      { wave: 'triangle', freq: 2093, attack: 0.002, decay: 0.3, volume: 0.08, delay: 0.28 },
+      { wave: 'noise', freq: 1, attack: 0.02, decay: 0.5, volume: 0.06, lowpass: 7200, delay: 0.1 },
+    ],
+  },
+
   rook_q_swing: {
     id: 'rook_q_swing',
     layers: [

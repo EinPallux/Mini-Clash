@@ -297,6 +297,21 @@ export class MatchRuntime {
     this.link.send({ t: 'trainer', cmd: { k: 'setBench', championId } });
   }
 
+  /** Training: deal a fresh augment draft on demand. */
+  openDraft(): void {
+    this.link.send({ t: 'trainer', cmd: { k: 'openDraft' } });
+  }
+
+  /** Take an offer from the open augment draft (docs/AUGMENTS.md §1). */
+  draftPick(offer: 0 | 1 | 2): void {
+    this.link.send({ t: 'draftPick', offer });
+  }
+
+  /** Spend the match's reroll token on the current offer set. */
+  draftReroll(): void {
+    this.link.send({ t: 'draftReroll' });
+  }
+
   /** Ping at the current cursor ground position (wheel/quick-ping UI). */
   ping(kind: PingKind): void {
     const g = this.input.cursorGround;
@@ -478,6 +493,11 @@ export class MatchRuntime {
         case 'surrendered':
           hud.addFeed({ kind: 'surrender', team: ev.team, text: 'Surrendered' });
           break;
+        case 'augmentPicked':
+          // Only your own pick drives the confirmation slab — an ally's card is
+          // their business, and an enemy's never reaches this client at all.
+          if (ev.player === this.selfPlayer) hud.augmentTaken(ev.augmentId, ev.auto);
+          break;
         case 'matchOver':
           this.camera.shake('l');
           // The match resolved — a later refresh should NOT rejoin its corpse.
@@ -641,6 +661,10 @@ export class MatchRuntime {
         maxError: this.predicted ? Math.round(this.predicted.maxError * 100) / 100 : undefined,
         morphT: Math.round(this.renderedMorphT * 1000) / 1000,
         swapLatencyMs: this.swapLatencyMs,
+        // Cooldowns + augments let the draft smoke prove the overlay never eats
+        // a game input, and that picks actually land on the champion.
+        cds: useHud.getState().champion?.cooldowns ?? null,
+        augments: useHud.getState().champion?.augments ?? [],
         rtt: Math.round(this.link?.rttMs ?? 0),
         calls: this.renderer.renderer.info.render.calls,
         tris: this.renderer.renderer.info.render.triangles,

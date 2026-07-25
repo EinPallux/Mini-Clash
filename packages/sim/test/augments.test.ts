@@ -1,9 +1,10 @@
 import { AUGMENTS, DRAFT, GENERIC_AUGMENTS } from '@mini-clash/data';
-import type { Intent, IntentMsg, MatchConfig } from '@mini-clash/protocol';
+import type { Intent, IntentMsg } from '@mini-clash/protocol';
 import { describe, expect, it } from 'vitest';
 import { Sim } from '../src';
 import { applyCc } from '../src/buffs';
 import { dealDamage } from '../src/combat';
+import { pickAugment } from '../src/draft';
 import { championStats } from '../src/stats';
 
 /**
@@ -174,6 +175,44 @@ describe('draft flow', () => {
     run(sim, DRAFT.seconds + 1);
     expect(c.draft).toBeNull();
     expect(c.augments).toHaveLength(1);
+  });
+
+  it('flags the timeout pick as automatic, and a chosen one as not', () => {
+    // The HUD says "coach chose" only when the timer actually ran out (UI_UX §9).
+    // tick() drains the queue into its snapshot, so read the events from there.
+    const timeout = bridge();
+    levelTo(timeout, 3);
+    let auto: boolean | null = null;
+    for (let i = 0; i < Math.round((DRAFT.seconds + 1) * 30); i++) {
+      for (const ev of timeout.tick().events) {
+        if (ev.t === 'augmentPicked' && ev.player === 1) auto = ev.auto;
+      }
+    }
+    expect(auto).toBe(true);
+
+    const chosen = bridge();
+    levelTo(chosen, 3);
+    chosen.applyIntents([msg({ t: 'draftPick', offer: 0 })]);
+    const ev = chosen.tick().events.find((x) => x.t === 'augmentPicked');
+    expect(ev && ev.t === 'augmentPicked' ? ev.auto : null).toBe(false);
+  });
+
+  it('a max-HP card grants the delta instead of shaving the bar mid-fight', () => {
+    const sim = bridge();
+    const e = me(sim);
+    const c = e.champ;
+    if (!c) throw new Error('no champ');
+    levelTo(sim, 3);
+    dealDamage(sim.world, { source: e, label: 'test' }, e, 200, 'physical');
+    const hpBefore = e.hp;
+    const maxBefore = e.hpMax;
+    // Pick directly: a tick in between would let the fountain plate heal us and
+    // hide exactly the thing under test.
+    c.draft = { index: 0, offers: ['thick_hide'], tLeft: 5, rerolled: false };
+    expect(pickAugment(sim.world, e, 0)).toBe(true);
+    expect(e.hpMax).toBeGreaterThan(maxBefore);
+    // Missing HP is unchanged: the card gave us the new slice, it didn't take one.
+    expect(e.hpMax - e.hp).toBeCloseTo(maxBefore - hpBefore, 3);
   });
 
   it('the match keeps running while a draft is open — it never pauses', () => {

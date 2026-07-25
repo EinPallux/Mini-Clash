@@ -20,12 +20,11 @@ export function levelUpChamp(w: World, e: Entity): void {
   e.hp = Math.min(newMax, e.hp + (newMax - oldMax) + newMax * LEVELUP_HEAL_PCT);
   w.emit({ t: 'levelup', id: e.id, level: c.level });
   w.fx('generic.levelup', e.x, e.z, { source: e.id });
-  // Levels 3/6/9 open an augment draft — bridge only, and never twice for the
-  // same level (a champion can cross several levels in one XP grant).
-  if (w.match?.mode === 'bridge') {
-    const idx = draftIndexForLevel(c.level);
-    if (idx >= 0 && idx === c.draftsDone && !c.draft) openDraft(w, e, idx);
-  }
+  // Levels 3/6/9 open an augment draft, and never twice for the same level (a
+  // champion can cross several levels in one XP grant). The Training Grounds
+  // draft too — trying a card on is the whole point of the Grounds.
+  const idx = draftIndexForLevel(c.level);
+  if (idx >= 0 && idx === c.draftsDone && !c.draft) openDraft(w, e, idx);
 }
 
 export function grantXp(w: World, e: Entity, amount: number): void {

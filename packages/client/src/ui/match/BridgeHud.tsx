@@ -7,6 +7,7 @@ import type { MatchRuntime } from '../../game/match';
 import { useLobby } from '../../state/lobby';
 import { useSession } from '../../state/session';
 import { paletteColors, useSettings } from '../../state/settings';
+import { DraftOverlay } from './DraftOverlay';
 import { ChampionCluster, DenyFlash, SLOT_ICONS } from './HudShared';
 
 /**
@@ -23,6 +24,10 @@ const CHAMP_TONE: Record<string, string> = {
   rattle: '#8a2f3c',
   grukk: '#4a7a3a',
   sylva: '#c47a3a',
+  boltz: '#59b7e8',
+  wisp: '#7fa8c8',
+  piper: '#e8944a',
+  vex: '#b0304a',
 };
 
 function fmtClock(t: number): string {
@@ -158,6 +163,9 @@ export function BridgeHud({ runtime }: { runtime: () => MatchRuntime | null }): 
       <CoachMarks dead={champ.dead} />
 
       <Scoreboard />
+
+      {/* Power Surge draft — docked, never pauses the match (UI_UX §9) */}
+      <DraftOverlay runtime={runtime} />
 
       {/* death screen = the shop */}
       {champ.dead && !match.over && <DeathShop runtime={runtime} />}

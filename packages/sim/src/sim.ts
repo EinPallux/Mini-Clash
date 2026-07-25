@@ -34,7 +34,7 @@ import { type BotBrain, makeBrain, thinkBots } from './bots';
 import { isHiddenFrom, updateBrushState } from './brush';
 import { applyBuff, applyBuffById, applyCc, applyFear, shieldTotal, tickBuffs } from './buffs';
 import { dealDamage } from './combat';
-import { pickAugment, rerollDraft, updateDrafts } from './draft';
+import { openDraft, pickAugment, rerollDraft, updateDrafts } from './draft';
 import { levelUpChamp, updateIncome, updateOrbs } from './economy';
 import { tryBuy, tryBuyRelic, trySell, tryUseRelic, updateItemPassives } from './items';
 import { spawnWave, updateMini } from './minis';
@@ -448,10 +448,22 @@ export class Sim {
           if (d.dummy) this.resetDummy(d);
         }
         break;
+      case 'openDraft': {
+        // Grounds-only affordance: try cards on without walking a level curve.
+        if (c.draft) break;
+        openDraft(w, e, Math.min(c.draftsDone, DRAFT.levels.length - 1));
+        break;
+      }
       case 'switchChampion': {
         const def = CHAMPIONS[cmd.championId];
         if (!def || def.id === c.def.id) break;
         c.def = def;
+        // A new kit is a clean slate: the old champion's signatures must not
+        // ride along, and a draft rolled for them is no longer a valid offer.
+        c.augments = [];
+        c.draft = null;
+        c.draftsDone = 0;
+        c.rerolls = DRAFT.rerolls;
         c.cds = { q: 0, w: 0, r: 0 };
         c.aaCd = 0;
         c.cast = null;

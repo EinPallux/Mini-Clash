@@ -1,6 +1,7 @@
 import { CHAMPIONS, type Slot, TAG_SWAP } from '@mini-clash/data';
 import { useEffect, useState } from 'react';
 import { type HudChampion, useHud } from '../../game/hudStore';
+import { AugmentStrip } from './DraftOverlay';
 
 /** HUD pieces shared by every mode: champion cluster, ability slots, deny flash, death veil. */
 
@@ -126,6 +127,7 @@ export function ChampionCluster(): React.ReactElement | null {
   const def = CHAMPIONS[champ.championId];
   return (
     <div className="hud-bottom">
+      <AugmentStrip />
       <DuoPanel champ={champ} />
       <div
         className="portrait"

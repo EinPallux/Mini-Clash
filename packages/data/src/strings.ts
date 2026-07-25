@@ -52,6 +52,7 @@ export const STRINGS = {
   cheatEnergy: 'Infinite energy',
   cheatLevelUp: 'Level up',
   cheatResetDummies: 'Reset dummies',
+  cheatDraft: 'Deal augment draft',
   dps: 'DPS',
   level: 'Level',
   settingsVideo: 'Video',

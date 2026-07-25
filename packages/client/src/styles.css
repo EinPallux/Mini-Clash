@@ -2948,3 +2948,357 @@ input[type="range"] {
   background: var(--gold);
   opacity: 0.85;
 }
+
+/* ---------------------------- Power Surge draft ---------------------------- */
+/* Docked bottom-centre, above the ability cluster but never covering it — the
+   match keeps playing behind this (UI_UX §9). Pointer events stay on the cards
+   themselves so the deck underneath is still clickable. */
+.draft-dock {
+  position: absolute;
+  left: 50%;
+  /* Clears the health/energy bars and the ability cluster: the dock must never
+     cover the numbers you are making the decision with (UI_UX §9). */
+  bottom: 152px;
+  transform: translateX(-50%);
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  pointer-events: none;
+  animation: draftin 0.28s cubic-bezier(0.2, 1.4, 0.4, 1);
+}
+@keyframes draftin {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(26px);
+  }
+}
+.draft-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(10, 13, 24, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  padding: 4px 12px;
+  clip-path: polygon(8px 0, 100% 0, calc(100% - 8px) 100%, 0 100%);
+}
+.draft-title {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  color: #ffc72e;
+  font-size: 0.9rem;
+}
+.draft-sub {
+  font-size: 0.68rem;
+  color: rgba(255, 255, 255, 0.62);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+}
+/* The 45 s ring (UI_UX §9): a conic sweep that empties clockwise. Reads as a
+   clock at a glance, and turns hot under 10 s without needing a second element. */
+.draft-ring {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: conic-gradient(#ffc72e calc(var(--frac) * 360deg), rgba(255, 255, 255, 0.12) 0);
+  transition: background 0.25s linear;
+}
+.draft-ring::after {
+  content: "";
+  position: absolute;
+  inset: 3px;
+  border-radius: 50%;
+  background: rgba(10, 13, 24, 0.95);
+}
+.draft-ring b {
+  position: relative;
+  z-index: 1;
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+}
+.draft-ring.urgent {
+  background: conic-gradient(#ff5a3c calc(var(--frac) * 360deg), rgba(255, 255, 255, 0.12) 0);
+  animation: draftpulse 0.9s ease-in-out infinite;
+}
+.draft-ring.urgent b {
+  color: #ff8a5c;
+}
+@keyframes draftpulse {
+  50% {
+    transform: scale(1.1);
+  }
+}
+
+.draft-cards {
+  display: flex;
+  gap: 10px;
+  pointer-events: auto;
+}
+.draft-card {
+  position: relative;
+  width: 216px;
+  min-height: 150px;
+  padding: 26px 12px 12px;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  color: #fff;
+  cursor: pointer;
+  background: linear-gradient(160deg, rgba(30, 36, 56, 0.97), rgba(14, 18, 30, 0.97));
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  /* Sharp, skewed corner — the hero-shooter card language, not a rounded pill. */
+  clip-path: polygon(
+    0 0,
+    calc(100% - 14px) 0,
+    100% 14px,
+    100% 100%,
+    14px 100%,
+    0 calc(100% - 14px)
+  );
+  transition:
+    transform 0.12s ease,
+    filter 0.12s ease;
+}
+.draft-card:hover:not(:disabled) {
+  transform: translateY(-4px);
+  filter: brightness(1.12);
+}
+.draft-card:focus-visible {
+  outline: 2px solid #ffc72e;
+  outline-offset: 2px;
+}
+.draft-card.silver {
+  border-color: rgba(200, 210, 230, 0.5);
+  box-shadow: inset 0 2px 0 rgba(200, 210, 230, 0.45);
+}
+.draft-card.gold {
+  border-color: rgba(255, 199, 46, 0.65);
+  box-shadow: inset 0 2px 0 rgba(255, 199, 46, 0.6);
+}
+/* Prismatic: the chase card. A slow rainbow sweep across the whole surface. */
+.draft-card.prismatic {
+  border-color: rgba(255, 255, 255, 0.7);
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, 0.75),
+    0 0 18px rgba(180, 120, 255, 0.35);
+}
+.draft-card.prismatic::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    115deg,
+    rgba(255, 90, 140, 0.22),
+    rgba(255, 199, 46, 0.22),
+    rgba(110, 230, 180, 0.22),
+    rgba(120, 160, 255, 0.22),
+    rgba(200, 120, 255, 0.22)
+  );
+  background-size: 300% 100%;
+  animation: prismshimmer 3.2s linear infinite;
+  mix-blend-mode: screen;
+}
+@keyframes prismshimmer {
+  to {
+    background-position: 300% 0;
+  }
+}
+.draft-card.taken {
+  transform: translateY(-8px) scale(1.02);
+  filter: brightness(1.3);
+}
+.draft-card.dimmed {
+  opacity: 0.35;
+  filter: grayscale(0.6);
+}
+.draft-card:disabled {
+  cursor: default;
+}
+.draft-key {
+  position: absolute;
+  top: 6px;
+  left: 8px;
+  display: inline-grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 0.72rem;
+  background: rgba(255, 255, 255, 0.14);
+}
+.draft-rarity {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  font-size: 0.6rem;
+  letter-spacing: 0.1em;
+  opacity: 0.75;
+}
+/* Category glyph — the "no two cards from the same category" rule made visible. */
+.draft-rarity i {
+  font-style: normal;
+  font-size: 0.72rem;
+  opacity: 0.9;
+}
+.draft-owner {
+  font-size: 0.62rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #ffc72e;
+}
+.draft-name {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-weight: 800;
+  font-size: 1.02rem;
+  line-height: 1.1;
+}
+.draft-desc {
+  font-size: 0.74rem;
+  line-height: 1.3;
+  opacity: 0.9;
+}
+.draft-visual {
+  margin-top: auto;
+  font-size: 0.66rem;
+  line-height: 1.25;
+  opacity: 0.55;
+  font-style: italic;
+}
+.draft-foot {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  pointer-events: auto;
+}
+.draft-reroll {
+  font-size: 0.72rem;
+  padding: 4px 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.draft-reroll .cap {
+  font-size: 0.6rem;
+  padding: 0 4px;
+  background: rgba(255, 255, 255, 0.14);
+}
+.draft-reroll:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.draft-hint {
+  font-size: 0.66rem;
+  opacity: 0.5;
+}
+
+/* Confirmation slab: what you (or the coach, on a timeout) just took. Replaces
+   the dock for ~2.6 s, then the card lives on in the strip (UI_UX §9). */
+.draft-slab {
+  position: absolute;
+  left: 50%;
+  bottom: 176px;
+  transform: translateX(-50%);
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 300px;
+  max-width: 460px;
+  padding: 10px 26px 14px;
+  text-align: center;
+  pointer-events: none;
+  background: rgba(10, 13, 24, 0.92);
+  border: 1px solid rgba(200, 210, 230, 0.5);
+  clip-path: polygon(12px 0, 100% 0, calc(100% - 12px) 100%, 0 100%);
+  animation:
+    slabin 0.3s cubic-bezier(0.2, 1.4, 0.4, 1),
+    slabout 0.5s ease-in 2.1s forwards;
+}
+@keyframes slabin {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) scale(0.9);
+  }
+}
+@keyframes slabout {
+  to {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-14px);
+  }
+}
+.draft-slab.gold {
+  border-color: rgba(255, 199, 46, 0.7);
+  box-shadow: 0 0 22px rgba(255, 199, 46, 0.22);
+}
+.draft-slab.prismatic {
+  border-color: rgba(255, 255, 255, 0.85);
+  box-shadow: 0 0 28px rgba(180, 120, 255, 0.4);
+}
+.draft-slab-kicker {
+  font-size: 0.62rem;
+  letter-spacing: 0.18em;
+  color: rgba(255, 255, 255, 0.8);
+}
+.draft-slab-name {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-weight: 800;
+  font-size: 1.15rem;
+  line-height: 1.1;
+  color: #ffc72e;
+}
+.draft-slab.prismatic .draft-slab-name {
+  background: linear-gradient(100deg, #ff6fd8, #ffc72e, #6ee6ff);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.draft-slab-desc {
+  font-size: 0.72rem;
+  line-height: 1.35;
+  color: rgba(255, 255, 255, 0.82);
+  max-width: 400px;
+}
+
+/* Taken augments, beside the ability cluster. */
+.augment-strip {
+  position: absolute;
+  left: 0;
+  bottom: 86px;
+  display: flex;
+  gap: 4px;
+}
+.aug-pip {
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  font-size: 0.76rem;
+  line-height: 1;
+  color: #fff;
+  background: rgba(20, 26, 42, 0.95);
+  border: 1px solid rgba(200, 210, 230, 0.5);
+  cursor: help;
+}
+.aug-pip.gold {
+  border-color: rgba(255, 199, 46, 0.75);
+  color: #ffc72e;
+}
+.aug-pip.prismatic {
+  border-color: rgba(255, 255, 255, 0.8);
+  background: linear-gradient(135deg, #6a3fa0, #a03f7a, #3f6aa0);
+}

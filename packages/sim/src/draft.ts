@@ -7,6 +7,7 @@ import {
   signaturesFor,
 } from '@mini-clash/data';
 import type { Pcg32 } from './rng';
+import { championStats } from './stats';
 import type { Entity, World } from './world';
 
 /**
@@ -148,21 +149,37 @@ export function openDraft(w: World, e: Entity, index: number): void {
   const offers = rollOffers(w, e, index);
   if (offers.length === 0) return; // catalog exhausted — nothing to offer
   c.draft = { index, offers, tLeft: DRAFT.seconds, rerolled: false };
-  w.emit({ t: 'draftOpen', player: c.player, index, offers });
+  w.emit({ t: 'draftOpen', player: c.player, team: e.team, index, offers });
 }
 
-/** Take an augment (by offer index). Returns true if it stuck. */
-export function pickAugment(w: World, e: Entity, offerIndex: number): boolean {
+/**
+ * Take an augment (by offer index). Returns true if it stuck.
+ * `auto` marks the timer-expiry pick so the HUD can say the coach chose.
+ */
+export function pickAugment(w: World, e: Entity, offerIndex: number, auto = false): boolean {
   const c = e.champ;
   const d = c?.draft;
   if (!c || !d) return false;
   const id = d.offers[offerIndex];
   if (!id || !AUGMENTS[id] || c.augments.includes(id)) return false;
+  const oldMax = championStats(e).hpMax;
   c.augments.push(id);
   c.draft = null;
   c.draftsDone++;
-  // A pool of stats changed underneath us: keep the health bar honest.
-  w.emit({ t: 'augmentPicked', player: c.player, augmentId: id, index: d.index });
+  // A max-HP card resized the pool underneath us: grant the delta rather than
+  // silently shaving a slice off the bar mid-fight (same rule as a level-up).
+  const newMax = championStats(e).hpMax;
+  e.hpMax = newMax;
+  if (newMax > oldMax) e.hp = Math.min(newMax, e.hp + (newMax - oldMax));
+  else e.hp = Math.min(newMax, e.hp);
+  w.emit({
+    t: 'augmentPicked',
+    player: c.player,
+    team: e.team,
+    augmentId: id,
+    index: d.index,
+    auto,
+  });
   w.fx(`augment.${AUGMENTS[id].rarity}`, e.x, e.z, { source: e.id });
   return true;
 }
@@ -177,7 +194,7 @@ export function rerollDraft(w: World, e: Entity): boolean {
   c.rerolls--;
   d.rerolled = true;
   d.offers = offers;
-  w.emit({ t: 'draftReroll', player: c.player, offers });
+  w.emit({ t: 'draftReroll', player: c.player, team: e.team, offers });
   return true;
 }
 
@@ -229,8 +246,12 @@ export function scoreOffer(w: World, e: Entity, def: AugmentDef, rng: Pcg32): nu
   return score * (0.85 + rng.float() * 0.3);
 }
 
-/** Pick the best offer by utility (bots, and the human auto-pick at 0). */
-export function autoPick(w: World, e: Entity): void {
+/**
+ * Pick the best offer by utility. `auto` is true when the 45 s timer ran out —
+ * the HUD calls that "the coach chose" (UI_UX §9); a bot picking early is a
+ * decision, not a timeout, so it goes through the normal `draftPick` intent.
+ */
+export function autoPick(w: World, e: Entity, auto = false): void {
   const c = e.champ;
   const d = c?.draft;
   if (!c || !d) return;
@@ -245,7 +266,7 @@ export function autoPick(w: World, e: Entity): void {
       bestIdx = i;
     }
   }
-  pickAugment(w, e, bestIdx);
+  pickAugment(w, e, bestIdx, auto);
 }
 
 /** Tick every open draft; auto-pick at 0. */
@@ -254,6 +275,6 @@ export function updateDrafts(w: World, dt: number): void {
     const c = e.champ;
     if (!c?.draft) continue;
     c.draft.tLeft -= dt;
-    if (c.draft.tLeft <= 0) autoPick(w, e);
+    if (c.draft.tLeft <= 0) autoPick(w, e, true);
   }
 }

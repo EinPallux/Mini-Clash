@@ -2,6 +2,7 @@ import { CHAMPION_LIST, STRINGS } from '@mini-clash/data';
 import { uiSound } from '../../game/audio';
 import { useHud } from '../../game/hudStore';
 import type { MatchRuntime } from '../../game/match';
+import { DraftOverlay } from './DraftOverlay';
 import { ChampionCluster, DenyFlash } from './HudShared';
 
 export function TrainingHud({
@@ -123,6 +124,21 @@ export function TrainingHud({
               {STRINGS.cheatResetDummies}
             </button>
           </div>
+          {/* Power Surge on demand: try a card on any kit at any level, rather
+              than walking the 3/6/9 curve every time (AUGMENTS §1). */}
+          <div className="row">
+            <button
+              type="button"
+              className="btn"
+              disabled={!!champ.draft}
+              onClick={() => {
+                uiSound('ui_click');
+                runtime()?.openDraft();
+              }}
+            >
+              {STRINGS.cheatDraft}
+            </button>
+          </div>
         </div>
         {dummies.map((d) => (
           <div className="dummy-chip" key={d.id}>
@@ -134,6 +150,7 @@ export function TrainingHud({
 
       <DenyFlash />
       <ChampionCluster />
+      <DraftOverlay runtime={runtime} />
 
       <div className="keyhint">
         <span className="cap">ESC</span>

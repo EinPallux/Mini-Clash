@@ -23,6 +23,11 @@ export interface HudChampion {
   recap: ChampionSnap['recap'];
   /** Tag Team bench + swap timers (GAME_DESIGN §7.2); absent when solo. */
   duo: ChampionSnap['duo'];
+  /** Augments taken this match (docs/AUGMENTS.md). */
+  augments: string[];
+  /** Your open draft, if one is up. Never populated for anyone else. */
+  draft: ChampionSnap['draft'];
+  rerolls: number;
   stats: ChampionSnap['stats'];
 }
 
@@ -55,6 +60,8 @@ export interface HudSeat {
   championId: string;
   /** Benched half of this seat's duo (absent for solo configs). */
   benchChampionId?: string;
+  /** Augments this seat has taken (enemy ones are gated by discovery). */
+  augments: string[];
   name: string;
   bot: boolean;
   level: number;
@@ -112,6 +119,8 @@ interface HudState {
   droppedReason: string | null;
   /** True while the server has a bot covering our seat (AFK, GAME_DESIGN §17). */
   afkCovered: boolean;
+  /** Your last augment pick — drives the draft's confirmation slab (UI_UX §9). */
+  draftTaken: { augmentId: string; auto: boolean; at: number } | null;
   deniedAt: number;
   deniedReason: string;
   fps: number;
@@ -123,6 +132,7 @@ interface HudState {
   addChat: (player: number, name: string, phrase: string) => void;
   dropped: (reason: string) => void;
   setAfk: (covered: boolean) => void;
+  augmentTaken: (augmentId: string, auto: boolean) => void;
   shopResult: (ok: boolean, reason?: string) => void;
   denied: (reason: string) => void;
   setFps: (fps: number) => void;
@@ -143,6 +153,7 @@ export const useHud = create<HudState>()((set, get) => ({
   shopMsg: null,
   droppedReason: null,
   afkCovered: false,
+  draftTaken: null,
   deniedAt: 0,
   deniedReason: '',
   fps: 0,
@@ -159,6 +170,7 @@ export const useHud = create<HudState>()((set, get) => ({
     })),
   dropped: (reason) => set({ droppedReason: reason }),
   setAfk: (covered) => set({ afkCovered: covered }),
+  augmentTaken: (augmentId, auto) => set({ draftTaken: { augmentId, auto, at: Date.now() } }),
   shopResult: (ok, reason) => set({ shopMsg: { at: Date.now(), ok, reason } }),
   reset: () =>
     set({
@@ -173,6 +185,7 @@ export const useHud = create<HudState>()((set, get) => ({
       shopMsg: null,
       droppedReason: null,
       afkCovered: false,
+      draftTaken: null,
       noCooldowns: false,
       infiniteEnergy: false,
     }),
@@ -225,6 +238,9 @@ export const useHud = create<HudState>()((set, get) => ({
             passive: e.passive,
             recap: e.recap,
             duo: e.duo,
+            augments: e.augments,
+            draft: e.draft,
+            rerolls: e.rerolls,
             stats: e.stats,
           };
         }
@@ -248,6 +264,7 @@ export const useHud = create<HudState>()((set, get) => ({
       team: e.team,
       championId: e.championId,
       benchChampionId: e.duo?.championId,
+      augments: e.augments,
       name: e.name,
       bot: e.bot,
       level: e.level,

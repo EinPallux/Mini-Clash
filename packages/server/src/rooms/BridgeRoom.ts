@@ -324,14 +324,29 @@ export class BridgeRoom extends Room {
     }
   }
 
-  /** Team-scope the event feed: pings are team comms, everything else is public. */
+  /**
+   * Team-scope the event feed. Pings are team comms; draft events are private
+   * to the drafting team, because an enemy must never read your offers or learn
+   * a pick before the card shows itself on the field (AUGMENTS §1, UI_UX §9).
+   * Everything else is public.
+   */
   private filterView(
     snap: ReturnType<Sim['snapshotFor']>,
     team: 0 | 1,
   ): ReturnType<Sim['snapshotFor']> {
     return {
       ...snap,
-      events: snap.events.filter((ev) => ev.t !== 'ping' || ev.team === team),
+      events: snap.events.filter((ev) => {
+        switch (ev.t) {
+          case 'ping':
+          case 'draftOpen':
+          case 'draftReroll':
+          case 'augmentPicked':
+            return ev.team === team;
+          default:
+            return true;
+        }
+      }),
     };
   }
 

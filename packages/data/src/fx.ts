@@ -21,6 +21,10 @@ const FOX = 0xe8944a; // Chomp orange
 const SNACK = 0xf2c46a; // Piper's snacks
 const CRIMSON = 0xb0304a; // Vex blood
 const PETAL = 0xff6f8a; // Vex rose petals
+const AUG_SILVER = 0xc6d2e0; // Power Surge rarities
+const AUG_GOLD = 0xffc23c;
+const AUG_PRISM_A = 0xff6fd8;
+const AUG_PRISM_B = 0x6ee6ff;
 
 export const FX: Record<string, FxTimeline> = {
   /* ------------------------------- Rook ------------------------------- */
@@ -2292,6 +2296,161 @@ export const FX: Record<string, FxTimeline> = {
       },
     ],
   },
+  /* ----------------------------- Augments -----------------------------
+   * Pick flourishes (AUGMENTS §1). Rarity escalates the *whole* moment —
+   * colour, ring count, particle mass and camera — so a prismatic reads from
+   * across the bridge without anyone having to look at the dock.
+   */
+  'augment.silver': {
+    id: 'augment.silver',
+    events: [
+      { time: 0, op: { t: 'sound', cue: 'augment_take', volume: 0.7 } },
+      { time: 0, op: { t: 'flash', at: 'self', color: AUG_SILVER, life: 0.1 } },
+      {
+        time: 0,
+        op: { t: 'ring', at: 'self', color: AUG_SILVER, radius: 1.5, width: 0.1, life: 0.45 },
+      },
+      {
+        time: 0,
+        op: {
+          t: 'burst',
+          at: 'self',
+          count: 16,
+          color: AUG_SILVER,
+          color2: 0xffffff,
+          size: 0.11,
+          speed: 3.2,
+          up: 3,
+          life: 0.5,
+          shape: 'spark',
+        },
+      },
+    ],
+  },
+  'augment.gold': {
+    id: 'augment.gold',
+    events: [
+      { time: 0, op: { t: 'sound', cue: 'augment_take' } },
+      { time: 0, op: { t: 'flash', at: 'self', color: 0xffffff, life: 0.09 } },
+      {
+        time: 0,
+        op: { t: 'ring', at: 'self', color: AUG_GOLD, radius: 1.9, width: 0.14, life: 0.55 },
+      },
+      {
+        time: 0,
+        op: {
+          t: 'burst',
+          at: 'self',
+          count: 30,
+          color: AUG_GOLD,
+          color2: 0xfff3d6,
+          size: 0.13,
+          speed: 4.2,
+          up: 4.5,
+          life: 0.65,
+          shape: 'spark',
+        },
+      },
+      {
+        time: 0,
+        op: { t: 'light', at: 'self', color: AUG_GOLD, intensity: 2.6, radius: 5, life: 0.4 },
+      },
+      { time: 0, op: { t: 'shake', power: 's' } },
+      {
+        time: 0.16,
+        op: { t: 'ring', at: 'self', color: AUG_GOLD, radius: 2.8, width: 0.09, life: 0.45 },
+      },
+    ],
+  },
+  'augment.prismatic': {
+    id: 'augment.prismatic',
+    events: [
+      { time: 0, op: { t: 'sound', cue: 'augment_prismatic' } },
+      { time: 0, op: { t: 'flash', at: 'self', color: 0xffffff, life: 0.12 } },
+      { time: 0, op: { t: 'hitstop', ms: 45 } },
+      { time: 0, op: { t: 'shake', power: 'm' } },
+      {
+        time: 0,
+        op: { t: 'ring', at: 'self', color: AUG_PRISM_A, radius: 2.2, width: 0.18, life: 0.6 },
+      },
+      {
+        time: 0,
+        op: {
+          t: 'burst',
+          at: 'self',
+          count: 52,
+          color: AUG_PRISM_A,
+          color2: AUG_PRISM_B,
+          size: 0.15,
+          speed: 5.5,
+          up: 6,
+          life: 0.9,
+          gravity: 3,
+          shape: 'spark',
+        },
+      },
+      {
+        time: 0,
+        op: { t: 'light', at: 'self', color: AUG_PRISM_A, intensity: 3.6, radius: 7, life: 0.5 },
+      },
+      // Two more rings chase outward: the tell that this one was the chase card.
+      {
+        time: 0.14,
+        op: { t: 'ring', at: 'self', color: AUG_PRISM_B, radius: 3.4, width: 0.14, life: 0.55 },
+      },
+      {
+        time: 0.28,
+        op: { t: 'ring', at: 'self', color: AUG_GOLD, radius: 4.6, width: 0.1, life: 0.5 },
+      },
+      {
+        time: 0.3,
+        op: {
+          t: 'burst',
+          at: 'self',
+          count: 24,
+          color: AUG_PRISM_B,
+          color2: 0xffffff,
+          size: 0.1,
+          speed: 2.4,
+          up: 5,
+          life: 1.1,
+          gravity: 1.5,
+          shape: 'puff',
+        },
+      },
+      {
+        time: 0.34,
+        op: { t: 'light', at: 'self', color: AUG_PRISM_B, intensity: 2, radius: 6, life: 0.5 },
+      },
+    ],
+  },
+  /** Chain Shot's filament arcing to a second target (generic `onBasic` rider). */
+  'augment.chain': {
+    id: 'augment.chain',
+    events: [
+      { time: 0, op: { t: 'sound', cue: 'boltz_zap_hit', volume: 0.45 } },
+      { time: 0, op: { t: 'flash', at: 'target', color: AUG_PRISM_B, life: 0.06 } },
+      {
+        time: 0,
+        op: {
+          t: 'burst',
+          at: 'target',
+          count: 9,
+          color: AUG_PRISM_B,
+          color2: 0xffffff,
+          size: 0.08,
+          speed: 3.6,
+          life: 0.22,
+          shape: 'spark',
+        },
+      },
+      {
+        time: 0,
+        op: { t: 'ring', at: 'target', color: AUG_PRISM_B, radius: 0.8, width: 0.07, life: 0.24 },
+      },
+    ],
+  },
+
   'relic.blink.out': {
     id: 'relic.blink.out',
     events: [

@@ -42,7 +42,9 @@ export type TrainerCmd =
   | { k: 'resetDummies' }
   | { k: 'switchChampion'; championId: string }
   /** Training duo config: set (or clear, with null) the benched half. */
-  | { k: 'setBench'; championId: string | null };
+  | { k: 'setBench'; championId: string | null }
+  /** Training: deal a fresh augment draft on demand, at any level. */
+  | { k: 'openDraft' };
 
 export interface IntentMsg {
   seq: number;
@@ -371,9 +373,20 @@ export type SimEvent =
   | { t: 'suddenDeath' }
   | { t: 'ping'; player: PlayerId; team: Team; kind: PingKind; x: number; z: number }
   | { t: 'surrendered'; team: Team }
-  | { t: 'draftOpen'; player: PlayerId; index: number; offers: string[] }
-  | { t: 'draftReroll'; player: PlayerId; offers: string[] }
-  | { t: 'augmentPicked'; player: PlayerId; augmentId: string; index: number };
+  /* Draft events carry `team` so the server can scope them like pings: an
+   * enemy must never see your offers (UI_UX §9) or learn a pick before the
+   * card shows itself on the field (AUGMENTS §1, the visibility mandate). */
+  | { t: 'draftOpen'; player: PlayerId; team: Team; index: number; offers: string[] }
+  | { t: 'draftReroll'; player: PlayerId; team: Team; offers: string[] }
+  | {
+      t: 'augmentPicked';
+      player: PlayerId;
+      team: Team;
+      augmentId: string;
+      index: number;
+      /** True when the 45 s timer ran out and the coach picked for you. */
+      auto: boolean;
+    };
 
 export interface Snapshot {
   tick: number;
