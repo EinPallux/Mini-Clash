@@ -21,8 +21,13 @@ Entry categories: `Added` · `Changed` · `Fixed` · `Balance` · `Content` · `
 - **Augment state lives in its own bag** (`augState`) on the seat. Unlike passive scratch it is **not** exchanged on a Tag Swap, because a `[duo]` card belongs to the seat rather than to whichever half is on stage.
 - **The balance harness reports augments.** Every run now prints pick-when-offered and winrate per card against the acceptance rails (generics: ≤65% pick, ≤56% win), with signatures listed separately — a near-auto-pick on the kit they were written for is the design, not a flag.
 
+### Balance
+- **Undying Contract** 40% → **30%** revive HP, and the half that steps in is now stuck out there for a full swap cooldown. At 60 matches it was taken **74% of the times it was offered** against a 65% rail — a refused death that was *also* a free swap is a strict upgrade, and the bot scorer read it exactly that way. (Its winrate was a flat 45%, so the flag was a must-pick problem, not a power problem — which is what the pick-rate rail exists to catch.)
+- **Piper** 640 → **690** base HP (73.33 → 75 per level), 22 → **24** base armor (2.44 → 2.6 per level). She landed at **35% over ~100 games** with a 6.4/8.8 K/D — a support dying too often to do her job. Sylva, the other support, sits at 49% with 705 HP and 24 armor; this closes most of that gap without touching the kit.
+
 ### Docs
 - AUGMENTS §3.3 #15 (Elemental Ascension) drops the "choose at pickup" wording: the shipped card rolls its element off the match seed, which is what the data has always said and what determinism requires.
+- AUGMENTS #29, CHAMPIONS Piper stat row, GAME_DESIGN §10.3 (Silence) and UI_UX §9/§11 all re-synced to what shipped.
 
 ## [Unreleased] — v0.4.0 "Tag Team" (in progress)
 

@@ -373,10 +373,10 @@ export const GENERIC_AUGMENTS: AugmentDef[] = [
     category: 'defense',
     scope: 'duo',
     description:
-      'Once per match, dying instead brings your benched champion up on the spot at 40% health.',
+      'Once per match, dying instead brings your benched champion up on the spot at 30% health — and they are stuck out there until the swap comes back.',
     visual: 'The paperwork tears itself up in a spray of embers as they rise.',
     tags: ['sustain', 'swap'],
-    effects: [{ k: 'special', id: 'undying', params: { hpFrac: 0.4 } }],
+    effects: [{ k: 'special', id: 'undying', params: { hpFrac: 0.3 } }],
   },
 
   /* --------------------- 3.7 Mobility & Utility — Silver ------------------- */

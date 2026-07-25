@@ -444,7 +444,10 @@ describe('augment effects', () => {
     dealDamage(sim.world, { source: foe }, e, 99999, 'physical');
     expect(e.dead).toBe(false);
     expect(c.def.id).not.toBe(was); // the bench half took the field
-    expect(e.hp / e.hpMax).toBeCloseTo(0.4, 1);
+    expect(e.hp / e.hpMax).toBeCloseTo(0.3, 1);
+    // A refused death is not also a free swap — the half that stepped in is
+    // locked out there for a full swap cooldown.
+    expect(c.duo?.swapCd ?? 0).toBeGreaterThan(1);
     // The contract is spent: the next lethal blow lands.
     dealDamage(sim.world, { source: foe }, e, 99999, 'physical');
     dealDamage(sim.world, { source: foe }, e, 99999, 'physical');

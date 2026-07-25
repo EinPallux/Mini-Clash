@@ -1,4 +1,4 @@
-import { BRIDGE, CORE_DEF, type DamageType, TOWER_DEF } from '@mini-clash/data';
+import { BRIDGE, CORE_DEF, type DamageType, TAG_SWAP, TOWER_DEF } from '@mini-clash/data';
 import { augmentDamageMul, augParam, special } from './augments';
 import { absorbShields, applyBuff, applyCc, consumeBlock } from './buffs';
 import { creditKill, onMiniKilled } from './economy';
@@ -540,7 +540,10 @@ function undyingContract(w: World, target: Entity): boolean {
   [c.aaCd, duo.aaCd] = [duo.aaCd, c.aaCd];
   [c.passive, duo.passive] = [duo.passive, c.passive];
   target.radius = c.def.stats.radius;
-  duo.swapCd = 0;
+  // The half that stepped in is stuck out there: a refused death is not also a
+  // free swap. Without this the card is a strict upgrade and the harness picks
+  // it 74% of the time it is offered.
+  duo.swapCd = TAG_SWAP.cooldown;
   duo.morphT = 0;
   w.fx('augment.undying', target.x, target.z, { source: target.id });
   w.fx('duo.swap', target.x, target.z, { source: target.id });

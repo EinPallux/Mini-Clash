@@ -70,7 +70,7 @@ Tags: `[duo]` both champions · `[active]` fielded champion only · `[Q]/[W]/[R]
 | # | Augment | Effect |
 |---|---|---|
 | 28 | Guardian Constellation | `[duo]` every 20 s, gain a star-shield that blocks one ability entirely (orbiting star shows charge state) |
-| 29 | Undying Contract | `[duo]` once per match: on death, your benched champion rises at the spot with 40% HP (the duo refuses to file the paperwork). Cannot trigger during Overtime |
+| 29 | Undying Contract | `[duo]` once per match: on death, your benched champion rises at the spot with 30% HP and the swap goes on full cooldown — the half that stepped in is stuck out there (the duo refuses to file the paperwork). Cannot trigger during Overtime |
 
 ### 3.7 Mobility & Utility — Silver
 | # | Augment | Effect |
