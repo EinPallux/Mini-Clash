@@ -1,4 +1,5 @@
 import { BUFFS, type BuffDef, type CcSpec, ITEMS } from '@mini-clash/data';
+import { slowResist } from './augments';
 import type { BuffInstance, Entity } from './world';
 
 export function applyBuff(target: Entity, def: BuffDef, opts?: { blockNextHit?: boolean }): void {
@@ -28,11 +29,14 @@ export function applyCc(target: Entity, cc: CcSpec): void {
   if (target.kind === 'tower' || target.kind === 'core') return; // structures are CC-immune
   switch (cc.kind) {
     case 'slow': {
+      // Juggernaut Frame blunts slows before they ever become a buff.
+      const strength = (cc.strength ?? 0.2) * (1 - slowResist(target));
+      if (strength <= 0.001) break;
       const def: BuffDef = {
-        id: `cc_slow_${Math.round((cc.strength ?? 0.2) * 100)}`,
+        id: `cc_slow_${Math.round(strength * 100)}`,
         name: 'Slowed',
         duration: cc.duration,
-        mul: { moveSpeed: 1 - (cc.strength ?? 0.2) },
+        mul: { moveSpeed: 1 - strength },
       };
       applyBuff(target, def);
       break;

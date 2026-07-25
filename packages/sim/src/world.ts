@@ -125,9 +125,29 @@ export interface ChampState {
   dancing: boolean;
   /** Feared (Wisp R): fleeing away from a point, controls locked, until tLeft ≤ 0. */
   feared: { tLeft: number; fromX: number; fromZ: number } | null;
+  /** Augments taken this match, in pick order (docs/AUGMENTS.md). */
+  augments: string[];
+  /** Open draft, or null. The match never pauses for it. */
+  draft: DraftState | null;
+  /** Which draft levels have already been served (3/6/9). */
+  draftsDone: number;
+  /** Reroll tokens left this match. */
+  rerolls: number;
   /** Champion-specific passive scratch (stonewallCd, powderCount, luckyT…). */
   passive: Record<string, number>;
   speed: number;
+}
+
+/** An open augment draft for one player (AUGMENTS.md §1). */
+export interface DraftState {
+  /** Which draft this is: 0, 1, 2 — drives the rarity odds row. */
+  index: number;
+  /** The three offered augment ids. */
+  offers: string[];
+  /** Seconds until the utility scorer picks for you. */
+  tLeft: number;
+  /** True once this player has spent their reroll on this draft set. */
+  rerolled: boolean;
 }
 
 export interface DummyState {

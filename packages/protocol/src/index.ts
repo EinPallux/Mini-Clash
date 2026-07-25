@@ -27,6 +27,10 @@ export type Intent =
   | { t: 'sell'; itemId: string }
   | { t: 'dance' }
   | { t: 'swap' }
+  /** Take offer 0/1/2 from the open augment draft. */
+  | { t: 'draftPick'; offer: 0 | 1 | 2 }
+  /** Spend the match's reroll token on the current offer set. */
+  | { t: 'draftReroll' }
   | { t: 'ping'; kind: PingKind; x: number; z: number }
   | { t: 'surrender' }
   | { t: 'trainer'; cmd: TrainerCmd };
@@ -162,7 +166,25 @@ export interface ChampionSnap extends EntityBase {
     morphT: number;
   };
   dancing: boolean;
+  /** Augments taken this match, in pick order (docs/AUGMENTS.md). */
+  augments: string[];
+  /** Your open draft — only ever present on your OWN champion. */
+  draft?: DraftSnap;
+  /** Reroll tokens left. */
+  rerolls: number;
   stats: { ad: number; attackSpeed: number; moveSpeed: number; armor: number; ward: number };
+}
+
+/** An open augment draft (AUGMENTS.md §1). The match keeps running around it. */
+export interface DraftSnap {
+  /** 0/1/2 — which of the three drafts this is. */
+  index: number;
+  /** Three augment ids. */
+  offers: string[];
+  /** Seconds until auto-pick. */
+  tLeft: number;
+  /** True once the reroll has been spent on this set. */
+  rerolled: boolean;
 }
 
 export interface DummySnap extends EntityBase {
@@ -348,7 +370,10 @@ export type SimEvent =
   | { t: 'overtime' }
   | { t: 'suddenDeath' }
   | { t: 'ping'; player: PlayerId; team: Team; kind: PingKind; x: number; z: number }
-  | { t: 'surrendered'; team: Team };
+  | { t: 'surrendered'; team: Team }
+  | { t: 'draftOpen'; player: PlayerId; index: number; offers: string[] }
+  | { t: 'draftReroll'; player: PlayerId; offers: string[] }
+  | { t: 'augmentPicked'; player: PlayerId; augmentId: string; index: number };
 
 export interface Snapshot {
   tick: number;

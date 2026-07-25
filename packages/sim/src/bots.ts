@@ -1,7 +1,17 @@
-import { BRIDGE, type ChampionDef, ITEMS, type MapDef, RELICS, type Slot } from '@mini-clash/data';
+import {
+  AUGMENTS,
+  BRIDGE,
+  type ChampionDef,
+  DRAFT,
+  ITEMS,
+  type MapDef,
+  RELICS,
+  type Slot,
+} from '@mini-clash/data';
 import type { BotTier, Intent, IntentMsg, PlayerId } from '@mini-clash/protocol';
 import { isHiddenFrom } from './brush';
 import { structureInvulnerable } from './combat';
+import { scoreOffer } from './draft';
 import { buyCost } from './items';
 import { Pcg32 } from './rng';
 import { championStats } from './stats';
@@ -285,6 +295,27 @@ function act(w: World, e: Entity, brain: BotBrain, tp: TierParams, map: MapDef):
   const c = e.champ;
   const battle = map.battle;
   if (!c || !battle || !w.match) return [];
+
+  // Drafting (AUGMENTS.md §2). Bots don't sit on an open draft for 45 s — they
+  // take a beat to "read" the cards, then commit. Elites weigh combo lines
+  // harder because scoreOffer's kit-affinity terms dominate their choice.
+  if (c.draft) {
+    const thinkFor = tp.swaps === 'smart' ? 1.5 : tp.swaps === 'basic' ? 2.5 : 4;
+    if (DRAFT.seconds - c.draft.tLeft >= thinkFor) {
+      let bestIdx = 0;
+      let best = Number.NEGATIVE_INFINITY;
+      for (let i = 0; i < c.draft.offers.length; i++) {
+        const def = AUGMENTS[c.draft.offers[i]];
+        if (!def) continue;
+        const s = scoreOffer(w, e, def, brain.rng);
+        if (s > best) {
+          best = s;
+          bestIdx = i;
+        }
+      }
+      return [{ t: 'draftPick', offer: bestIdx as 0 | 1 | 2 }];
+    }
+  }
   const out: Intent[] = [];
   const rng = brain.rng;
   const pm = personalityMul(brain.personality, rng);

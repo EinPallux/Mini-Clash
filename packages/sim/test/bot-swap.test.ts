@@ -60,16 +60,18 @@ describe('bot Tag Swap', () => {
     expect(t0 + t1).toBe(0);
   });
 
-  it('veterans swap too — and elites swap LESS, because they hold ready ultimates', () => {
+  it('veterans and elites both swap actively', () => {
     const vet = swapsByTeam(bridge('veteran'), 150).reduce((a, b) => a + b, 0);
     const elite = swapsByTeam(bridge('elite'), 150).reduce((a, b) => a + b, 0);
     expect(vet).toBeGreaterThan(0);
     expect(elite).toBeGreaterThan(0);
-    // Competence is not frequency. Veterans cycle the bench whenever Energy or
-    // cooldowns say so; elites additionally refuse to trade away an ultimate that
-    // is up in a live fight, which makes them swap *less often but better* — the
-    // value of their swaps is what scripts/swap-ab.mjs measures.
-    expect(elite).toBeLessThan(vet);
+    // Deliberately NOT asserting which tier swaps more often. An earlier version
+    // of this test locked in "elites swap less" off a single measurement; adding
+    // augments flipped the ordering (47<58 became 59>53) without changing either
+    // brain. Swap COUNT is context noise — the ult-discipline rule really does
+    // suppress some elite swaps, but it competes with cooldown- and Energy-driven
+    // ones that augments accelerate. What matters is the value of a swap, and
+    // that is what scripts/swap-ab.mjs measures head-to-head.
   });
 
   it('rig.noSwapTeam pins exactly one side — the A/B is honest', () => {

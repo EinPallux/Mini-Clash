@@ -1,4 +1,4 @@
-import { capacitorArc, powderBlast } from './abilities';
+import { applyBasicRiders, capacitorArc, powderBlast } from './abilities';
 import { applyCc } from './buffs';
 import { dealDamage, displace } from './combat';
 import { dist, norm } from './vec';
@@ -133,6 +133,7 @@ function updateHoming(w: World, e: Entity, dt: number): void {
       displace(w, target, p.dirX, p.dirZ, owner.champ?.def.passive.params.push ?? 0.5);
     }
     if (p.capacitor && owner) capacitorArc(w, owner, target);
+    if (owner?.champ && owner.champ.augments.length > 0) applyBasicRiders(w, owner, target);
     e.dead = true;
     w.remove(e.id);
     return;

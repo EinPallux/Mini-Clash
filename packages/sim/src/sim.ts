@@ -2,6 +2,7 @@ import {
   BRIDGE,
   CHAMPIONS,
   type ChampionDef,
+  DRAFT,
   type MapDef,
   SHATTERBRIDGE_MAP,
   TICK_DT,
@@ -33,6 +34,7 @@ import { type BotBrain, makeBrain, thinkBots } from './bots';
 import { isHiddenFrom, updateBrushState } from './brush';
 import { applyBuff, applyBuffById, applyCc, applyFear, shieldTotal, tickBuffs } from './buffs';
 import { dealDamage } from './combat';
+import { pickAugment, rerollDraft, updateDrafts } from './draft';
 import { levelUpChamp, updateIncome, updateOrbs } from './economy';
 import { tryBuy, tryBuyRelic, trySell, tryUseRelic, updateItemPassives } from './items';
 import { spawnWave, updateMini } from './minis';
@@ -207,6 +209,10 @@ export class Sim {
           respawnIn: 0,
           dancing: false,
           feared: null,
+          augments: [],
+          draft: null,
+          draftsDone: 0,
+          rerolls: DRAFT.rerolls,
           passive: initPassive(def),
           duo: benchDef
             ? {
@@ -392,6 +398,14 @@ export class Sim {
       case 'swap': {
         const deny = trySwap(w, e);
         if (deny) w.emit({ t: 'castDenied', player: m.player, reason: deny });
+        break;
+      }
+      case 'draftPick': {
+        pickAugment(w, e, it.offer);
+        break;
+      }
+      case 'draftReroll': {
+        rerollDraft(w, e);
         break;
       }
       case 'useRelic': {
@@ -602,7 +616,10 @@ export class Sim {
       }
     }
 
-    // 7. Match orchestration: barrier, waves, orbs.
+    // 7. Open augment drafts tick down (the match never pauses for them).
+    updateDrafts(w, dt);
+
+    // 8. Match orchestration: barrier, waves, orbs.
     this.updateMatchFlow();
   }
 
@@ -957,8 +974,13 @@ export class Sim {
     if (!wasBot) this.brains.delete(player);
   }
 
+  /** Offline convenience: the single human seat this sim is rendered for. */
+  private soleHuman(): PlayerId | undefined {
+    return this.config.players.find((p) => !p.bot)?.id;
+  }
+
   snapshot(): Snapshot {
-    const snap = this.snapshotFor(this.viewerTeam);
+    const snap = this.snapshotFor(this.viewerTeam, this.soleHuman());
     this.world.events = [];
     return snap;
   }
@@ -968,13 +990,27 @@ export class Sim {
    * leave the sim, so neither team can wallhack). Does NOT drain the event queue;
    * the caller drains via `drainEvents()` after building every view it needs.
    */
-  snapshotFor(team: 0 | 1): Snapshot {
+  snapshotFor(team: 0 | 1, forPlayer?: PlayerId): Snapshot {
     const w = this.world;
     const entities: EntitySnap[] = [];
     for (const e of w.entities) {
       // Brush concealment: hidden enemies never leave the sim (map-hack impossible).
       if (e.kind === 'champion' && isHiddenFrom(w, team, e)) continue;
-      entities.push(this.snapEntity(e));
+      const snap = this.snapEntity(e);
+      // Your draft is yours: offers never travel to anyone else, so nobody can
+      // read what their opponent is about to pick.
+      if (snap.kind === 'champion' && e.champ?.draft) {
+        const owner = forPlayer !== undefined ? forPlayer : this.soleHuman();
+        if (e.champ.player === owner) {
+          snap.draft = {
+            index: e.champ.draft.index,
+            offers: [...e.champ.draft.offers],
+            tLeft: Math.max(0, Math.ceil(e.champ.draft.tLeft * 10) / 10),
+            rerolled: e.champ.draft.rerolled,
+          };
+        }
+      }
+      entities.push(snap);
     }
     return { tick: w.tick, time: w.time, match: this.matchSnap(), entities, events: w.events };
   }
@@ -1070,6 +1106,8 @@ export class Sim {
             }
           : undefined,
         dancing: c.dancing,
+        augments: [...c.augments],
+        rerolls: c.rerolls,
         stats: {
           ad: Math.round(stats.ad),
           attackSpeed: stats.attackSpeed,

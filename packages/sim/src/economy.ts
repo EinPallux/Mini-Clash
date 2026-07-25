@@ -1,5 +1,8 @@
 import { BRIDGE, LEVEL_MAX, LEVELUP_HEAL_PCT, XP_CURVE } from '@mini-clash/data';
 import type { PlayerId } from '@mini-clash/protocol';
+import { economyMods } from './augments';
+import { applyBuff } from './buffs';
+import { draftIndexForLevel, openDraft } from './draft';
 import { championStats } from './stats';
 import { dist } from './vec';
 import type { Entity, World } from './world';
@@ -17,6 +20,12 @@ export function levelUpChamp(w: World, e: Entity): void {
   e.hp = Math.min(newMax, e.hp + (newMax - oldMax) + newMax * LEVELUP_HEAL_PCT);
   w.emit({ t: 'levelup', id: e.id, level: c.level });
   w.fx('generic.levelup', e.x, e.z, { source: e.id });
+  // Levels 3/6/9 open an augment draft — bridge only, and never twice for the
+  // same level (a champion can cross several levels in one XP grant).
+  if (w.match?.mode === 'bridge') {
+    const idx = draftIndexForLevel(c.level);
+    if (idx >= 0 && idx === c.draftsDone && !c.draft) openDraft(w, e, idx);
+  }
 }
 
 export function grantXp(w: World, e: Entity, amount: number): void {
@@ -48,7 +57,9 @@ export function onMiniKilled(w: World, mini: Entity, byTeam: number): void {
   for (const u of near) {
     const c = u.champ;
     if (!c) continue;
-    c.gold += goldEach;
+    // Windfall multiplies every source; Scavenger adds a flat Mini kicker.
+    const econ = c.augments.length > 0 ? economyMods(u) : null;
+    c.gold += (goldEach + (econ?.miniBonusGold ?? 0)) * (econ?.goldMul ?? 1);
     grantXp(w, u, def.xp);
   }
 }
@@ -119,8 +130,18 @@ export function updateOrbs(w: World): void {
       if (dist(u.x, u.z, orb.x, orb.z) > orb.radius + u.radius + 0.2) continue;
       const c = u.champ;
       if (!c) continue;
-      u.hp = Math.min(u.hpMax, u.hp + u.hpMax * BRIDGE.orb.heal);
+      // Field Rations: bigger orbs, and a short sprint out of the pickup.
+      const econ = c.augments.length > 0 ? economyMods(u) : null;
+      u.hp = Math.min(u.hpMax, u.hp + u.hpMax * BRIDGE.orb.heal * (econ?.orbHealMul ?? 1));
       c.energy = Math.min(100, c.energy + BRIDGE.orb.energy);
+      if (econ && econ.orbMs > 0) {
+        applyBuff(u, {
+          id: 'aug_field_rations',
+          name: 'Field Rations',
+          duration: 1.5,
+          mul: { moveSpeed: 1 + econ.orbMs },
+        });
+      }
       grantXp(w, u, BRIDGE.orb.xp);
       for (const ally of w.champions()) {
         if (ally.id === u.id || ally.team !== u.team) continue;

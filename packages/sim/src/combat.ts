@@ -1,4 +1,5 @@
 import { BRIDGE, CORE_DEF, type DamageType, TOWER_DEF } from '@mini-clash/data';
+import { augmentDamageMul } from './augments';
 import { absorbShields, applyBuff, applyCc, consumeBlock } from './buffs';
 import { creditKill, onMiniKilled } from './economy';
 import { championStats, hasItemPassive, mitigate, unitStats } from './stats';
@@ -86,6 +87,12 @@ export function dealDamage(
     if (inviteAmp > 0 && target.buffs.some((b) => b.id === 'vex_invited')) {
       amount *= 1 + inviteAmp;
     }
+  }
+  // Augment damage conditions (Opportunist, Giant Slayer, Executioner, Siege
+  // Rounds, Glass Core, Kinetic Battery…). Structures qualify too, so Siege
+  // Rounds has to sit outside the champion-target guard above.
+  if (srcChamp && srcChamp.augments.length > 0 && (tag === 'aa' || tag === 'ability')) {
+    amount *= augmentDamageMul(ctx.source, target, tag);
   }
   // Ram Minis siege: bonus vs structures, resilience vs tower fire (both from data).
   if (ctx.source.mini && (target.kind === 'tower' || target.kind === 'core')) {

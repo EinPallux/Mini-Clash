@@ -1,8 +1,9 @@
 import { type AbilityDef, BRIDGE, type Slot, TAG_SWAP } from '@mini-clash/data';
 import { executeActions, plantFlower } from './actions';
+import { basicRiders, duoMods, economyMods, energyCostMul } from './augments';
 import { isHiddenFrom } from './brush';
 import { applyBuff, applyBuffById, applyCc, isUntargetable } from './buffs';
-import { dealDamage, structureInvulnerable } from './combat';
+import { dealDamage, displace, structureInvulnerable } from './combat';
 import { petsOf, spawnPet } from './pets';
 import { championStats, hastedCooldown, resolveScaling } from './stats';
 import { dist, norm } from './vec';
@@ -75,12 +76,16 @@ export function tryCast(
   if (slot === 'r' && w.match?.mode === 'bridge' && c.level < BRIDGE.rUnlockLevel) return 'level';
   if (c.cds[slot] > 0.001) return 'cooldown';
   const ability = c.def.abilities[slot];
-  // Entrance flourishes can make the next Q free (Rattle).
-  let cost = ability.cost;
+  // Entrance flourishes can make the next Q free (Rattle, Vex).
+  let cost = ability.cost * energyCostMul(e);
   const freeQ = slot === 'q' ? e.buffs.findIndex((b) => b.id === 'entrance_free_q') : -1;
   if (freeQ >= 0) cost = 0;
+  // Tag Combo: the first ability after a swap is free, whichever slot it is.
+  const combo = e.buffs.findIndex((b) => b.id === 'aug_tag_combo');
+  if (combo >= 0) cost = 0;
   if (!infiniteEnergy && c.energy < cost) return 'energy';
   if (freeQ >= 0) e.buffs.splice(freeQ, 1);
+  else if (combo >= 0) e.buffs.splice(combo, 1);
 
   // Cancel an in-flight basic-attack windup — abilities take priority.
   if (c.cast?.kind === 'aa') c.cast = null;
@@ -174,18 +179,34 @@ export function updateCasts(w: World, e: Entity, dt: number, noCooldowns: boolea
   // Cooldowns, energy, passives.
   for (const s of ['q', 'w', 'r'] as const) c.cds[s] = Math.max(0, c.cds[s] - dt);
   c.aaCd = Math.max(0, c.aaCd - dt);
-  c.energy = Math.min(100, c.energy + 4 * dt);
+  c.energy = Math.min(
+    100,
+    c.energy + (4 + (c.augments.length > 0 ? economyMods(e).energyRegen : 0)) * dt,
+  );
   if (c.passive.stonewallCd !== undefined)
     c.passive.stonewallCd = Math.max(0, c.passive.stonewallCd - dt);
   // The benched half keeps living (GAME_DESIGN §7.2): cooldowns tick, Energy
   // refills — swapping is a resource play precisely because the bench recovers.
   const duo = c.duo;
   if (duo) {
+    const mods = c.augments.length > 0 ? duoMods(e) : null;
+    const benchRate = mods?.benchCdRate ?? 1;
     duo.swapCd = Math.max(0, duo.swapCd - dt);
     duo.morphT = Math.max(0, duo.morphT - dt);
-    for (const s of ['q', 'w', 'r'] as const) duo.cds[s] = Math.max(0, duo.cds[s] - dt);
+    // Warm Bench: the benched half recovers faster than the fielded one.
+    for (const s of ['q', 'w', 'r'] as const) {
+      duo.cds[s] = Math.max(0, duo.cds[s] - dt * benchRate);
+    }
     duo.aaCd = Math.max(0, duo.aaCd - dt);
-    duo.energy = Math.min(100, duo.energy + 4 * dt);
+    duo.energy = Math.min(100, duo.energy + 4 * dt * benchRate);
+    // Understudy: a benched champion banks Resolve for its next entrance.
+    if (mods && mods.resolvePerSec > 0) {
+      const cap = e.hpMax * mods.resolveCap;
+      c.passive.resolve = Math.min(
+        cap,
+        (c.passive.resolve ?? 0) + e.hpMax * mods.resolvePerSec * dt,
+      );
+    }
     if (duo.passive.stonewallCd !== undefined)
       duo.passive.stonewallCd = Math.max(0, duo.passive.stonewallCd - dt);
   }
@@ -363,6 +384,7 @@ function commitAutoAttack(w: World, e: Entity, targetId: number | undefined): vo
     if (dist(e.x, e.z, target.x, target.z) - target.radius <= reach) {
       dealDamage(w, { source: e, tag: 'aa' }, target, stats.ad * luckyMul, 'physical');
       w.fx('generic.melee.hit', target.x, target.z, { source: e.id, target: target.id });
+      applyBasicRiders(w, e, target);
     }
     return;
   }
@@ -377,6 +399,7 @@ function commitAutoAttack(w: World, e: Entity, targetId: number | undefined): vo
       powder = true;
     }
   }
+  c.passive.basicCount = (c.passive.basicCount ?? 0) + 1;
   // Capacitor (Boltz): a basic after `idle`s of silence carries the charge.
   let capacitor = false;
   if (c.def.passive.id === 'capacitor') {
@@ -436,7 +459,12 @@ export function applySpawnEffects(w: World, e: Entity): void {
 export function applyEntrance(w: World, e: Entity): void {
   const c = e.champ;
   if (!c) return;
-  const p = c.def.entrance.params;
+  // Dramatic Entrance scales the whole effect: damage, radii, slows, durations.
+  const potency = c.augments.length > 0 ? duoMods(e).entrancePotency : 1;
+  const p =
+    potency === 1
+      ? c.def.entrance.params
+      : Object.fromEntries(Object.entries(c.def.entrance.params).map(([k, v]) => [k, v * potency]));
   switch (c.def.entrance.id) {
     case 'shieldwall': {
       applyBuffById(e, 'rook_entrance_shieldwall');
@@ -568,16 +596,43 @@ export function trySwap(w: World, e: Entity): DenyReason | null {
   [c.cds, duo.cds] = [duo.cds, c.cds];
   [c.aaCd, duo.aaCd] = [duo.aaCd, c.aaCd];
   [c.passive, duo.passive] = [duo.passive, c.passive];
-  duo.swapCd = TAG_SWAP.cooldown;
+  const mods = c.augments.length > 0 ? duoMods(e) : null;
+  duo.swapCd = Math.max(1, (mods?.swapCd ?? TAG_SWAP.cooldown) + (mods?.swapCdDelta ?? 0));
   duo.morphT = TAG_SWAP.morphS;
   c.lastActionAt = w.time; // swapping reveals in brush like any action
 
   applyBuff(e, {
     id: 'tag_swap_momentum',
     name: 'Tag Momentum',
-    duration: TAG_SWAP.hasteDuration,
-    decayingMsBonus: TAG_SWAP.haste,
+    duration: mods?.swapMsDuration ?? TAG_SWAP.hasteDuration,
+    decayingMsBonus: mods?.swapMs ?? TAG_SWAP.haste,
   });
+  if (mods) {
+    // Bulwark Bond: the arriving champion lands behind a shield.
+    if (mods.shieldOnSwap) {
+      applyBuff(e, {
+        id: 'aug_bulwark',
+        name: 'Bulwark Bond',
+        duration: 2,
+        shield: resolveScaling(
+          mods.shieldOnSwap,
+          c.level,
+          championStats(e).ad,
+          championStats(e).ap,
+        ),
+      });
+    }
+    // Tag Combo: the next ability inside the window costs nothing.
+    if (mods.freeCastWindow > 0) {
+      applyBuff(e, { id: 'aug_tag_combo', name: 'Tag Combo', duration: mods.freeCastWindow });
+    }
+    // Understudy: banked Resolve arrives as grey health on the incoming half.
+    const resolve = c.passive.resolve ?? 0;
+    if (resolve > 1) {
+      applyBuff(e, { id: 'aug_resolve', name: 'Resolve', duration: 12, shield: resolve });
+      c.passive.resolve = 0;
+    }
+  }
   applyEntrance(w, e);
   w.fx('duo.swap', e.x, e.z, { source: e.id });
   return null;
@@ -601,6 +656,71 @@ export function powderBlast(w: World, owner: Entity, target: Entity): void {
     }
   }
   w.fx('fathom.passive.blast', target.x, target.z, { source: owner.id, target: target.id });
+}
+
+/**
+ * Augment riders on a basic attack that just landed (Heavy Rounds, Hex Tip,
+ * Chain Lightning). Tagged `item` so they never re-enter the on-hit hooks that
+ * spawned them.
+ */
+export function applyBasicRiders(w: World, owner: Entity, target: Entity): void {
+  const c = owner.champ;
+  if (!c || c.augments.length === 0) return;
+  const riders = basicRiders(owner, c.passive.basicCount ?? 0);
+  if (riders.length === 0) return;
+  const stats = championStats(owner);
+  for (const r of riders) {
+    const amount = r.bonus ? resolveScaling(r.bonus, c.level, stats.ad, stats.ap) : 0;
+    if (amount > 0) {
+      if (r.burnSeconds > 0) {
+        // Spread it over time — the burn is the visible tell, not a bigger number.
+        const ticks = 4;
+        for (let i = 1; i <= ticks; i++) {
+          w.schedule((r.burnSeconds / ticks) * i, (world) => {
+            const src = world.get(owner.id);
+            const tgt = world.get(target.id);
+            if (!src || !tgt || tgt.dead) return;
+            dealDamage(
+              world,
+              { source: src, tag: 'burn', label: 'augment' },
+              tgt,
+              amount / ticks,
+              r.dtype,
+            );
+          });
+        }
+      } else {
+        dealDamage(w, { source: owner, tag: 'item', label: 'augment' }, target, amount, r.dtype);
+      }
+    }
+    if (r.push > 0) {
+      const [px, pz] = norm(target.x - owner.x, target.z - owner.z);
+      displace(w, target, px, pz, r.push);
+    }
+    if (r.chain) {
+      // Arc to the nearest OTHER enemy — the filament is the visibility tell.
+      let best: Entity | undefined;
+      let bestD = r.chain.radius;
+      for (const u of w.enemiesOf(owner.team)) {
+        if (u.kind === 'keg' || u.id === target.id || isUntargetable(u)) continue;
+        const d = dist(target.x, target.z, u.x, u.z);
+        if (d < bestD) {
+          bestD = d;
+          best = u;
+        }
+      }
+      if (best) {
+        dealDamage(
+          w,
+          { source: owner, tag: 'item', label: 'augment' },
+          best,
+          stats.ad * r.chain.mul,
+          r.dtype,
+        );
+        w.fx('augment.chain', best.x, best.z, { source: owner.id, target: best.id });
+      }
+    }
+  }
 }
 
 /** Capacitor charged basic (Boltz): bonus arcane on the target, arcing to one more. */

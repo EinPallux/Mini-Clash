@@ -1,4 +1,5 @@
 export { SOUND_CUES } from './audio';
+export * from './augments';
 export { BUFFS } from './buffs';
 export { BOLTZ } from './champions/boltz';
 export { FATHOM } from './champions/fathom';
