@@ -396,6 +396,7 @@ export class MatchRuntime {
     championId: string;
     benchId?: string;
     team: number;
+    augments?: string[];
   } {
     const snap = this.buffer.current;
     for (const e of snap?.entities ?? []) {
@@ -405,6 +406,7 @@ export class MatchRuntime {
           championId: e.championId,
           benchId: e.duo?.championId,
           team: e.team,
+          augments: e.augments,
         };
       }
     }
@@ -452,6 +454,7 @@ export class MatchRuntime {
             // pair that lost the fight — the bench half reads dimmed.
             killerBench: killer?.benchId,
             victimBench: victim.benchId,
+            killerAugments: killer?.augments,
             killerName: killer?.name ?? 'The bridge',
             victimName: victim.name,
             team: killer?.team ?? (victim.team === 0 ? 1 : 0),

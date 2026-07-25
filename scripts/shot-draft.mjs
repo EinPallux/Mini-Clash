@@ -206,6 +206,15 @@ try {
   if (third.some((c) => c.name === takenName)) errors.push('a taken augment was offered again');
   await page.screenshot({ path: `${OUT}/8-second-draft.png` });
   console.info('second draft:', JSON.stringify(third));
+
+  // Take it, then check the surfaces the trio has to reach.
+  await page.keyboard.press('Digit1');
+  await page.waitForTimeout(3200);
+  const both = await page.evaluate(() => globalThis.__mcDebug?.augments ?? []);
+  if (both.length !== 2) errors.push(`expected 2 held augments, got ${both.length}`);
+  const strip = await page.evaluate(() => document.querySelectorAll('.augment-strip .aug-pip').length);
+  if (strip !== 2) errors.push(`augment strip shows ${strip} pips, expected 2`);
+  await page.screenshot({ path: `${OUT}/9-two-augments.png` });
 } catch (e) {
   errors.push(`fatal: ${e instanceof Error ? e.message : String(e)}`);
 } finally {

@@ -9,16 +9,17 @@ import {
   TRAINING_MAP,
   UNITS,
 } from '@mini-clash/data';
-import type {
-  BotTier,
-  ChampionSnap,
-  EntitySnap,
-  IntentMsg,
-  MatchConfig,
-  MatchStateSnap,
-  PlayerId,
-  Snapshot,
-  TrainerCmd,
+import {
+  type BotTier,
+  type ChampionSnap,
+  type EntitySnap,
+  type IntentMsg,
+  type MatchConfig,
+  type MatchStateSnap,
+  type PlayerId,
+  type Snapshot,
+  type TrainerCmd,
+  UNKNOWN_AUGMENT,
 } from '@mini-clash/protocol';
 import {
   applySpawnEffects,
@@ -33,7 +34,7 @@ import {
 import { healEntity, plantFlower } from './actions';
 import { augParam } from './augments';
 import { type BotBrain, makeBrain, thinkBots } from './bots';
-import { isHiddenFrom, updateBrushState } from './brush';
+import { isHiddenFrom, updateBrushState, updateDiscovery } from './brush';
 import { applyBuff, applyBuffById, applyCc, applyFear, shieldTotal, tickBuffs } from './buffs';
 import { dealDamage } from './combat';
 import { openDraft, pickAugment, rerollDraft, updateDrafts } from './draft';
@@ -624,6 +625,7 @@ export class Sim {
           }
         }
         updateBrushState(w, e);
+        updateDiscovery(w, e);
       }
       if (e.champ) updateIncome(w, e, dt);
       if (e.champ && e.dead) {
@@ -1075,6 +1077,15 @@ export class Sim {
       // Brush concealment: hidden enemies never leave the sim (map-hack impossible).
       if (e.kind === 'champion' && isHiddenFrom(w, team, e)) continue;
       const snap = this.snapEntity(e);
+      // Augment discovery (UI_UX §11): an enemy's cards travel as `?` until this
+      // team has actually seen them on the field. The count still crosses, so
+      // "they have three and I know one" reads correctly on the scoreboard.
+      if (snap.kind === 'champion' && e.team !== team && snap.augments.length > 0) {
+        const seen = w.discovered[team];
+        snap.augments = snap.augments.map((id) =>
+          seen.has(`${snap.player}:${id}`) ? id : UNKNOWN_AUGMENT,
+        );
+      }
       // Your draft is yours: offers never travel to anyone else, so nobody can
       // read what their opponent is about to pick.
       if (snap.kind === 'champion' && e.champ?.draft) {

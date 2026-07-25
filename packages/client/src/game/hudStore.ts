@@ -94,6 +94,8 @@ export interface FeedEntry {
   /** Benched halves: kill cards show the whole duo, dimmed (UI_UX §10). */
   killerBench?: string;
   victimBench?: string;
+  /** Killer's augments as this client knows them (`?` for undiscovered). */
+  killerAugments?: string[];
   killerName?: string;
   victimName?: string;
   /** Team of the actor (colors the entry edge). */

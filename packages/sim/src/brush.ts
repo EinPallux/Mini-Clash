@@ -33,3 +33,17 @@ export function isHiddenFrom(w: World, viewerTeam: Team, e: Entity): boolean {
   }
   return true;
 }
+
+/**
+ * Augment discovery (AUGMENTS §1): a card becomes known to the other team the
+ * moment its owner is actually visible to them holding it. Alive, on the field,
+ * not tucked in a brush — scouting is what buys the information.
+ */
+export function updateDiscovery(w: World, e: Entity): void {
+  const c = e.champ;
+  if (!c || c.augments.length === 0 || e.dead) return;
+  const enemyTeam: Team = e.team === 0 ? 1 : 0;
+  if (isHiddenFrom(w, enemyTeam, e)) return;
+  const seen = w.discovered[enemyTeam];
+  for (const id of c.augments) seen.add(`${c.player}:${id}`);
+}

@@ -451,6 +451,12 @@ export class World {
   match: MatchState | null = null;
   /** Recent team pings (bots read these; trimmed to the last ~5 s each tick). */
   pings: TeamPing[] = [];
+  /**
+   * Augment discovery (AUGMENTS §1, UI_UX §11): `player:augmentId` pairs each
+   * team has actually seen on the field. Scouting is the price of information —
+   * an undiscovered enemy card shows as `?` on the scoreboard and nameplate.
+   */
+  discovered: [Set<string>, Set<string>] = [new Set(), new Set()];
 
   constructor(
     public nav: NavGrid,

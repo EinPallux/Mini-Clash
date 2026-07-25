@@ -1,5 +1,5 @@
 import { AUGMENT_LIST, AUGMENTS, DRAFT, GENERIC_AUGMENTS } from '@mini-clash/data';
-import type { Intent, IntentMsg } from '@mini-clash/protocol';
+import { type Intent, type IntentMsg, UNKNOWN_AUGMENT } from '@mini-clash/protocol';
 import { describe, expect, it } from 'vitest';
 import { Sim } from '../src';
 import { applyCc } from '../src/buffs';
@@ -227,6 +227,32 @@ describe('draft flow', () => {
     sim.applyIntents([msg({ t: 'move', x: 0, z: 0 })]);
     run(sim, 1);
     expect(me(sim).champ?.draft).not.toBeNull();
+  });
+
+  it('enemy augments arrive as `?` until they are seen on the field', () => {
+    const sim = bridge();
+    const c = me(sim).champ;
+    if (!c) throw new Error('no champ');
+    // Grant directly and freeze discovery: nobody has looked at us yet.
+    c.augments.push('stoneskin');
+    sim.world.discovered = [new Set(), new Set()];
+    const enemyView = sim.snapshotFor(1, 2);
+    const hidden = enemyView.entities.find((e) => e.kind === 'champion' && e.player === 1);
+    expect(hidden?.kind === 'champion' ? hidden.augments : []).toEqual([UNKNOWN_AUGMENT]);
+    // The count still crosses: "they have one, I do not know which".
+    expect(hidden?.kind === 'champion' ? hidden.augments.length : 0).toBe(1);
+
+    // Our own team always sees the real card.
+    const ownView = sim.snapshotFor(0, 1);
+    const own = ownView.entities.find((e) => e.kind === 'champion' && e.player === 1);
+    expect(own?.kind === 'champion' ? own.augments : []).toEqual(['stoneskin']);
+
+    // Standing in the open for a tick is what buys the information.
+    run(sim, 0.5);
+    const after = sim.snapshotFor(1, 2).entities.find(
+      (e) => e.kind === 'champion' && e.player === 1,
+    );
+    expect(after?.kind === 'champion' ? after.augments : []).toEqual(['stoneskin']);
   });
 
   it('your offers are private — they never reach the other team', () => {

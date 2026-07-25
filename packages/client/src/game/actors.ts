@@ -6,7 +6,7 @@ import { AnimGraph } from './anim';
 import { assetMeta, findSocket, instantiate } from './assets';
 import type { ParticleSystem } from './fx/particles';
 import type { RenderEntity } from './interp';
-import { HealthBar } from './ui3d';
+import { AugmentPips3D, HealthBar } from './ui3d';
 
 /** Visual actors bound to sim entities. Pooled per kind; all juice lives here. */
 
@@ -134,6 +134,8 @@ class ChampionActor implements Actor {
   private flasher!: Flasher;
   private fader!: Fader;
   private bar: HealthBar;
+  /** Augment chips over the nameplate; `?` cards read grey (UI_UX §11). */
+  private pips = new AugmentPips3D();
   private def: ChampionDef;
   private lastCast: string | null = null;
   private lastDead = false;
@@ -157,7 +159,8 @@ class ChampionActor implements Actor {
     this.buildModel();
     this.bar = new HealthBar(1.5, teamColor(ctx, snap.team, snap.player === ctx.selfPlayerId));
     this.bar.group.position.y = 2.15;
-    this.root.add(this.bar.group);
+    this.pips.group.position.y = 2.36;
+    this.root.add(this.bar.group, this.pips.group);
     scene.add(this.root);
   }
 
@@ -274,6 +277,8 @@ class ChampionActor implements Actor {
       this.model.position.y = 0;
     }
 
+    this.pips.set(snap.augments.map((id) => AUGMENTS[id]?.rarity ?? 'unknown'));
+
     // Thick Hide (and any future `visual.scale` card) makes the body visibly
     // chonkier — the augment's on-screen tell, read straight off the snapshot.
     let bulk = 1;
@@ -372,6 +377,7 @@ class ChampionActor implements Actor {
 
   updateBar(frac: number, dt: number, camera: THREE.Camera): void {
     this.bar.update(frac, dt, camera);
+    this.pips.update(camera);
   }
 
   flash(): void {

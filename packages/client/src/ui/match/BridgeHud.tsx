@@ -1,4 +1,12 @@
-import { CHAMPIONS, ITEMS, type ItemDef, QUICK_CHAT, RELICS, STRINGS } from '@mini-clash/data';
+import {
+  AUGMENTS,
+  CHAMPIONS,
+  ITEMS,
+  type ItemDef,
+  QUICK_CHAT,
+  RELICS,
+  STRINGS,
+} from '@mini-clash/data';
 import type { PingKind } from '@mini-clash/protocol';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { uiSound } from '../../game/audio';
@@ -7,7 +15,7 @@ import type { MatchRuntime } from '../../game/match';
 import { useLobby } from '../../state/lobby';
 import { useSession } from '../../state/session';
 import { paletteColors, useSettings } from '../../state/settings';
-import { DraftOverlay } from './DraftOverlay';
+import { CATEGORY_GLYPH, DraftOverlay } from './DraftOverlay';
 import { ChampionCluster, DenyFlash, SLOT_ICONS } from './HudShared';
 
 /**
@@ -261,6 +269,12 @@ function FeedRow({ e }: { e: FeedEntry }): React.ReactElement {
       <div className={`feed-row ${e.team === selfTeam ? 'ally' : 'enemy'}`}>
         {e.killerChamp && <DuoChip active={e.killerChamp} bench={e.killerBench} />}
         <b>{e.killerName}</b>
+        {/* What killed you is also *how* — the trio rides the card (UI_UX §10). */}
+        {e.killerAugments && e.killerAugments.length > 0 && (
+          <span className="feed-augs">
+            <AugmentPips ids={e.killerAugments} />
+          </span>
+        )}
         <span className="x">⚔</span>
         <b>{e.victimName}</b>
         {e.victimChamp && <DuoChip active={e.victimChamp} bench={e.victimBench} flip />}
@@ -748,12 +762,50 @@ function Scoreboard(): React.ReactElement | null {
                     />
                   ))}
                 </span>
+                <span className="sb-augs">
+                  <AugmentPips ids={s.augments} />
+                </span>
                 <span className="sb-gold">⬢ {s.gold.toLocaleString()}</span>
               </div>
             ))}
         </div>
       ))}
     </div>
+  );
+}
+
+/**
+ * Augment pips for any seat. An enemy card you have not seen on the field
+ * arrives as `?` from the server (UI_UX §11) — the count is public, the
+ * identity is what scouting buys.
+ */
+function AugmentPips({ ids }: { ids: string[] }): React.ReactElement | null {
+  if (ids.length === 0) return null;
+  return (
+    <>
+      {ids.map((id, i) => {
+        const a = AUGMENTS[id];
+        if (!a) {
+          return (
+            // biome-ignore lint/suspicious/noArrayIndexKey: placeholders are identical by design
+            <span key={`unknown-${i}`} className="aug-pip unknown" title="Not seen yet">
+              ?
+            </span>
+          );
+        }
+        return (
+          <span
+            key={id}
+            className={`aug-pip ${a.rarity}`}
+            title={`${a.name} — ${a.description}`}
+            role="img"
+            aria-label={a.name}
+          >
+            {CATEGORY_GLYPH[a.category]}
+          </span>
+        );
+      })}
+    </>
   );
 }
 
@@ -1005,6 +1057,8 @@ interface HistoryEntry {
   myChampion: string;
   /** Benched half of your duo (absent for pre-v0.4 entries and solo configs). */
   myBench?: string;
+  /** Your augment trio (docs/AUGMENTS.md) — absent for pre-v0.5 entries. */
+  myAugments?: string[];
   seats: {
     championId: string;
     benchId?: string;
@@ -1013,6 +1067,8 @@ interface HistoryEntry {
     k: number;
     d: number;
     a: number;
+    /** Enemy entries keep their `?` placeholders: history records what you saw. */
+    augments?: string[];
   }[];
 }
 
@@ -1054,6 +1110,7 @@ function EndSequence(): React.ReactElement | null {
       kills: match.teamKills,
       myChampion: champ.championId,
       myBench: champ.duo?.championId,
+      myAugments: champ.augments,
       seats: seats.map((s) => ({
         championId: s.championId,
         benchId: s.benchChampionId,
@@ -1062,6 +1119,7 @@ function EndSequence(): React.ReactElement | null {
         k: s.kills,
         d: s.deaths,
         a: s.assists,
+        augments: s.augments,
       })),
     });
   }, [match, champ, seats, won, selfPlayer]);
@@ -1155,6 +1213,9 @@ function EndSequence(): React.ReactElement | null {
                   <span className="sb-lv">{s.level}</span>
                   <span className="sb-kda">
                     {s.kills}/{s.deaths}/{s.assists}
+                  </span>
+                  <span className="sb-augs">
+                    <AugmentPips ids={s.augments} />
                   </span>
                 </div>
               ))}

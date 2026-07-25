@@ -2039,7 +2039,7 @@ input[type="range"] {
 }
 .sb-row {
   display: grid;
-  grid-template-columns: 24px minmax(96px, 1fr) 26px 64px 96px 70px;
+  grid-template-columns: 24px minmax(96px, 1fr) 26px 64px 96px 66px 70px;
   gap: 6px;
   align-items: center;
   padding: 4px 8px;
@@ -2279,7 +2279,7 @@ input[type="range"] {
   margin-top: 10px;
 }
 .summary-table .sb-row {
-  grid-template-columns: 24px 1fr 26px 70px;
+  grid-template-columns: 24px 1fr 26px 70px 66px;
 }
 
 /* ------------------------------ Custom lobby ------------------------------ */
@@ -3301,4 +3301,27 @@ input[type="range"] {
 .aug-pip.prismatic {
   border-color: rgba(255, 255, 255, 0.8);
   background: linear-gradient(135deg, #6a3fa0, #a03f7a, #3f6aa0);
+}
+/* Not scouted yet: the slot is there, the identity is not (UI_UX §11). */
+.aug-pip.unknown {
+  border-color: rgba(200, 210, 230, 0.25);
+  color: rgba(255, 255, 255, 0.45);
+  background: rgba(20, 26, 42, 0.7);
+}
+
+/* Augment trios on the scoreboard, the summary and kill cards. */
+.sb-augs,
+.feed-augs {
+  display: inline-flex;
+  gap: 3px;
+  align-items: center;
+}
+.sb-augs .aug-pip,
+.feed-augs .aug-pip {
+  width: 17px;
+  height: 17px;
+  font-size: 0.62rem;
+}
+.feed-augs {
+  margin-left: 4px;
 }

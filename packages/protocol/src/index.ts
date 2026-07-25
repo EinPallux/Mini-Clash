@@ -8,6 +8,9 @@ import type { Slot, Team } from '@mini-clash/data';
 
 export { PROTOCOL_VERSION } from '@mini-clash/data';
 
+/** Placeholder id for an enemy augment this team has not discovered yet. */
+export const UNKNOWN_AUGMENT = '?';
+
 export type EntityId = number;
 export type PlayerId = number;
 
@@ -168,7 +171,11 @@ export interface ChampionSnap extends EntityBase {
     morphT: number;
   };
   dancing: boolean;
-  /** Augments taken this match, in pick order (docs/AUGMENTS.md). */
+  /**
+   * Augments taken this match, in pick order (docs/AUGMENTS.md). Enemy entries
+   * you have not yet seen on the field arrive as `UNKNOWN_AUGMENT` — the count
+   * is public, the identities are earned (UI_UX §11).
+   */
   augments: string[];
   /** Your open draft — only ever present on your OWN champion. */
   draft?: DraftSnap;
