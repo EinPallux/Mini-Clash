@@ -210,7 +210,11 @@ export function rerollDraft(w: World, e: Entity): boolean {
 export function scoreOffer(w: World, e: Entity, def: AugmentDef, rng: Pcg32): number {
   const c = e.champ;
   if (!c) return 0;
-  let score = def.rarity === 'prismatic' ? 3 : def.rarity === 'gold' ? 2 : 1;
+  // Rarity is a *prior*, not the decision. It used to be 1/2/3, which no amount
+  // of kit affinity could overcome — so bots took the shiniest card in the hand
+  // and the harness's pick-rate rail was measuring this weight rather than the
+  // augment. Kept small enough that two good tag matches beat a tier.
+  let score = def.rarity === 'prismatic' ? 1.6 : def.rarity === 'gold' ? 1.25 : 1;
 
   // Signatures are built for this kit — that is the whole point of them.
   if (def.category === 'signature') score += 2;
