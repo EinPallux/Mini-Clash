@@ -1,16 +1,13 @@
 import cookie from '@fastify/cookie';
 import rateLimit from '@fastify/rate-limit';
-import Fastify, {
-  type FastifyBaseLogger,
-  type FastifyInstance,
-  type FastifyReply,
-} from 'fastify';
+import Fastify, { type FastifyBaseLogger, type FastifyInstance, type FastifyReply } from 'fastify';
 import { ZodError, type ZodType } from 'zod';
 import { checkCsrf, SESSION_COOKIE, SESSION_MAX_AGE, type Session, sessionFor } from './auth';
 import { migrate, openDb, type Sql } from './db';
 import { ApiError } from './errors';
 import { log } from './log';
 import { authRoutes } from './routes/auth';
+import { hubRoutes } from './routes/hub';
 
 /**
  * The Fastify app (TECH §9–§10).
@@ -157,6 +154,7 @@ export async function buildApp(opts: AppOptions = {}): Promise<FastifyInstance> 
   }));
 
   await app.register(authRoutes, { prefix: '/auth' });
+  await app.register(hubRoutes);
 
   return app;
 }

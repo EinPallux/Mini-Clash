@@ -54,6 +54,9 @@ create table mastery (
   champion_id text not null,
   xp          integer not null default 0 check (xp >= 0),
   level       integer not null default 1 check (level between 1 and 10),
+  -- Highest milestone whose coins have been collected, so a claim button can
+  -- only ever pay out once (UI_UX §13).
+  claimed     integer not null default 0 check (claimed >= 0),
   primary key (user_id, champion_id)
 );
 
