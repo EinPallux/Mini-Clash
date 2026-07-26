@@ -8,7 +8,12 @@
 
 No install, no launcher. Open a link, invite three friends (bots fill the rest), and clash.
 
-> **Status: 📐 Planning phase.** This repository currently contains the complete design & technical documentation plus the CC0 3D asset library. No game code exists yet — implementation begins with Roadmap Phase v0.1.
+> **Status: 🎮 v0.7 “The Hub”.** The game plays end to end: Training Grounds, 4v4
+> Bridge Brawl against bots, authoritative online play with custom lobbies and
+> reconnect, the Tag Team duo system, the Power Surge augment draft, the Living
+> Bridge event system — and now accounts, the Clash Coin economy, unlocks,
+> quests, mastery and server-side match history. Roster: 10 champions.
+> Next up is `v0.8` in [ROADMAP.md](ROADMAP.md).
 
 ---
 
@@ -31,21 +36,49 @@ The client's own `build` script runs the asset pipeline first (`pnpm -w
 assets:build`), so there is no host configuration that can skip it. The
 pipeline launches through esbuild (`run.mjs`), making it independent of the
 host's Node TypeScript support; any Node ≥20 works. Static hosting covers
-offline/vs-bots play only — online needs the game server below.
+offline/vs-bots play only, with no account and no rewards — online play, coins,
+unlocks, quests and match history all need the stack below.
 
-### Online stack (one VPS, Docker Compose)
+### Online stack (one VPS, Ubuntu 24.04 LTS)
+
+Everything runs on one box under Docker Compose. Two commands from a fresh
+Ubuntu 24.04 server:
 
 ```bash
-DOMAIN=play.example.com docker compose up -d --build
+git clone <this repo> /srv/mini-clash && cd /srv/mini-clash
+sudo ./deploy/setup.sh      # Docker, firewall, and a .env with fresh secrets
+# edit .env: set DOMAIN=play.example.com once its DNS points at this box
+./deploy/deploy.sh          # build, migrate, roll out, verify
 ```
 
-Three services (see `compose.yaml`): **game** — the Colyseus server as a single
-self-contained bundle (`packages/server/build.mjs`); **web** — Caddy with
-automatic HTTPS serving the built client and reverse-proxying everything under
-`/ws` (websockets, Colyseus matchmake calls, lobby-code lookups) to the game;
-**status** — an uptime-kuma status page on `:3001` (point a monitor at
-`http://game:2567/healthz`). Leave `DOMAIN` unset for a plain-HTTP local run
-on `:80`. Staging is the same file on a second box with its own `DOMAIN`.
+| Script | What it does |
+|---|---|
+| `deploy/setup.sh` | One-time host prep: Docker Engine from Docker's own apt repo, `ufw` (SSH/80/443, and **not** the status page), a swap warning on small boxes, and a `.env` with generated secrets. Idempotent, and it never overwrites an existing `.env`. |
+| `deploy/deploy.sh` | Backs up the database, builds the images, starts the stack, waits for both health endpoints, and checks the edge. `--pull` to `git pull` first, `--no-build` to restart what is already built. |
+| `deploy/start.sh` / `stop.sh` | Bring the stack up or down. `stop.sh --destroy` also deletes the database volume, and makes you type the word. |
+| `deploy/status.sh` | Containers, health, account/match counts, **and a ledger reconciliation** — the same invariant the api's tests assert, run against live data. |
+| `deploy/logs.sh [service] [lines]` | Follow the logs. The api and game server write pino JSON; pipe through `jq`. |
+| `deploy/backup.sh [dir]` | `pg_dump` inside the container, gzipped, newest 14 kept. Verifies the dump is not empty before trusting it. Cron-friendly. |
+| `deploy/restore.sh <dump>` | Stops the writers, takes a safety dump of what it is about to replace, then loads the file. |
+| `deploy/selftest.sh` | 37 checks over the scripts themselves — argument handling, config guards, secret generation, compose validity. Touches nothing; safe on a live box. |
+
+Five services (see `compose.yaml`): **api** — accounts, the coin ledger,
+unlocks, quests and match history (Fastify + Postgres, migrations applied on
+boot); **db** — Postgres 17 on a named volume; **game** — the Colyseus server as
+a single self-contained bundle; **web** — Caddy with automatic HTTPS serving the
+built client, proxying `/ws` to the game and `/api` to the api **on the same
+origin**, which is what keeps the session cookie first-party and means there is
+no CORS configuration to get wrong; **status** — an uptime-kuma page on `:3001`
+(firewalled; reach it over an SSH tunnel).
+
+Two secrets live in `.env` and neither is recoverable — keep a copy:
+`POSTGRES_PASSWORD`, and `MC_INTERNAL_SECRET`, which signs the link between the
+game server and the api. Without a valid one the api **refuses** to record
+matches rather than accepting unsigned ones, so a misconfigured deploy pays
+nobody instead of letting anybody post fabricated results.
+
+Leave `DOMAIN` at `:80` for a plain-HTTP local or IP-only trial. Staging is the
+same repo on a second box with its own `DOMAIN`.
 
 Observability (TECH §14): the game server writes pino JSON logs to stdout
 (`docker compose logs game`) and exposes Prometheus metrics at
