@@ -10,7 +10,10 @@ FROM node:22-alpine AS build
 # `pnpm lockfile` (scripts/check-lockfile.mjs) enforces that in CI.
 RUN corepack enable
 WORKDIR /app
-COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
+# tsconfig.base.json is not optional: every package tsconfig extends it, and
+# vite reads the client's when it transforms, so leaving it out fails the client
+# build with "failed to resolve extends" rather than anything about a copy.
+COPY pnpm-lock.yaml pnpm-workspace.yaml package.json tsconfig.base.json ./
 COPY packages ./packages
 COPY assets ./assets
 COPY scripts ./scripts

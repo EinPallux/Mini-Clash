@@ -132,9 +132,25 @@ try {
   if (!history?.includes('"result"')) errors.push('match history not written');
 
   // Airplane mode: the SW precaches the full build at install — wait for the
-  // worker to be active and its cache populated, then cut the network.
+  // worker to be active, *controlling this page*, and its cache populated, then
+  // cut the network.
+  //
+  // Controlling matters and `ready` does not prove it: `ready` resolves on an
+  // active worker, but the page that registered it is only claimed once
+  // `activate` runs its `clients.claim()`. Reload before that and the navigation
+  // never reaches the fetch handler — the browser goes to the network, which is
+  // switched off, and the app shell simply does not come back.
   const cached = await page.evaluate(async () => {
     await navigator.serviceWorker.ready;
+    if (!navigator.serviceWorker.controller) {
+      await Promise.race([
+        new Promise((r) =>
+          navigator.serviceWorker.addEventListener('controllerchange', r, { once: true }),
+        ),
+        new Promise((r) => setTimeout(r, 10000)),
+      ]);
+    }
+    if (!navigator.serviceWorker.controller) return 0;
     for (let i = 0; i < 40; i++) {
       const keys = await caches.keys();
       const name = keys.find((k) => k.startsWith('mini-clash-'));
@@ -147,18 +163,22 @@ try {
     }
     return 0;
   });
-  if (!cached) errors.push('service worker never finished precaching');
+  if (!cached) errors.push('service worker never claimed this page or finished precaching');
   offlinePhase = true;
   await context.setOffline(true);
   // The first offline reload can race the service worker's cold start under
-  // CDP-emulated offline (observed on SwiftShader runners) — allow one retry.
+  // CDP-emulated offline (observed on SwiftShader runners) — allow retries, and
+  // poll rather than sleep a fixed amount, because boot on a software rasterizer
+  // is slower than the wait that looks generous on a developer machine.
   let offlineHub = false;
-  for (let attempt = 0; attempt < 2 && !offlineHub; attempt++) {
+  for (let attempt = 0; attempt < 3 && !offlineHub; attempt++) {
     await page.reload().catch(() => {});
-    await page.waitForTimeout(3000);
-    offlineHub = await page.evaluate(
-      () => document.body.textContent?.includes('MINI CLASH') ?? false,
-    );
+    for (let i = 0; i < 20 && !offlineHub; i++) {
+      await page.waitForTimeout(500);
+      offlineHub = await page
+        .evaluate(() => document.body.textContent?.includes('MINI CLASH') ?? false)
+        .catch(() => false);
+    }
   }
   if (!offlineHub) errors.push('offline reload did not reach the app shell');
   try {
