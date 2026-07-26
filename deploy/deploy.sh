@@ -56,8 +56,13 @@ if [[ "${BEHIND_PROXY}" -eq 1 ]]; then
 fi
 
 # A shared box is the normal case, not the exception. Look before touching it.
+#
+# Preflight is told which mode it is checking for. Behind a proxy Mini Clash
+# never asks for :80/:443, so a conflict there is somebody else's business and
+# not a reason to stop — checking for it anyway would block the one flag that
+# exists to resolve it.
 if [[ "${SKIP_PREFLIGHT}" -eq 0 ]]; then
-  if ! "${REPO_ROOT}/deploy/preflight.sh"; then
+  if ! MC_BEHIND_PROXY="${BEHIND_PROXY}" "${REPO_ROOT}/deploy/preflight.sh"; then
     die "Preflight found a conflict. Read the advice above, then re-run.
      If you have already handled it: ./deploy/deploy.sh --skip-preflight"
   fi

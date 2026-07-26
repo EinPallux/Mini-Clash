@@ -151,6 +151,25 @@ if have_cmd docker; then
   check $? "…and the merged config really publishes 8090 instead"
 fi
 
+step "Preflight mode awareness"
+# --behind-proxy exists precisely to resolve an :80 conflict. A preflight that
+# still failed on :80 in that mode would block the only flag that fixes it —
+# which is exactly what happened the first time this ran on a real box.
+grep -q 'MC_BEHIND_PROXY' "${REPO_ROOT}/deploy/preflight.sh"
+check $? "preflight knows which mode it is checking for"
+grep -q 'MC_BEHIND_PROXY="\${BEHIND_PROXY}"' "${REPO_ROOT}/deploy/deploy.sh"
+check $? "deploy.sh tells it, so --behind-proxy is not blocked by :80"
+grep -A2 'MC_BEHIND_PROXY:-0}" == "1"' "${REPO_ROOT}/deploy/preflight.sh" |
+  grep -q 'EDGE_PORT'
+check $? "…and in that mode it checks the loopback port instead"
+
+# The advice is a list of commands, not an interactive menu. It read as one
+# once, and somebody typed "A" at their shell.
+! grep -qE '^\s+"  [AB]\. ' "${REPO_ROOT}/deploy/preflight.sh"
+check $? "the advice does not look like a menu waiting for a keypress"
+grep -q 'Run ONE of these' "${REPO_ROOT}/deploy/preflight.sh"
+check $? "…it says to run one of the commands shown"
+
 step "Port detection"
 # The guard that protects another service is only worth having if it can
 # actually see. A silent "everything is free" is the failure mode that matters.

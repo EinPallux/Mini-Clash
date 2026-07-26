@@ -24,6 +24,12 @@ readonly PROJECT=mini-clash
 conflicts=0
 advice=()
 
+# Read once, up front: the port advice quotes it.
+domain_hint="${DOMAIN:-}"
+[[ -z "${domain_hint}" && -f "${REPO_ROOT}/.env" ]] &&
+  domain_hint="$(grep -E '^DOMAIN=' "${REPO_ROOT}/.env" | cut -d= -f2-)"
+[[ -z "${domain_hint}" || "${domain_hint}" == ":80" ]] && domain_hint="your domain"
+
 have_cmd docker || die "Docker is not installed. Run: sudo ./deploy/setup.sh"
 if ! docker info >/dev/null 2>&1; then
   die "Cannot talk to the Docker daemon (are you in the docker group?).
@@ -97,24 +103,50 @@ check_port() {
   [[ -n "${owner}" ]] && info "    (compose project '${owner}')"
 }
 
-check_port 80 "Caddy, and Let's Encrypt validates over it"
-check_port 443 "Caddy's HTTPS"
-check_port 3001 "the status page (loopback only)"
+# Which ports does this deploy actually want? Behind a proxy the answer is one
+# loopback port, and :80/:443 are none of our business.
+if [[ "${MC_BEHIND_PROXY:-0}" == "1" ]]; then
+  info "Behind-proxy mode: :80 and :443 are left to whoever already has them"
+  check_port "${EDGE_PORT:-8090}" "Caddy, behind your existing proxy"
+else
+  check_port 80 "Caddy, and Let's Encrypt validates over it"
+  check_port 443 "Caddy's HTTPS"
+fi
+check_port "${STATUS_PORT:-3001}" "the status page (loopback only)"
 
 if [[ "${conflicts}" -gt 0 ]]; then
-  advice+=(
-    "Port 80/443 belong to something else. Two ways forward:"
-    ""
-    "  A. Run BOTH, with the existing proxy in front (recommended):"
-    "       ./deploy/deploy.sh --behind-proxy"
-    "     Mini Clash then listens on 127.0.0.1:8090 and never touches 80/443."
-    "     Point your existing proxy at it for moba.pathlands.cc — the header"
-    "     block you need is at the top of compose.behind-proxy.yaml."
-    ""
-    "  B. Take turns. Stop the other stack YOURSELF first, then deploy:"
-    "       docker compose -p <that-project> stop"
-    "     Nothing in deploy/ will ever stop another project for you."
-  )
+  if [[ "${MC_BEHIND_PROXY:-0}" == "1" ]]; then
+    advice+=(
+      "The loopback port Mini Clash wants is already in use."
+      "Pick another and try again:"
+      ""
+      "    EDGE_PORT=8091 ./deploy/deploy.sh --behind-proxy"
+      ""
+      "(Or set EDGE_PORT in .env so it sticks.)"
+    )
+  else
+    # Presented as commands, not as a lettered menu — nothing here is waiting
+    # for you to type a letter.
+    advice+=(
+      "Something else already owns those ports. Run ONE of these:"
+      ""
+      "  Run both games at once, behind the proxy you already have:"
+      ""
+      "    ./deploy/deploy.sh --behind-proxy"
+      ""
+      "  Mini Clash then listens on 127.0.0.1:${EDGE_PORT:-8090} and never"
+      "  touches :80/:443. Afterwards, point your existing proxy at it for"
+      "  ${domain_hint}. The nginx and Caddy snippets are at the top of"
+      "  compose.behind-proxy.yaml, and in DEPLOY.md § 3."
+      ""
+      "  Or take turns — stop the other stack yourself, then deploy normally:"
+      ""
+      "    docker compose -p <project-name-from-above> stop"
+      "    ./deploy/deploy.sh"
+      ""
+      "  Nothing in deploy/ will ever stop another project for you."
+    )
+  fi
 fi
 
 # ---------------------------------------------------------------------------
@@ -209,5 +241,5 @@ if [[ "${conflicts}" -eq 0 ]]; then
   ok "Clear to deploy: ./deploy/deploy.sh"
   exit 0
 fi
-warn "${conflicts} port conflict(s). Pick A or B above, then deploy."
+warn "${conflicts} port conflict(s) — see the commands above."
 exit 1

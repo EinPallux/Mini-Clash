@@ -88,6 +88,12 @@ client with `/api/*` and `/ws/*` on the same origin.
 ./deploy/deploy.sh --behind-proxy
 ```
 
+Nothing else — no extra argument. Preflight knows about this mode and stops
+checking `:80`/`:443`, because in it Mini Clash never asks for them.
+
+If `8090` is also busy, pick another: `EDGE_PORT=8091 ./deploy/deploy.sh
+--behind-proxy`, or set `EDGE_PORT` in `.env` so it sticks.
+
 Mini Clash's Caddy then binds **`127.0.0.1:8090` only** and never touches the
 public ports, so **both games run at once**. Point your existing proxy at it:
 
@@ -198,7 +204,7 @@ another stack's anything.
   while that would cut off a listening port.
 - No writing outside `/srv/mini-clash` except the Docker volumes above.
 
-`./deploy/selftest.sh` checks these mechanically — 51 checks, including that the
+`./deploy/selftest.sh` checks these mechanically — 56 checks, including that the
 project name is pinned, that no unscoped prune exists anywhere in `deploy/`, and
 that the behind-proxy override really does bind neither 80 nor 443.
 
