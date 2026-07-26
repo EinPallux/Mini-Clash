@@ -3543,3 +3543,947 @@ input[type="range"] {
     animation: none;
   }
 }
+
+/* ========================================================================== */
+/* v0.7 — The Hub: champions, store, quests, history, profile (UI_UX §13).    */
+/* Same chrome language as the Play tab: flat plates, skewed accents, one     */
+/* gold highlight. Nothing here scrolls the page sideways — every wide thing  */
+/* (scoreboards especially) scrolls inside its own box.                       */
+/* ========================================================================== */
+
+.profile-tile {
+  background: none;
+  border: 0;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+}
+.profile-tile .pt-name {
+  font-weight: 600;
+}
+.profile-tile .pt-level {
+  margin-left: 6px;
+  padding: 1px 6px;
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  background: rgba(255, 199, 46, 0.18);
+  color: var(--gold);
+  border-radius: var(--r);
+}
+
+.hub-status {
+  padding: 8px 26px;
+  font-family: var(--font-ui);
+  font-size: 0.92rem;
+  color: var(--ink-soft);
+  background: rgba(29, 36, 48, 0.06);
+  border-bottom: 1px solid rgba(29, 36, 48, 0.08);
+}
+.hub-status strong {
+  color: var(--ink);
+}
+.hub-status.warn {
+  background: rgba(255, 161, 59, 0.14);
+  color: #7a4a12;
+}
+.hub-status.warn strong {
+  color: #6a3d0c;
+}
+.hub-status.subtle-line {
+  background: transparent;
+}
+.link-btn {
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  color: var(--gold-deep);
+  text-decoration: underline;
+  cursor: pointer;
+}
+.link-btn:hover {
+  color: #b8880a;
+}
+.reward-note {
+  margin-top: 14px;
+  font-family: var(--font-ui);
+  font-size: 0.9rem;
+  color: var(--ink-soft);
+}
+
+.screen-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.filter-row {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.filter-chip {
+  padding: 5px 14px;
+  font-family: var(--font-ui);
+  font-size: 0.86rem;
+  text-transform: capitalize;
+  letter-spacing: 0.03em;
+  background: rgba(29, 36, 48, 0.06);
+  border: 1px solid transparent;
+  border-radius: var(--r);
+  color: var(--ink-soft);
+  cursor: pointer;
+}
+.filter-chip:hover {
+  background: rgba(29, 36, 48, 0.11);
+}
+.filter-chip.on {
+  background: var(--chrome);
+  color: var(--paper);
+}
+.empty-note {
+  margin: 24px 0;
+  max-width: 54ch;
+  font-family: var(--font-ui);
+  color: var(--ink-soft);
+  line-height: 1.5;
+}
+.empty-note.small {
+  margin: 10px 0;
+  font-size: 0.9rem;
+}
+.small-note {
+  margin: -6px 0 8px;
+  font-size: 0.88rem;
+}
+.form-notice {
+  margin-top: 10px;
+  padding: 8px 12px;
+  font-family: var(--font-ui);
+  font-size: 0.9rem;
+  color: var(--ink);
+  background: rgba(255, 199, 46, 0.18);
+  border-left: 3px solid var(--gold);
+  border-radius: var(--r);
+}
+.screen .form-notice {
+  color: rgba(255, 240, 214, 0.92);
+  background: rgba(255, 199, 46, 0.14);
+}
+
+/* Loading placeholders — shape first, so nothing jumps when data lands. */
+.skeleton-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 16px;
+}
+.skeleton-list > span {
+  height: 58px;
+  border-radius: var(--r);
+  background: linear-gradient(
+    90deg,
+    rgba(29, 36, 48, 0.07) 25%,
+    rgba(29, 36, 48, 0.13) 37%,
+    rgba(29, 36, 48, 0.07) 63%
+  );
+  background-size: 400% 100%;
+  animation: skeleton 1.3s ease infinite;
+}
+@keyframes skeleton {
+  0% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0 50%;
+  }
+}
+
+/* ------------------------------- Champions ------------------------------- */
+
+.champion-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(178px, 1fr));
+  gap: 14px;
+  margin-top: 18px;
+}
+.champion-card {
+  position: relative;
+  display: grid;
+  gap: 2px;
+  padding: 0 0 12px;
+  text-align: left;
+  background: var(--panel-light);
+  border: 1px solid rgba(29, 36, 48, 0.1);
+  border-radius: var(--r);
+  cursor: pointer;
+  overflow: hidden;
+  transition:
+    transform 0.12s ease,
+    box-shadow 0.12s ease;
+}
+.champion-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 10px 22px rgba(16, 20, 28, 0.18);
+}
+.champion-card:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+}
+.cc-portrait {
+  display: grid;
+  place-items: center;
+  height: 118px;
+  font-family: var(--font-display);
+  font-size: 3rem;
+  color: rgba(255, 255, 255, 0.9);
+}
+.cc-name {
+  padding: 8px 12px 0;
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+  letter-spacing: 0.02em;
+  color: var(--ink);
+}
+.cc-title,
+.cc-role {
+  padding: 0 12px;
+  font-family: var(--font-ui);
+  font-size: 0.82rem;
+  color: var(--ink-soft);
+}
+.cc-role {
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.72rem;
+}
+.cc-tag {
+  margin: 6px 12px 0;
+  padding: 3px 8px;
+  justify-self: start;
+  font-family: var(--font-ui);
+  font-size: 0.8rem;
+  border-radius: var(--r);
+}
+.cc-tag.owned {
+  background: rgba(46, 168, 96, 0.18);
+  color: #1d6e40;
+}
+.cc-tag.rotate {
+  background: rgba(59, 167, 255, 0.18);
+  color: #17568c;
+}
+.cc-tag.price {
+  background: rgba(255, 199, 46, 0.2);
+  color: #7a5a05;
+}
+.cc-mastery {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  padding: 2px 7px;
+  font-family: var(--font-display);
+  font-size: 0.8rem;
+  color: var(--paper);
+  background: rgba(18, 22, 31, 0.72);
+  border-radius: var(--r);
+}
+
+.champion-detail .back-btn {
+  margin-bottom: 12px;
+}
+.cd-grid {
+  display: grid;
+  grid-template-columns: minmax(280px, 1fr) minmax(320px, 1.15fr);
+  gap: 24px;
+  align-items: start;
+}
+@media (max-width: 900px) {
+  .cd-grid {
+    grid-template-columns: 1fr;
+  }
+}
+.cd-stage {
+  position: relative;
+  padding: 12px;
+  background: linear-gradient(170deg, #202634, #12161f);
+  border-radius: var(--r);
+}
+.cd-canvas {
+  display: block;
+  width: 100%;
+  height: 380px;
+  touch-action: none;
+  cursor: grab;
+}
+.cd-canvas:active {
+  cursor: grabbing;
+}
+.cd-loading {
+  position: absolute;
+  inset: 12px;
+  display: grid;
+  place-items: center;
+  font-family: var(--font-ui);
+  color: var(--paper-soft);
+  /* A status label, not a shield: the ability buttons under it stay clickable. */
+  pointer-events: none;
+}
+.cd-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+.cd-action {
+  padding: 5px 12px;
+  font-family: var(--font-ui);
+  font-size: 0.86rem;
+  color: var(--paper);
+  background: rgba(255, 255, 255, 0.09);
+  border: 1px solid transparent;
+  border-radius: var(--r);
+  cursor: pointer;
+}
+.cd-action:hover {
+  background: rgba(255, 255, 255, 0.16);
+}
+.cd-action.on {
+  background: var(--gold);
+  color: #241c00;
+}
+.cd-turn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 8px;
+  font-size: 0.8rem;
+  color: var(--paper-soft);
+}
+.cd-turn button {
+  width: 28px;
+  height: 28px;
+  color: var(--paper);
+  background: rgba(255, 255, 255, 0.09);
+  border: 0;
+  border-radius: var(--r);
+  cursor: pointer;
+}
+.cd-palettes {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+  justify-content: center;
+}
+.swatch {
+  width: 26px;
+  height: 26px;
+  border: 2px solid transparent;
+  border-radius: 50%;
+  cursor: pointer;
+}
+.swatch.on {
+  border-color: var(--gold);
+}
+.swatch.locked {
+  opacity: 0.45;
+}
+.swatch.small {
+  width: 18px;
+  height: 18px;
+  cursor: default;
+}
+
+.cd-info h1 {
+  font-family: var(--font-display);
+  font-size: 2.4rem;
+  letter-spacing: 0.01em;
+  color: var(--ink);
+}
+.cd-subtitle {
+  font-family: var(--font-ui);
+  color: var(--ink-soft);
+}
+.cd-role {
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.82rem;
+}
+.cd-subtitle .dim {
+  opacity: 0.3;
+}
+.cd-kit {
+  display: grid;
+  gap: 8px;
+  margin: 16px 0;
+}
+.kit-row {
+  display: grid;
+  grid-template-columns: 34px 1fr auto;
+  gap: 10px;
+  align-items: start;
+  padding: 10px 12px;
+  background: rgba(29, 36, 48, 0.05);
+  border-radius: var(--r);
+}
+.kit-key {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  font-family: var(--font-display);
+  font-size: 1rem;
+  color: var(--paper);
+  background: var(--chrome);
+  border-radius: var(--r);
+}
+/*
+ * `.spread` on its own only sets justify-content — elsewhere it always rides
+ * on `.row`, which supplies the flex. The hub uses it inside grid cards, so
+ * scope the flex here rather than changing a utility the match HUD relies on.
+ */
+.hub-content .spread {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 14px;
+}
+.hub-content .spread > .subtle {
+  flex: 0 0 auto;
+  text-align: right;
+}
+.kit-body p {
+  margin-top: 2px;
+  font-family: var(--font-ui);
+  font-size: 0.9rem;
+  line-height: 1.45;
+  color: var(--ink-soft);
+}
+.kit-preview {
+  width: 30px;
+  height: 30px;
+  color: var(--ink);
+  background: rgba(29, 36, 48, 0.09);
+  border: 0;
+  border-radius: var(--r);
+  cursor: pointer;
+}
+.kit-preview:hover {
+  background: var(--gold);
+}
+.cd-mastery {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  background: rgba(29, 36, 48, 0.05);
+  border-radius: var(--r);
+}
+.mastery-bar {
+  height: 8px;
+  background: rgba(29, 36, 48, 0.12);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.mastery-bar > div {
+  height: 100%;
+  background: linear-gradient(90deg, var(--gold-deep), var(--gold));
+}
+.cd-buy {
+  display: flex;
+  gap: 10px;
+  margin-top: 16px;
+  flex-wrap: wrap;
+}
+.cd-owned {
+  padding: 10px 18px;
+  font-family: var(--font-display);
+  letter-spacing: 0.06em;
+  color: #1d6e40;
+  background: rgba(46, 168, 96, 0.16);
+  border-radius: var(--r);
+}
+.cd-owned.rotate {
+  color: #17568c;
+  background: rgba(59, 167, 255, 0.16);
+}
+.cd-palette-buy {
+  display: grid;
+  gap: 6px;
+  margin-top: 14px;
+}
+.palette-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 10px;
+  background: rgba(29, 36, 48, 0.05);
+  border-radius: var(--r);
+}
+.palette-name {
+  flex: 1;
+  font-family: var(--font-ui);
+}
+
+/* --------------------------------- Store --------------------------------- */
+
+.purse {
+  font-family: var(--font-display);
+  font-size: 1.3rem;
+  color: var(--ink);
+}
+.featured {
+  margin: 14px 0 20px;
+}
+.featured-note {
+  max-width: 60ch;
+  font-family: var(--font-ui);
+  font-size: 0.9rem;
+  color: var(--ink-soft);
+}
+.featured-row {
+  display: flex;
+  gap: 12px;
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+.featured-card {
+  display: grid;
+  gap: 2px;
+  padding: 14px 18px;
+  min-width: 180px;
+  text-align: left;
+  color: var(--paper);
+  background: linear-gradient(135deg, #2f3a52, #171d29);
+  border: 0;
+  border-radius: var(--r);
+  cursor: pointer;
+}
+.featured-card:hover {
+  filter: brightness(1.12);
+}
+.fc-name {
+  font-family: var(--font-display);
+  font-size: 1.3rem;
+}
+.fc-title {
+  font-family: var(--font-ui);
+  font-size: 0.84rem;
+  color: var(--paper-soft);
+}
+.fc-price {
+  margin-top: 6px;
+  color: var(--gold);
+}
+.shop-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 10px;
+  margin-top: 14px;
+}
+.shop-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  background: var(--panel-light);
+  border: 1px solid rgba(29, 36, 48, 0.1);
+  border-radius: var(--r);
+}
+.sc-swatch,
+.sc-mark {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: var(--r);
+  font-family: var(--font-display);
+  color: var(--paper);
+  background: var(--chrome);
+}
+.sc-body {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+}
+.sc-body strong {
+  font-family: var(--font-display);
+  letter-spacing: 0.02em;
+}
+.btn.small {
+  padding: 6px 12px;
+  font-size: 0.85rem;
+}
+.btn.danger {
+  background: rgba(255, 77, 77, 0.16);
+  color: #8c1f1f;
+}
+.btn.danger:hover {
+  background: rgba(255, 77, 77, 0.28);
+}
+
+.modal-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(10, 13, 19, 0.62);
+  backdrop-filter: blur(2px);
+}
+.modal-panel {
+  width: min(440px, 100%);
+  max-height: 86vh;
+  overflow: auto;
+  gap: 12px;
+}
+.modal-panel.wide {
+  width: min(880px, 100%);
+}
+
+/* --------------------------------- Quests -------------------------------- */
+
+.quest-list {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 18px;
+}
+.quest-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 14px;
+  background: var(--panel-light);
+  border: 1px solid rgba(29, 36, 48, 0.1);
+  border-left: 3px solid rgba(29, 36, 48, 0.18);
+  border-radius: var(--r);
+}
+.quest-card.ready {
+  border-left-color: var(--gold);
+}
+.quest-card.claimed {
+  opacity: 0.62;
+  border-left-color: #2ea860;
+}
+.qc-body {
+  flex: 1;
+  min-width: 0;
+}
+.qc-bar {
+  height: 7px;
+  max-width: 420px;
+  margin-top: 6px;
+  background: rgba(29, 36, 48, 0.12);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.qc-bar > div {
+  height: 100%;
+  background: linear-gradient(90deg, var(--ally), #7fd0ff);
+  transition: width 0.3s ease;
+}
+.qc-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 0 0 auto;
+}
+/* The reroll is a real affordance, not a watermark: `.btn.ghost` is built for
+   dark plates and all but vanishes on the light quest card. */
+.qc-actions .btn.ghost {
+  width: 30px;
+  padding: 0;
+  height: 30px;
+  font-size: 1rem;
+  color: var(--ink);
+  background: rgba(29, 36, 48, 0.1);
+  border: 1px solid rgba(29, 36, 48, 0.18);
+}
+.qc-actions .btn.ghost:hover {
+  background: var(--gold);
+  border-color: var(--gold-deep);
+}
+.qc-reward,
+.qc-done,
+.quest-card .btn {
+  flex: 0 0 auto;
+}
+.qc-reward,
+.qc-done {
+  font-family: var(--font-display);
+  color: var(--ink-soft);
+}
+.qc-done {
+  color: #1d6e40;
+}
+.streak-chip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 12px;
+  background: rgba(29, 36, 48, 0.06);
+  border-radius: var(--r);
+}
+.streak-count {
+  font-family: var(--font-display);
+  font-size: 1.4rem;
+  line-height: 1;
+  padding-right: 4px;
+  border-right: 1px solid rgba(29, 36, 48, 0.14);
+  color: var(--gold-deep);
+}
+.streak-days {
+  display: flex;
+  gap: 3px;
+}
+.streak-days > span {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  font-family: var(--font-ui);
+  font-size: 0.72rem;
+  color: var(--ink-soft);
+  background: rgba(29, 36, 48, 0.08);
+  border-radius: var(--r);
+}
+.streak-days > span.on {
+  color: #241c00;
+  background: var(--gold);
+}
+
+/* -------------------------------- History -------------------------------- */
+
+.history-list {
+  display: grid;
+  gap: 6px;
+  margin-top: 16px;
+  list-style: none;
+}
+.history-row {
+  display: grid;
+  grid-template-columns: 92px 1.4fr 110px 90px 1fr;
+  gap: 12px;
+  align-items: center;
+  width: 100%;
+  padding: 10px 14px;
+  text-align: left;
+  font-family: var(--font-ui);
+  background: var(--panel-light);
+  border: 1px solid rgba(29, 36, 48, 0.1);
+  border-left: 4px solid var(--enemy);
+  border-radius: var(--r);
+  cursor: pointer;
+}
+.history-row.won {
+  border-left-color: #2ea860;
+}
+.history-row:hover {
+  background: #fff;
+}
+.hr-result {
+  font-family: var(--font-display);
+  letter-spacing: 0.05em;
+}
+.hr-meta {
+  text-align: right;
+  color: var(--ink-soft);
+  font-size: 0.86rem;
+}
+.hr-augs {
+  display: flex;
+  gap: 4px;
+}
+.aug-chip {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  font-size: 0.76rem;
+  color: var(--paper);
+  background: var(--arcane);
+  border-radius: var(--r);
+}
+@media (max-width: 800px) {
+  .history-row {
+    grid-template-columns: 1fr 1fr;
+  }
+  .hr-meta {
+    text-align: left;
+  }
+}
+.board-team {
+  margin-top: 8px;
+}
+.board-team.won .section-label {
+  color: #1d6e40;
+}
+.scoreboard {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--font-ui);
+  font-size: 0.88rem;
+  display: block;
+  overflow-x: auto;
+}
+.scoreboard th,
+.scoreboard td {
+  padding: 5px 8px;
+  text-align: left;
+  white-space: nowrap;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+.scoreboard tr.me {
+  background: rgba(255, 199, 46, 0.14);
+}
+.bot-tag {
+  margin-left: 6px;
+  padding: 1px 5px;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  color: var(--paper-soft);
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: var(--r);
+}
+
+/* -------------------------------- Profile -------------------------------- */
+
+.profile-banner {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 18px 22px;
+  margin-bottom: 8px;
+  color: var(--paper);
+  background: linear-gradient(120deg, #2b3448, #151a25);
+  border-radius: var(--r);
+}
+.level-ring {
+  display: grid;
+  place-items: center;
+  width: 66px;
+  height: 66px;
+  font-family: var(--font-display);
+  font-size: 1.7rem;
+  color: var(--gold);
+  border: 3px solid var(--gold);
+  border-radius: 50%;
+}
+.pb-body {
+  flex: 1;
+  min-width: 0;
+}
+.pb-body h1 {
+  font-family: var(--font-display);
+  font-size: 2rem;
+}
+.pb-body .subtle {
+  color: var(--paper-soft);
+}
+.pb-purse {
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  color: var(--gold);
+}
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.stat-cell {
+  display: grid;
+  gap: 2px;
+  padding: 12px 14px;
+  background: rgba(29, 36, 48, 0.05);
+  border-radius: var(--r);
+}
+.stat-value {
+  font-family: var(--font-display);
+  font-size: 1.35rem;
+  color: var(--ink);
+}
+.stat-label {
+  font-family: var(--font-ui);
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--ink-soft);
+}
+.mastery-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.mastery-card {
+  display: grid;
+  gap: 6px;
+  padding: 12px 14px;
+  background: rgba(29, 36, 48, 0.05);
+  border-radius: var(--r);
+}
+.mastery-level {
+  font-family: var(--font-display);
+  color: var(--gold-deep);
+}
+.showcase-row {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+.showcase-pick {
+  padding: 6px 14px;
+  font-family: var(--font-ui);
+  background: rgba(29, 36, 48, 0.06);
+  border: 1px solid transparent;
+  border-radius: var(--r);
+  cursor: pointer;
+}
+.showcase-pick.on {
+  background: var(--gold);
+  color: #241c00;
+}
+.account-panel {
+  display: grid;
+  gap: 10px;
+  max-width: 460px;
+  padding: 16px 18px;
+  background: rgba(29, 36, 48, 0.05);
+  border-radius: var(--r);
+}
+.account-panel h2 {
+  font-family: var(--font-display);
+  font-size: 1.3rem;
+}
+.account-panel label {
+  display: grid;
+  gap: 4px;
+  font-family: var(--font-ui);
+  font-size: 0.86rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ink-soft);
+}
+.account-panel input {
+  padding: 8px 10px;
+  font-family: var(--font-ui);
+  font-size: 1rem;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--ink);
+  background: #fff;
+  border: 1px solid rgba(29, 36, 48, 0.18);
+  border-radius: var(--r);
+}
+.account-panel input:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 1px;
+}
+.account-panel hr {
+  border: 0;
+  border-top: 1px solid rgba(29, 36, 48, 0.12);
+  margin: 4px 0;
+}

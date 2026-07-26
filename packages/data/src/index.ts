@@ -12,6 +12,7 @@ export { SYLVA } from './champions/sylva';
 export { VEX } from './champions/vex';
 export { WISP } from './champions/wisp';
 export * from './constants';
+export * from './cosmetics';
 export * from './events';
 export { FX } from './fx';
 export {

@@ -1,6 +1,7 @@
 import { STRINGS } from '@mini-clash/data';
 import { useEffect, useState } from 'react';
 import { readRejoinTicket } from '../game/link';
+import { useAccount } from '../state/account';
 import { useSession } from '../state/session';
 
 /** Boot: warm the asset manifest + fonts, then route to name pick or hub —
@@ -17,6 +18,9 @@ export function BootScreen(): React.ReactElement {
       const steps: Promise<unknown>[] = [
         fetch('/game-assets/manifest.json').then((r) => r.json()),
         document.fonts.ready,
+        // Who are we? A signed-out or unreachable answer is fine — the name
+        // screen handles both, and Training never needed an account.
+        useAccount.getState().boot(),
       ];
       let done = 0;
       for (const s of steps) {
@@ -42,7 +46,8 @@ export function BootScreen(): React.ReactElement {
         goto('match');
         return;
       }
-      goto(profile ? 'hub' : 'name');
+      // The account's name wins over the local one: it survives a new browser.
+      goto(useAccount.getState().user || profile ? 'hub' : 'name');
     };
     void work();
     return () => {

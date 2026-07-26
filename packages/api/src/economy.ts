@@ -6,6 +6,7 @@ import {
   freeRotation,
   MASTERY_CURVE,
   masteryLevelFor,
+  PALETTE_BY_ID,
   REWARDS,
   weekIndexOf,
 } from '@mini-clash/data';
@@ -180,9 +181,10 @@ export function priceOf(kind: UnlockKind, refId: string): number | null {
   if (kind === 'champion') {
     return Object.hasOwn(CHAMPION_PRICES, refId) ? CHAMPION_PRICES[refId] : null;
   }
-  // Cosmetics are priced by kind; the catalog of ids lands with the champion
-  // viewer, which is the only place a palette can actually be judged.
-  return COSMETIC_PRICES[kind] ?? null;
+  // Palettes are a real catalog; stickers and poses are priced but have no ids
+  // yet (see cosmetics.ts), so nothing can be bought that does not exist.
+  if (kind === 'palette') return PALETTE_BY_ID[refId] ? COSMETIC_PRICES.palette : null;
+  return null;
 }
 
 export interface PurchaseResult {
