@@ -180,7 +180,16 @@ try {
         .catch(() => false);
     }
   }
-  if (!offlineHub) errors.push('offline reload did not reach the app shell');
+  if (!offlineHub) {
+    // Say what *was* on screen. "Did not reach the app shell" covers a browser
+    // error page, a boot screen that never routed and a name screen, and those
+    // are three different bugs — a CI failure that cannot tell them apart costs
+    // a round trip to find out.
+    const seen = await page
+      .evaluate(() => (document.body.textContent ?? '').replace(/\s+/g, ' ').slice(0, 120))
+      .catch(() => '(page unreachable)');
+    errors.push(`offline reload did not reach the app shell — on screen: "${seen}"`);
+  }
   try {
     await page.getByText('Bridge Brawl', { exact: true }).click({ timeout: 8000 });
     await page.waitForTimeout(2000);
