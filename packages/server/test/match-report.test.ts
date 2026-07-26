@@ -218,6 +218,39 @@ describe('a real match, reported for real', () => {
   });
 });
 
+describe('the golden fixture', () => {
+  /**
+   * The same seed must produce the same summary, run after run.
+   *
+   * This is what makes the history detail's promise checkable: "reproduces any
+   * finished match's scoreboard exactly" only means something if the scoreboard
+   * is a function of the match rather than of when it happened to be recorded.
+   * A hash rather than a stored blob, because the point is the equality, not
+   * the contents — and a diff of two 8-seat scoreboards is unreadable anyway.
+   */
+  it('reproduces the same scoreboard from the same seed', async () => {
+    const summaries = [20260726, 20260726].map((seed) => {
+      const { sim, tally } = playOut(seed);
+      const match = createMatchState(config(seed).players, { seed });
+      return buildReport(sim, match, tally, {
+        matchId: 'golden',
+        startedAt: new Date('2026-07-26T12:00:00.000Z'),
+        users: new Map(),
+      });
+    });
+    expect(JSON.stringify(summaries[0])).toBe(JSON.stringify(summaries[1]));
+
+    // …and a different seed must not, or the "reproducible" claim is vacuous.
+    const { sim, tally } = playOut(999);
+    const other = buildReport(sim, createMatchState(config(999).players, { seed: 999 }), tally, {
+      matchId: 'golden',
+      startedAt: new Date('2026-07-26T12:00:00.000Z'),
+      users: new Map(),
+    });
+    expect(JSON.stringify(other)).not.toBe(JSON.stringify(summaries[0]));
+  }, 300_000);
+});
+
 describe('a match nobody signed in for', () => {
   it('is not reported at all rather than reported with empty seats', async () => {
     const { sim, tally } = playOut(777);

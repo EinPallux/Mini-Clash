@@ -316,8 +316,9 @@ Full screen specs in UI_UX.md; economy summary:
 
 - **Clash Coins** earned: win 120 / loss 70 · first win of day +150 · quests (3 daily 50–80 each, 1 weekly 200) · mastery milestones · match-performance bonus (±20% by score, capped so losses still pay).
 - **Champions:** 4 starters owned by every account (Rook, Fathom, Mortis, Sylva — one per role family) + 4-champion weekly free rotation. Unlock prices 3500 (early roster) / 5500 (later) / 8000 (newest). Average active player unlocks a champion roughly weekly at launch cadence.
-- **Cosmetics (earn-only at 1.0):** champion palettes 800 (each champion ships with 2 unlockable palettes built from its asset pack's texture variants), emote stickers 400, victory poses 600.
-- **Mastery:** per-champion XP → levels 1–10; rewards at 3 (palette), 5 (coins), 7 (sticker), 10 (animated podium title).
+- **Cosmetics (earn-only at 1.0):** champion palettes 800 (each champion ships with 2 unlockable palettes), emote stickers 400, victory poses 600. **As of v0.7 only palettes exist** — 20 of them, a multiply tint over each champion's own materials so the silhouette never changes, previewing live in the champion viewer. Stickers and poses are priced but have no catalog: they need art and animation that does not exist, and the api returns `unknown_item` for both rather than selling a placeholder.
+- **Name changes:** the first is free, then 300 coins — deliberately the cheapest thing in the shop. The price is friction against name-churn, not a penalty for a typo.
+- **Mastery:** per-champion XP → levels 1–10; rewards at 3 (palette), 5 (coins), 7 (sticker), 10 (animated podium title). **v0.7 pays the coin milestones (5 → 300, 10 → 750), claimed by the player and paid once.** The palette, sticker and title milestones wait on the cosmetics they hand out.
 - **Match history:** last 30 matches: result, duo played, augments drafted, K/D/A, damage, per-event outcomes; expandable full scoreboard.
 - **Profile:** level (account XP), banner, favorite duo showcase, lifetime stats.
 

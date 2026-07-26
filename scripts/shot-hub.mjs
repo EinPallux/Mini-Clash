@@ -17,8 +17,8 @@
  * Screenshots land in test-results/hub.
  */
 import { spawn } from 'node:child_process';
-import { createServer } from 'node:http';
 import { existsSync, mkdirSync } from 'node:fs';
+import { createServer } from 'node:http';
 import { build } from 'esbuild';
 import { chromium } from 'playwright';
 
@@ -236,10 +236,7 @@ async function main() {
       { timeout: 20_000 },
     );
     await page.waitForTimeout(2500);
-    check(
-      (await page.locator('.cd-loading').count()) === 0,
-      'the champion model finished loading',
-    );
+    check((await page.locator('.cd-loading').count()) === 0, 'the champion model finished loading');
     const kitRows = await page.locator('.kit-row').count();
     check(kitRows === 5, `passive, Q, W, R and entrance all listed (saw ${kitRows})`);
     await shot(page, '03-champion-detail');
@@ -288,9 +285,15 @@ async function main() {
       const body = await res.json();
       return `${body.user.id} coins=${body.profile.coins}`;
     });
-    check(purse.includes('9,000'), `the purse shows the granted coins (chip "${purse}", api ${served})`);
+    check(
+      purse.includes('9,000'),
+      `the purse shows the granted coins (chip "${purse}", api ${served})`,
+    );
 
-    const buyable = page.locator('.shop-card').filter({ has: page.locator('.btn.primary') }).first();
+    const buyable = page
+      .locator('.shop-card')
+      .filter({ has: page.locator('.btn.primary') })
+      .first();
     const buyingName = await buyable.locator('strong').innerText();
     await buyable.locator('.btn.primary').click();
     await page.waitForSelector('.modal-scrim');
@@ -398,10 +401,7 @@ async function main() {
     );
     const shownName = (await second.page.locator('.pb-body h1').innerText()).trim();
     // The display font uppercases it; compare the letters, not the styling.
-    check(
-      shownName.toLowerCase() === 'smoketester',
-      `…and the same name (saw "${shownName}")`,
-    );
+    check(shownName.toLowerCase() === 'smoketester', `…and the same name (saw "${shownName}")`);
     await tab(second.page, 'Champions');
     await second.page.waitForSelector('.champion-card');
     const ownedThere = await second.page.locator('.cc-tag.owned').count();
@@ -415,10 +415,7 @@ async function main() {
     await page.waitForSelector('.hub-root', { timeout: 30_000 });
     const status = await page.locator('.hub-status').innerText();
     check(status.toLowerCase().includes('offline'), 'the hub says it is offline');
-    check(
-      status.toLowerCase().includes('bots'),
-      '…and points out that offline play still works',
-    );
+    check(status.toLowerCase().includes('bots'), '…and points out that offline play still works');
     await tab(page, 'Champions');
     await page.waitForTimeout(400);
     check(

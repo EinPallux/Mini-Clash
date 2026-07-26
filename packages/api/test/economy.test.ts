@@ -1,4 +1,10 @@
-import { CHAMPION_PRICES, REWARDS, STARTER_CHAMPIONS } from '@mini-clash/data';
+import {
+  CHAMPION_PRICES,
+  COSMETIC_PRICES,
+  PALETTES,
+  REWARDS,
+  STARTER_CHAMPIONS,
+} from '@mini-clash/data';
 import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { guest } from '../src/auth';
 import { migrate, openDb, type Sql } from '../src/db';
@@ -51,9 +57,17 @@ describe('prices', () => {
     expect(priceOf('champion', 'not_a_champion')).toBeNull();
   });
 
-  it('quotes cosmetics by kind', () => {
-    expect(priceOf('palette', 'rook_gold')).toBeGreaterThan(0);
-    expect(priceOf('sticker', 'gg')).toBeGreaterThan(0);
+  it('quotes a palette from the catalog and refuses one that is not in it', () => {
+    expect(priceOf('palette', PALETTES[0].id)).toBe(COSMETIC_PRICES.palette);
+    expect(priceOf('palette', 'rook_invented')).toBeNull();
+  });
+
+  it('will not sell a sticker or a pose, because neither exists yet', () => {
+    // §18 prices all three cosmetic kinds; only palettes have a catalog (see
+    // packages/data/src/cosmetics.ts). Selling one would take the coins for
+    // something the game cannot show.
+    expect(priceOf('sticker', 'gg')).toBeNull();
+    expect(priceOf('pose', 'flex')).toBeNull();
   });
 });
 

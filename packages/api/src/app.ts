@@ -111,9 +111,24 @@ export async function buildApp(opts: AppOptions = {}): Promise<FastifyInstance> 
     global: true,
     max: 300,
     timeWindow: '1 minute',
-    // A guest has no user id yet, so the address is the only stable key. Behind
-    // the proxy `req.ip` is the forwarded one (see trustProxy above).
-    keyGenerator: (req) => req.ip,
+    /**
+     * Per session first, per address only as a fallback.
+     *
+     * Keying on the address alone looks fine until a household, a student
+     * halls, a café or anyone behind CGNAT shares one — then a handful of
+     * players exhaust a budget meant for one, and the limiter starts throttling
+     * the people it is supposed to protect. The session cookie is read
+     * straight from the header because this runs before the session is
+     * resolved; it is opaque and unguessable, which is all a bucket key needs
+     * to be. Signing out and back in mints a new one, which is a rate-limit
+     * evasion worth exactly one extra login through the far tighter `/auth`
+     * limits.
+     */
+    keyGenerator: (req) => {
+      const cookie = req.headers.cookie;
+      const match = cookie?.match(/(?:^|;\s*)mc_session=([^;]+)/);
+      return match ? `s:${match[1]}` : `ip:${req.ip}`;
+    },
     errorResponseBuilder: () => ({ error: 'rate_limited' }),
   });
 
