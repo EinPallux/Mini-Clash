@@ -204,7 +204,7 @@ another stack's anything.
   while that would cut off a listening port.
 - No writing outside `/srv/mini-clash` except the Docker volumes above.
 
-`./deploy/selftest.sh` checks these mechanically — 51 checks, including that the
+`./deploy/selftest.sh` checks these mechanically — 56 checks, including that the
 project name is pinned, that no unscoped prune exists anywhere in `deploy/`, and
 that the behind-proxy override really does bind neither 80 nor 443.
 
