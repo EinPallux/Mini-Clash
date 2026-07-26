@@ -80,7 +80,7 @@ Tags: `[duo]` both champions · `[active]` fielded champion only · `[Q]/[W]/[R]
 | 32 | Clockwork Mind | `[duo]` +10% Haste; tiny clock-hands halo while abilities are on CD |
 | 33 | Scavenger | `[duo]` Coin Rain coins +100% value to you, Minis drop 1 g extra; coin-sparkle magnet radius |
 | 34 | Long Reach | `[duo]` +0.4 attack range (melee +0.3); weapon grows subtly |
-| 35 | Orb Sense | `[duo]` see orb/event spawn timers on your HUD 10 s early; a compass wisp points to the next event |
+| 35 | Orb Sense | `[duo]` **your team** sees the next event 10 s earlier than the 30 s the HUD ticker gives everyone (GAME_DESIGN §9.1); a compass wisp points to it. Team-wide rather than personal because snapshots are built per team, and a timer one player can call out is shared anyway. |
 
 ### 3.8 Mobility & Utility — Gold
 | # | Augment | Effect |

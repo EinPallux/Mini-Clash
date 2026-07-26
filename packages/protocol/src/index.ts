@@ -82,6 +82,13 @@ export interface MatchConfig {
     enemyTowerHp?: number;
     /** Balance A/B: bots on this team never Tag Swap (ROADMAP v0.4 acceptance). */
     noSwapTeam?: Team;
+    /**
+     * Start the match clock here instead of 0:00 (ROADMAP v0.6). The Living
+     * Bridge timetable runs on match minutes, so a smoke that has to *see* an
+     * event would otherwise idle for two of them. Skips the wave/orb/event
+     * backlog rather than replaying it.
+     */
+    clock?: number;
   };
 }
 
@@ -362,6 +369,13 @@ export interface EventSnap {
   /** Seconds left in this phase. */
   tLeft: number;
   tTotal: number;
+  /**
+   * Where the event is, for the minimap glow and the world band: the Coin Rain
+   * zone centre, the Storm Front wall's current position, the altar for the
+   * golem, mid for the isles (which are symmetric about it).
+   */
+  x: number;
+  z: number;
 }
 
 export type SimEvent =

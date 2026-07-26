@@ -1,8 +1,11 @@
 import {
   BRIDGE,
   EVENT_ANNOUNCE_LEAD,
+  EVENT_INSURANCE_WINDOW,
+  EVENT_REVEAL_SECONDS,
   EVENT_SCHEDULE,
   EVENTS,
+  ORB_SENSE_BONUS_SECONDS,
   SHATTERBRIDGE_MAP,
   TICK_DT,
   TICK_RATE,
@@ -11,6 +14,7 @@ import type { MatchConfig } from '@mini-clash/protocol';
 import { describe, expect, it } from 'vitest';
 import { NavGrid, Sim } from '../src';
 import { canAttack } from '../src/abilities';
+import { makeBrain, thinkBots } from '../src/bots';
 import { dealDamage } from '../src/combat';
 import { spawnMini } from '../src/minis';
 import type { Entity } from '../src/world';
@@ -160,12 +164,38 @@ describe('schedule', () => {
     expect(sim.world.match?.events[0]?.phase).toBe('active');
   });
 
-  it('surfaces the next event and the live one in the snapshot', () => {
+  it('names the next window inside the reveal, and not before', () => {
     const sim = new Sim(cfg());
-    const snap = sim.tick();
-    expect(snap.match.nextEvent?.kind).toBe(sim.world.match?.schedule[0].kind);
-    expect(snap.match.nextEvent?.inSeconds).toBeGreaterThan(0);
-    expect(snap.match.deckHalf).toBe(DECK_HALF);
+    const first = sim.world.match?.schedule[0];
+    if (!first) throw new Error('no schedule');
+    // Two minutes out, the timetable is something you have to remember.
+    expect(sim.tick().match.nextEvent).toBeNull();
+    seek(sim, first.at - EVENT_REVEAL_SECONDS + 2);
+    const soon = sim.tick();
+    expect(soon.match.nextEvent?.kind).toBe(first.kind);
+    expect(soon.match.nextEvent?.inSeconds).toBeGreaterThan(0);
+    expect(soon.match.deckHalf).toBe(DECK_HALF);
+  });
+
+  it('Orb Sense buys the extra 10 s of warning', () => {
+    const withCard = new Sim(cfg());
+    const plain = new Sim(cfg());
+    const first = withCard.world.match?.schedule[0];
+    if (!first) throw new Error('no schedule');
+    for (const sim of [withCard, plain]) {
+      seek(sim, first.at - EVENT_REVEAL_SECONDS - ORB_SENSE_BONUS_SECONDS + 3);
+    }
+    const me = withCard.world.entities.find((e) => e.kind === 'champion' && e.champ?.player === 1);
+    if (!me?.champ) throw new Error('no champion');
+    me.champ.augments.push('orb_sense');
+    expect(plain.snapshotFor(0).match.nextEvent).toBeNull();
+    expect(withCard.snapshotFor(0).match.nextEvent?.kind).toBe(first.kind);
+    // It reveals for the holder's team only — the other side gets nothing.
+    expect(withCard.snapshotFor(1).match.nextEvent).toBeNull();
+  });
+
+  it('surfaces the live event in the snapshot', () => {
+    const sim = new Sim(cfg());
     const first = sim.world.match?.schedule[0];
     if (!first) throw new Error('no schedule');
     seek(sim, first.at - EVENT_ANNOUNCE_LEAD - 0.5);
@@ -443,6 +473,184 @@ describe('clash golem', () => {
     }
     expect(other.buffs.some((b) => b.id === 'golem_aegis')).toBe(false);
   });
+});
+
+describe('bots read the timetable', () => {
+  function botCfg(seed = 4242): MatchConfig {
+    const players = [];
+    for (let i = 0; i < 8; i++) {
+      const team = i < 4 ? (0 as const) : (1 as const);
+      players.push({
+        id: i + 1,
+        championId: i % 2 === 0 ? 'rook' : 'fathom',
+        team,
+        bot: 'elite' as const,
+      });
+    }
+    return { mode: 'bridge', seed, mapId: 'shatterbridge', players };
+  }
+
+  it('elites fight over the Clash Golem, and somebody takes it', () => {
+    const sim = new Sim(botCfg());
+    const slot = (sim.world.match?.schedule ?? []).find((s) => s.kind === 'clashGolem');
+    if (!slot) throw new Error('no golem slot');
+    seek(sim, slot.at - EVENT_ANNOUNCE_LEAD - 0.5);
+    let taken: { team: number; elder: boolean } | null = null;
+    let damaged = false;
+    for (let i = 0; i < 30 * 150 && !taken; i++) {
+      const snap = sim.tick();
+      for (const ev of snap.events) {
+        if (ev.t === 'golemTaken') taken = { team: ev.team, elder: ev.elder };
+      }
+      const g = sim.world.entities.find((e) => e.golem);
+      if (g && g.hp < g.hpMax) damaged = true;
+    }
+    expect(damaged).toBe(true);
+    expect(taken).not.toBeNull();
+  }, 60_000);
+
+  it('walks into the Storm Front rather than running with it', () => {
+    // Running away keeps you inside a 4 u wall moving at 5.3 u/s for 2.4 s;
+    // walking into it costs 0.45 s. The bot has to pick the second one.
+    const sim = toEvent('stormFront');
+    const ev = sim.world.match?.events[0];
+    if (!ev) throw new Error('no storm');
+    const dir = ev.data.dir ?? 1;
+    const bot = sim.world.entities.find((e) => e.kind === 'champion');
+    if (!bot?.champ) throw new Error('no champion');
+    // Put a bot in the band and give it a brain by running the real think pass.
+    const brain = makeBrain(7, bot.champ.player, 'elite');
+    // Elites only think every 6th tick; line the offset up so this pass counts.
+    brain.offset = (6 - (sim.world.tick % 6)) % 6;
+    const brains = new Map([[bot.champ.player, brain]]);
+    bot.x = ev.data.centre ?? 0;
+    bot.z = 0;
+    bot.hp = bot.hpMax;
+    const intents = thinkBots(sim.world, SHATTERBRIDGE_MAP, brains);
+    const move = intents.map((m) => m.intent).find((i) => i.t === 'move');
+    if (!move || move.t !== 'move') throw new Error('bot issued no move');
+    // Against the sweep: dir > 0 sweeps toward +x, so the escape is toward −x.
+    expect(Math.sign(move.x - bot.x)).toBe(-dir);
+  });
+
+  it('never walks onto a strip the Collapse has taken', () => {
+    const sim = new Sim(botCfg());
+    seek(sim, BRIDGE.overtime.at - 0.5);
+    run(sim, BRIDGE.collapse.every * 2 + 2);
+    const half = sim.world.match?.deckHalf ?? 0;
+    expect(half).toBeLessThan(BRIDGE.collapse.deckHalves[0]);
+    for (const e of sim.world.entities) {
+      if (e.kind !== 'champion' || e.dead) continue;
+      expect(Math.abs(e.z)).toBeLessThanOrEqual(half);
+    }
+  }, 60_000);
+});
+
+describe('the three event augments', () => {
+  it('Grounding Rod blunts Storm Front damage', () => {
+    const sim = toEvent('stormFront');
+    const champs = sim.world.entities.filter((e) => e.kind === 'champion');
+    const bare = champs[0];
+    const rodded = champs.find((e) => e.id !== bare.id && e.hpMax === bare.hpMax);
+    if (!bare.champ || !rodded?.champ) throw new Error('need two matching champions');
+    rodded.champ.augments.push('grounding_rod');
+    // Clear the field first. Standing in a live lane, four fifths of the damage
+    // these two take is Minis and tower fire, which the card does not touch —
+    // the ratio would measure the neighbourhood instead of the augment.
+    for (const u of [...sim.world.entities]) {
+      if (u.kind !== 'champion') sim.world.remove(u.id);
+    }
+    for (const e of [bare, rodded]) e.hp = e.hpMax;
+    // Suppress regen for the measurement. It is a flat add to both HP deltas,
+    // so it skews the *ratio* of two different damage totals — and the damage
+    // events are no help either, since a sub-1 tick of storm rounds to 1 on the
+    // wire for both. Restored below so nothing else in the file sees it.
+    const stats = bare.champ.def.stats;
+    const regen = stats.regenPctPerSec;
+    try {
+      (stats as { regenPctPerSec: number }).regenPctPerSec = 0;
+      for (let i = 0; i < 30; i++) {
+        const centre = sim.world.match?.events[0]?.data.centre ?? 0;
+        bare.x = centre;
+        bare.z = -2;
+        rodded.x = centre;
+        rodded.z = 2;
+        sim.tick();
+      }
+    } finally {
+      (stats as { regenPctPerSec: number }).regenPctPerSec = regen;
+    }
+    const bareLost = bare.hpMax - bare.hp;
+    const roddedLost = rodded.hpMax - rodded.hp;
+    expect(bareLost).toBeGreaterThan(0);
+    expect(roddedLost / bareLost).toBeCloseTo(0.75, 2);
+  });
+
+  it('Event Insurance pays out inside the window and not outside it', () => {
+    const sim = toEvent('coinRain');
+    const victim = sim.world.entities.find((e) => e.kind === 'champion');
+    if (!victim?.champ) throw new Error('no champion');
+    const killer = sim.world.entities.find((e) => e.kind === 'champion' && e.team !== victim.team);
+    if (!killer) throw new Error('no killer');
+    victim.champ.augments.push('event_insurance');
+
+    // Inside: the window opened a moment ago.
+    dealDamage(sim.world, { source: killer, tag: 'unit', label: 'test' }, victim, 1e9, 'physical');
+    const rebated = victim.champ.respawnIn;
+    expect(rebated).toBeGreaterThan(0);
+
+    // Outside: run past the insurance window, die again, pay full price.
+    victim.dead = false;
+    victim.hp = victim.hpMax;
+    victim.champ.respawnIn = 0;
+    run(sim, EVENT_INSURANCE_WINDOW + 2);
+    victim.hp = victim.hpMax;
+    dealDamage(sim.world, { source: killer, tag: 'unit', label: 'test' }, victim, 1e9, 'physical');
+    expect(victim.champ.respawnIn).toBeGreaterThan(rebated);
+  });
+});
+
+describe('tick budget', () => {
+  /**
+   * The sim shares a 33 ms frame with rendering on a 2019 iGPU laptop
+   * (TECH §11), so it has to stay a small slice of it — even in the states the
+   * Living Bridge creates: a converted golem dragging a buffed wave up the lane
+   * with the deck falling away behind it.
+   *
+   * This exists because v0.6 regressed exactly here. Minis re-path when their
+   * goal drifts, and a goal that is *another unit* drifts every tick, so a
+   * 120-strong mid-lane brawl was running ~100 A* searches a tick — 64% of a
+   * whole bot match. The straight-line steer in `moveToward` is what fixed it;
+   * this test is what stops it coming back quietly.
+   */
+  it('a busy late-game tick stays well inside the frame budget', () => {
+    const players = [];
+    for (let i = 0; i < 8; i++) {
+      const team = i < 4 ? (0 as const) : (1 as const);
+      players.push({
+        id: i + 1,
+        championId: i % 2 === 0 ? 'rook' : 'fathom',
+        team,
+        bot: 'elite' as const,
+      });
+    }
+    const sim = new Sim({ mode: 'bridge', seed: 1717, mapId: 'shatterbridge', players });
+    // Overtime: all-Ram waves, a collapsing deck, and the biggest blob a match
+    // ever produces.
+    seek(sim, BRIDGE.overtime.at - 20);
+    run(sim, 100);
+    const minis = sim.world.entities.filter((e) => e.kind === 'mini').length;
+    expect(minis).toBeGreaterThan(15); // the premise: this really is a busy tick
+
+    const TICKS = 900; // 30 s of match
+    const t0 = performance.now();
+    for (let i = 0; i < TICKS; i++) sim.tick();
+    const perTick = (performance.now() - t0) / TICKS;
+    console.info(`sim: ${perTick.toFixed(2)} ms/tick with ${minis} minis on the field`);
+    // 33 ms is the whole frame; the sim must not be most of it. Generous
+    // because CI hardware varies — this is a runaway detector, not a benchmark.
+    expect(perTick).toBeLessThan(8);
+  }, 120_000);
 });
 
 describe('bridge collapse', () => {

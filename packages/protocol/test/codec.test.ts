@@ -307,8 +307,16 @@ describe('snapshot codec', () => {
         match: {
           ...snap([]).match,
           events: [
-            { kind: 'clashGolem', elder: true, phase: 'active', tLeft, tTotal: 180 },
-            { kind: 'stormFront', elder: false, phase: 'announced', tLeft: 4.2, tTotal: 8 },
+            { kind: 'clashGolem', elder: true, phase: 'active', tLeft, tTotal: 180, x: 0, z: 0 },
+            {
+              kind: 'stormFront',
+              elder: false,
+              phase: 'announced',
+              tLeft: 4.2,
+              tTotal: 8,
+              x: -42.5,
+              z: 0,
+            },
           ],
           nextEvent: { kind: 'coinRain', elder: false, inSeconds: 91 },
           deckHalf: 6,
@@ -326,6 +334,7 @@ describe('snapshot codec', () => {
     });
     expect(first?.match.events[0].tLeft).toBeCloseTo(42.5, 1);
     expect(first?.match.events[1]).toMatchObject({ kind: 'stormFront', phase: 'announced' });
+    expect(first?.match.events[1].x).toBeCloseTo(-42.5, 2);
     expect(first?.match.nextEvent).toMatchObject({ kind: 'coinRain', inSeconds: 91 });
     expect(first?.match.deckHalf).toBe(6);
     expect(first?.match.eventLog).toHaveLength(1);

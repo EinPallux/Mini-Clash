@@ -1,5 +1,12 @@
-import { BRIDGE, CORE_DEF, type DamageType, TAG_SWAP, TOWER_DEF } from '@mini-clash/data';
-import { augmentDamageMul, augParam, special } from './augments';
+import {
+  BRIDGE,
+  CORE_DEF,
+  type DamageType,
+  EVENT_INSURANCE_WINDOW,
+  TAG_SWAP,
+  TOWER_DEF,
+} from '@mini-clash/data';
+import { augmentDamageMul, augParam, economyMods, special } from './augments';
 import { absorbShields, applyBuff, applyCc, consumeBlock } from './buffs';
 import { creditKill, onMiniKilled } from './economy';
 import { onGolemKilled } from './eventKinds';
@@ -555,6 +562,15 @@ function undyingContract(w: World, target: Entity): boolean {
   return true;
 }
 
+/** Did a Living Bridge window open in the last few seconds? (Event Insurance) */
+function recentEventStart(w: World): boolean {
+  for (const ev of w.match?.events ?? []) {
+    if (ev.phase !== 'active') continue;
+    if (ev.tTotal - ev.tLeft <= EVENT_INSURANCE_WINDOW) return true;
+  }
+  return false;
+}
+
 export function kill(w: World, target: Entity, by?: Entity): void {
   if (target.dead) return;
   // The Clash Golem does not die to its first killer — it changes sides (§9).
@@ -662,6 +678,13 @@ export function kill(w: World, target: Entity, by?: Entity): void {
       BRIDGE.respawnCap,
       BRIDGE.respawnBase + BRIDGE.respawnPerLevel * c.level,
     );
+    // Event Insurance (AUGMENTS §3.8): the rebate only pays out if you died
+    // *contesting* something — inside the window that opens when a Living Bridge
+    // event starts. A flat respawn cut would be a much stronger card than the
+    // one the catalog describes.
+    if (c.augments.length > 0 && recentEventStart(w)) {
+      c.respawnIn *= economyMods(target).respawnMul;
+    }
     c.cast = null;
     c.leap = null;
     c.order = null;

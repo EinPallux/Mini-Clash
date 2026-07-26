@@ -147,6 +147,15 @@ The map runs a seeded event schedule (all clients/server share the seed; bots pl
 
 Design intent: the schedule gives ARAM the *objective heartbeat* of a full MOBA (dragon/baron tempo) without a jungle, and the seeded pools mean match rhythm varies run-to-run.
 
+### 9.1 Rules the timetable runs on (v0.6)
+
+- **The reveal window is 30 s.** Inside it the HUD ticker names the next event and counts it down; outside it, the timetable is something you have to *remember*. This is what makes Orb Sense (+10 s, AUGMENTS §3.7) a card worth taking rather than a duplicate of the default HUD — and it keeps the ticker from being a permanent to-do list.
+- **A window you miss is missed.** The 8 s announce is the whole warning; nothing re-announces.
+- **Overtime ends the timetable.** No new event is announced once the Bridge Collapse starts, and any event still holding *terrain* (the Flank Isles) is retired the moment the deck begins to fall. The two systems both rewrite the walkable map and the last writer would win — an isle retiring after a collapse would hand back walkable void where the bridge used to be.
+- **The Flank Isles sit clear of the deck.** Platform centres are 14.5 u out, so the near edge is 2.5 u past the 18 u deck and the light-bridge spans a real gap. A flank route you could already walk is not a flank route. (Implementation: the navgrid is 38 u deep for this — the isles are carved out of void that has to exist before it can be opened.)
+- **The Storm Front is not outrun, it is crossed.** The wall is 4 u deep and sweeps at ~5.3 u/s; a champion moves 3.6. Running with it keeps you inside for ~2.4 s, standing still ~0.76 s, walking *into* the oncoming edge ~0.45 s. Bots from Veteran up know this, and so should players — it is the event's one piece of hidden depth.
+- **The golem starts from where it stands.** A converted golem picks up the owner's lane at the waypoint nearest the altar, not at step 0 — which for the eastern team is its own gate.
+
 ## 10. Combat system
 
 ### 10.1 Stats

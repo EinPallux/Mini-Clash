@@ -29,6 +29,18 @@ export interface EventDef {
 /** Announce lead-in (§9): horn + banner + ticker + minimap glow, 8 s ahead. */
 export const EVENT_ANNOUNCE_LEAD = 8;
 
+/**
+ * How long the ticker names the next window. Under this, "up next" is on your
+ * HUD; over it, the timetable is something you have to remember. Orb Sense
+ * (AUGMENTS §3.7) buys the extra 10 s — which is only worth anything because
+ * there is a base window it extends.
+ */
+export const EVENT_REVEAL_SECONDS = 30;
+export const ORB_SENSE_BONUS_SECONDS = 10;
+
+/** Event Insurance (AUGMENTS §3.8) pays out inside this window after a start. */
+export const EVENT_INSURANCE_WINDOW = 10;
+
 export const EVENTS: Record<EventKind, EventDef> = {
   flankIsles: {
     id: 'flankIsles',

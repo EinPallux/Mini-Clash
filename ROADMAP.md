@@ -128,8 +128,8 @@ Scope discipline: if a phase runs hot, cut **content quantity** (champions, augm
 **Acceptance:**
 - [ ] 1000-match harness: zero stalemates past 20:00 (Sudden Death always resolves); event participation lifts bot winrates as designed (golem-winner advantage measurable but < 65%).
 - [ ] Collapse stages swap navgrids without a single stuck unit across the harness corpus.
-- [ ] Every event readable with sound off (banner+minimap+telegraphs) and with reduced-VFX mode on.
-- [ ] Seeded schedule: same seed reproduces the identical event timeline in replay.
+- [x] Every event readable with sound off (banner+minimap+telegraphs) and with reduced-VFX mode on. — `scripts/shot-events.mjs` runs one window with `reducedVfx` on and every volume bus at 0, and asserts the banner, the live ticker chip, the minimap and the risen platforms are all still there. Reduced-VFX only thins particle counts; the carriers of meaning (HUD, rings, geometry) are untouched by design.
+- [x] Seeded schedule: same seed reproduces the identical event timeline in replay. — `scripts/determinism.mjs` now hashes the rolled timeline alongside the state hash and compares Node against headless Chromium: `120flankIsles|240coinRain|360clashGolem|510stormFront|630clashGolemE|750coinRain`, identical in both.
 
 ## v0.7 — The Hub
 

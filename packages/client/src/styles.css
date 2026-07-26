@@ -2126,7 +2126,9 @@ input[type="range"] {
 .coach-mark {
   position: absolute;
   left: 50%;
-  top: 22%;
+  /* Clear of the map-event announce banner, which owns the strip under the
+     match clock while a window is opening (UI_UX §9). */
+  top: 30%;
   transform: translateX(-50%) skewX(var(--skew));
   background: rgba(10, 13, 24, 0.92);
   border: 1px solid rgba(255, 255, 255, 0.2);
@@ -3324,4 +3326,214 @@ input[type="range"] {
 }
 .feed-augs {
   margin-left: 4px;
+}
+
+/* ---------------------- The Living Bridge (§9) HUD ----------------------- */
+
+/*
+ * The announce banner sits below the match strip and the AFK banner, so a map
+ * event never covers the clock, the score or a takeover warning. It is opaque
+ * enough to read over a teamfight and short enough not to eat the play space —
+ * the match does not pause for it (UI_UX §9).
+ */
+.event-banner {
+  position: absolute;
+  top: 104px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  grid-template-rows: auto auto;
+  align-items: center;
+  gap: 2px 12px;
+  min-width: 340px;
+  padding: 8px 16px 10px;
+  background: linear-gradient(180deg, rgba(24, 20, 12, 0.94), rgba(14, 12, 9, 0.94));
+  border: 1px solid rgba(255, 194, 75, 0.55);
+  border-left: 4px solid var(--gold);
+  z-index: 27;
+  animation: eventbanner-in 0.34s cubic-bezier(0.16, 1.2, 0.4, 1) both;
+}
+.event-banner.stormFront {
+  border-color: rgba(191, 228, 255, 0.55);
+  border-left-color: #bfe4ff;
+}
+.event-banner > .ev-glyph {
+  grid-row: 1 / span 2;
+  font-size: 1.9rem;
+  line-height: 1;
+  color: var(--gold);
+  text-shadow: 0 0 14px rgba(255, 199, 46, 0.55);
+}
+.event-banner.stormFront > .ev-glyph {
+  color: #bfe4ff;
+  text-shadow: 0 0 14px rgba(191, 228, 255, 0.6);
+}
+.event-banner > .text {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.15;
+}
+.event-banner > .text > b {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: 1.15rem;
+  letter-spacing: 0.1em;
+  color: #fff3d8;
+}
+.event-banner > .text > em {
+  font-style: normal;
+  font-size: 0.78rem;
+  /* Explicit, not inherited: the plate is near-black and the app's base ink is
+     dark, so an inherited colour renders this line invisible. */
+  color: rgba(255, 240, 214, 0.82);
+}
+.event-banner > .count {
+  grid-row: 1 / span 2;
+  font-family: var(--font-display);
+  font-size: 1.7rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--gold);
+}
+.event-banner > .fuse {
+  grid-column: 2 / span 2;
+  height: 3px;
+  background: rgba(255, 255, 255, 0.14);
+  overflow: hidden;
+}
+.event-banner > .fuse > .fill {
+  display: block;
+  height: 100%;
+  background: var(--gold);
+  transform-origin: left center;
+  transition: transform 0.12s linear;
+}
+.event-banner.stormFront > .fuse > .fill {
+  background: #bfe4ff;
+}
+@keyframes eventbanner-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -14px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
+/* Live chips + "up next", stacked directly under the minimap. */
+.event-ticker {
+  position: absolute;
+  right: 12px;
+  bottom: 116px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  z-index: 24;
+  pointer-events: none;
+}
+.event-chip,
+.event-next {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 3px 9px;
+  min-width: 176px;
+  background: rgba(10, 13, 24, 0.82);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+}
+.event-chip {
+  position: relative;
+  border-left: 3px solid var(--gold);
+  color: #ffeecb;
+}
+.event-chip.stormFront {
+  border-left-color: #bfe4ff;
+  color: #e4f4ff;
+}
+.event-chip.collapse {
+  border-left-color: #ff8a5c;
+  color: #ffd9c8;
+}
+.event-chip > .ev-glyph,
+.event-next > .ev-glyph {
+  font-size: 0.95rem;
+  line-height: 1;
+}
+.event-chip > .name,
+.event-next > .name {
+  flex: 1;
+  font-weight: 700;
+}
+.event-chip > .left,
+.event-next > .in {
+  font-variant-numeric: tabular-nums;
+  opacity: 0.85;
+}
+.event-chip > .fuse {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 2px;
+  background: rgba(255, 255, 255, 0.12);
+  overflow: hidden;
+}
+.event-chip > .fuse > .fill {
+  display: block;
+  height: 100%;
+  background: currentColor;
+  transform-origin: left center;
+  transition: transform 0.12s linear;
+}
+.event-next {
+  opacity: 0.72;
+  border-left: 3px solid rgba(255, 255, 255, 0.28);
+}
+
+/* Map-event log on the Tab scoreboard. */
+.sb-events {
+  min-width: 250px;
+  max-width: 280px;
+}
+.sb-event {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  padding: 4px 10px;
+  font-size: 0.74rem;
+  border-left: 3px solid rgba(255, 255, 255, 0.2);
+  margin-bottom: 3px;
+  background: rgba(255, 255, 255, 0.04);
+}
+.sb-event.ally {
+  border-left-color: var(--ally);
+}
+.sb-event.enemy {
+  border-left-color: var(--enemy);
+}
+.sb-event > .at {
+  font-variant-numeric: tabular-nums;
+  opacity: 0.5;
+  min-width: 30px;
+}
+.sb-event > .ev-glyph {
+  color: var(--gold);
+}
+.sb-event > .what {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .event-banner {
+    animation: none;
+  }
 }

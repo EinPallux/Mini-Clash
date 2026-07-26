@@ -25,6 +25,9 @@ const AUG_SILVER = 0xc6d2e0; // Power Surge rarities
 const AUG_GOLD = 0xffc23c;
 const AUG_PRISM_A = 0xff6fd8;
 const AUG_PRISM_B = 0x6ee6ff;
+const OBJECTIVE = 0xffc24b; // Living Bridge amber (ART_DIRECTION §3: golem, orbs, coins)
+const ISLE = 0x7fd4ff; // Flank Isle light-bridge cyan
+const STORM = 0xbfe4ff; // Storm Front lightning
 
 export const FX: Record<string, FxTimeline> = {
   /* ------------------------------- Rook ------------------------------- */
@@ -3040,6 +3043,430 @@ export const FX: Record<string, FxTimeline> = {
     events: [
       { time: 0, op: { t: 'sound', cue: 'relic_horn' } },
       { time: 0, op: { t: 'ring', at: 'self', color: 0x3ba7ff, radius: 6, width: 0.2, life: 0.6 } },
+    ],
+  },
+
+  /* ---------------------- The Living Bridge (§9) ---------------------- */
+  /*
+   * Announces are deliberately audio-only at the world layer: the banner, the
+   * ticker and the minimap glow carry the message (UI_UX §9), and a screen-wide
+   * particle burst 8 s before anything happens would read as the event itself.
+   */
+  'event.flankIsles.announce': {
+    id: 'event.flankIsles.announce',
+    events: [{ time: 0, op: { t: 'sound', cue: 'event_horn' } }],
+  },
+  'event.coinRain.announce': {
+    id: 'event.coinRain.announce',
+    events: [{ time: 0, op: { t: 'sound', cue: 'event_horn' } }],
+  },
+  'event.stormFront.announce': {
+    id: 'event.stormFront.announce',
+    events: [{ time: 0, op: { t: 'sound', cue: 'event_horn' } }],
+  },
+  'event.clashGolem.announce': {
+    id: 'event.clashGolem.announce',
+    events: [
+      { time: 0, op: { t: 'sound', cue: 'event_horn' } },
+      // The altar stirs where the golem will stand — the one announce that
+      // points at a place, because the whole map is about to walk there.
+      {
+        time: 0.5,
+        op: { t: 'ring', at: 'origin', color: OBJECTIVE, radius: 3, width: 0.25, life: 1.2 },
+      },
+      {
+        time: 2,
+        op: { t: 'ring', at: 'origin', color: OBJECTIVE, radius: 4, width: 0.2, life: 1.2 },
+      },
+      {
+        time: 4,
+        op: { t: 'ring', at: 'origin', color: OBJECTIVE, radius: 5, width: 0.18, life: 1.4 },
+      },
+      { time: 6, op: { t: 'shake', power: 's' } },
+      { time: 7, op: { t: 'shake', power: 's' } },
+    ],
+  },
+
+  'event.isles.rise': {
+    id: 'event.isles.rise',
+    events: [
+      { time: 0, op: { t: 'sound', cue: 'event_isles_rise' } },
+      { time: 0, op: { t: 'shake', power: 'm' } },
+      {
+        time: 0,
+        op: {
+          t: 'burst',
+          at: 'origin',
+          count: 46,
+          color: DUST,
+          color2: STONE,
+          size: 0.3,
+          speed: 4,
+          spread: 80,
+          up: 3,
+          life: 1.6,
+          gravity: -2,
+          shape: 'puff',
+        },
+      },
+      // Chunks of the platform shoulder their way up through the dust.
+      {
+        time: 0.2,
+        op: {
+          t: 'burst',
+          at: 'origin',
+          count: 20,
+          color: STONE,
+          size: 0.24,
+          speed: 6,
+          spread: 55,
+          up: 5,
+          life: 1.4,
+          gravity: 9,
+          shape: 'shard',
+        },
+      },
+      { time: 0.6, op: { t: 'shake', power: 's' } },
+      {
+        time: 1.4,
+        op: { t: 'ring', at: 'origin', color: ISLE, radius: 5.5, width: 0.3, life: 0.7 },
+      },
+      {
+        time: 1.9,
+        op: { t: 'light', at: 'origin', color: ISLE, intensity: 3, radius: 12, life: 0.8 },
+      },
+    ],
+  },
+  'event.isles.fall': {
+    id: 'event.isles.fall',
+    events: [
+      { time: 0, op: { t: 'sound', cue: 'event_isles_fall' } },
+      { time: 0, op: { t: 'shake', power: 'm' } },
+      {
+        time: 0.1,
+        op: {
+          t: 'burst',
+          at: 'origin',
+          count: 34,
+          color: STONE,
+          color2: DUST,
+          size: 0.26,
+          speed: 3,
+          spread: 70,
+          up: -1,
+          life: 1.8,
+          gravity: 11,
+          shape: 'shard',
+        },
+      },
+      {
+        time: 0.4,
+        op: {
+          t: 'burst',
+          at: 'origin',
+          count: 26,
+          color: DUST,
+          size: 0.34,
+          speed: 2.5,
+          spread: 90,
+          up: 0.5,
+          life: 1.4,
+          gravity: -1,
+          shape: 'puff',
+        },
+      },
+    ],
+  },
+
+  'event.coin.zone': {
+    id: 'event.coin.zone',
+    events: [
+      {
+        time: 0,
+        op: { t: 'decal', at: 'origin', kind: 'scorch', color: GOLD, radius: 4.4, life: 21 },
+      },
+      { time: 0, op: { t: 'ring', at: 'origin', color: GOLD, radius: 4, width: 0.28, life: 1 } },
+      {
+        time: 0,
+        op: { t: 'light', at: 'origin', color: GOLD, intensity: 2.2, radius: 10, life: 1.2 },
+      },
+    ],
+  },
+  'event.coin.drop': {
+    id: 'event.coin.drop',
+    events: [
+      { time: 0, op: { t: 'sound', cue: 'event_coin_drop', volume: 0.5 } },
+      {
+        time: 0,
+        op: {
+          t: 'burst',
+          at: 'origin',
+          count: 5,
+          color: GOLD,
+          size: 0.1,
+          speed: 2.4,
+          spread: 60,
+          up: 1.4,
+          life: 0.4,
+          gravity: 8,
+          shape: 'spark',
+        },
+      },
+    ],
+  },
+  'event.coin.pickup': {
+    id: 'event.coin.pickup',
+    events: [
+      { time: 0, op: { t: 'sound', cue: 'event_coin_pickup' } },
+      {
+        time: 0,
+        op: {
+          t: 'burst',
+          at: 'origin',
+          count: 12,
+          color: GOLD,
+          color2: 0xfff2c0,
+          size: 0.12,
+          speed: 4,
+          spread: 70,
+          up: 2.2,
+          life: 0.45,
+          shape: 'spark',
+        },
+      },
+      {
+        time: 0,
+        op: { t: 'ring', at: 'origin', color: GOLD, radius: 0.9, width: 0.1, life: 0.28 },
+      },
+    ],
+  },
+
+  'event.storm.start': {
+    id: 'event.storm.start',
+    events: [
+      { time: 0, op: { t: 'sound', cue: 'event_storm_roll' } },
+      { time: 0.3, op: { t: 'shake', power: 's' } },
+    ],
+  },
+  'event.storm.tick': {
+    id: 'event.storm.tick',
+    // Fires every 6 ticks along the wall's current centre — the crackle that
+    // makes the band feel alive rather than a moving decal.
+    events: [
+      {
+        time: 0,
+        op: {
+          t: 'burst',
+          at: 'origin',
+          count: 7,
+          color: STORM,
+          color2: 0xffffff,
+          size: 0.16,
+          speed: 7,
+          spread: 90,
+          up: 3,
+          life: 0.3,
+          shape: 'spark',
+          offset: [0, 0.4, 0],
+        },
+      },
+      {
+        time: 0,
+        op: { t: 'light', at: 'origin', color: STORM, intensity: 1.6, radius: 9, life: 0.18 },
+      },
+    ],
+  },
+  'event.storm.end': {
+    id: 'event.storm.end',
+    events: [{ time: 0, op: { t: 'sound', cue: 'event_storm_crack', volume: 0.7 } }],
+  },
+
+  'event.golem.wake': {
+    id: 'event.golem.wake',
+    events: [
+      { time: 0, op: { t: 'sound', cue: 'golem_wake' } },
+      { time: 0, op: { t: 'shake', power: 'm' } },
+      {
+        time: 0,
+        op: {
+          t: 'burst',
+          at: 'origin',
+          count: 40,
+          color: DUST,
+          color2: STONE,
+          size: 0.26,
+          speed: 5,
+          spread: 85,
+          up: 2.4,
+          life: 1.1,
+          gravity: 6,
+          shape: 'puff',
+        },
+      },
+      {
+        time: 0.1,
+        op: { t: 'ring', at: 'origin', color: OBJECTIVE, radius: 3.4, width: 0.3, life: 0.8 },
+      },
+      { time: 0.75, op: { t: 'shake', power: 's' } },
+      {
+        time: 0.75,
+        op: { t: 'light', at: 'origin', color: OBJECTIVE, intensity: 3.4, radius: 14, life: 0.9 },
+      },
+    ],
+  },
+  'event.golem.slam': {
+    id: 'event.golem.slam',
+    events: [
+      { time: 0, op: { t: 'sound', cue: 'golem_slam' } },
+      { time: 0, op: { t: 'shake', power: 'm' } },
+      { time: 0, op: { t: 'hitstop', ms: 45 } },
+      {
+        time: 0,
+        op: { t: 'decal', at: 'origin', kind: 'crack', color: STONE, radius: 2.2, life: 3.5 },
+      },
+      {
+        time: 0,
+        op: { t: 'ring', at: 'origin', color: OBJECTIVE, radius: 2.2, width: 0.22, life: 0.35 },
+      },
+      {
+        time: 0,
+        op: {
+          t: 'burst',
+          at: 'origin',
+          count: 26,
+          color: STONE,
+          color2: DUST,
+          size: 0.2,
+          speed: 8,
+          spread: 40,
+          up: 1.6,
+          life: 0.6,
+          gravity: 12,
+          shape: 'shard',
+        },
+      },
+    ],
+  },
+  'event.golem.convert': {
+    id: 'event.golem.convert',
+    events: [
+      { time: 0, op: { t: 'sound', cue: 'golem_convert' } },
+      { time: 0, op: { t: 'shake', power: 'm' } },
+      { time: 0, op: { t: 'flash', at: 'self', color: 0xffffff, life: 0.3 } },
+      {
+        time: 0,
+        op: { t: 'ring', at: 'origin', color: OBJECTIVE, radius: 4, width: 0.3, life: 0.7 },
+      },
+      {
+        time: 0.12,
+        op: { t: 'ring', at: 'origin', color: 0xffffff, radius: 6, width: 0.18, life: 0.6 },
+      },
+      {
+        time: 0,
+        op: {
+          t: 'burst',
+          at: 'self',
+          count: 34,
+          color: OBJECTIVE,
+          color2: 0xfff0c8,
+          size: 0.2,
+          speed: 7,
+          spread: 90,
+          up: 4,
+          life: 0.9,
+          shape: 'spark',
+        },
+      },
+      {
+        time: 0,
+        op: { t: 'light', at: 'self', color: OBJECTIVE, intensity: 4, radius: 16, life: 1 },
+      },
+    ],
+  },
+  'event.golem.aegis': {
+    id: 'event.golem.aegis',
+    events: [
+      { time: 0, op: { t: 'sound', cue: 'golem_aegis', volume: 0.6 } },
+      { time: 0, op: { t: 'ring', at: 'self', color: ALLY, radius: 6, width: 0.16, life: 0.5 } },
+    ],
+  },
+  'event.golem.death': {
+    id: 'event.golem.death',
+    events: [
+      { time: 0, op: { t: 'sound', cue: 'golem_death' } },
+      { time: 0, op: { t: 'shake', power: 'm' } },
+      {
+        time: 0,
+        op: {
+          t: 'burst',
+          at: 'origin',
+          count: 40,
+          color: STONE,
+          color2: DUST,
+          size: 0.28,
+          speed: 6,
+          spread: 85,
+          up: 3,
+          life: 1.3,
+          gravity: 11,
+          shape: 'shard',
+        },
+      },
+      {
+        time: 0.05,
+        op: {
+          t: 'prop',
+          model: 'castle/rocks-large',
+          at: 'origin',
+          scale: 1.1,
+          life: 6,
+          sink: true,
+        },
+      },
+    ],
+  },
+
+  'bridge.collapse': {
+    id: 'bridge.collapse',
+    // Fired once per edge strip per stage; `fz` says which side went.
+    events: [
+      { time: 0, op: { t: 'sound', cue: 'bridge_collapse' } },
+      { time: 0, op: { t: 'shake', power: 'l' } },
+      { time: 0.6, op: { t: 'shake', power: 'm' } },
+      { time: 1.3, op: { t: 'shake', power: 's' } },
+      {
+        time: 0,
+        op: {
+          t: 'burst',
+          at: 'origin',
+          count: 60,
+          color: STONE,
+          color2: DUST,
+          size: 0.36,
+          speed: 3,
+          spread: 90,
+          up: -0.5,
+          life: 2.4,
+          gravity: 13,
+          shape: 'shard',
+        },
+      },
+      {
+        time: 0.35,
+        op: {
+          t: 'burst',
+          at: 'origin',
+          count: 48,
+          color: DUST,
+          size: 0.5,
+          speed: 2,
+          spread: 90,
+          up: 1,
+          life: 2.6,
+          gravity: -1.5,
+          shape: 'puff',
+        },
+      },
     ],
   },
 };

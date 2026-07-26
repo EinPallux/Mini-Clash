@@ -48,6 +48,13 @@ function autoQuality(): Exclude<Quality, 'auto'> {
   return cores >= 8 ? 'high' : cores >= 4 ? 'medium' : 'low';
 }
 
+/** One instanced floor layer plus where each of its tiles sits (collapse §9). */
+export interface FloorLayer {
+  inst: THREE.InstancedMesh;
+  positions: [number, number][];
+  tileScale: THREE.Vector3;
+}
+
 export class GameRenderer {
   readonly renderer: THREE.WebGLRenderer;
   readonly scene = new THREE.Scene();
@@ -55,6 +62,8 @@ export class GameRenderer {
   private composer: EffectComposer | null = null;
   private profile: QualityProfile;
   private sun!: THREE.DirectionalLight;
+  private floorLayers: FloorLayer[] = [];
+  private props: THREE.Object3D[] = [];
 
   /** True when running on a software rasterizer (SwiftShader/llvmpipe — CI, VMs). */
   readonly softwareGl: boolean;
@@ -199,7 +208,18 @@ export class GameRenderer {
       if (Array.isArray(s)) root.scale.set(s[0], s[1], s[2]);
       else root.scale.setScalar(s);
       this.scene.add(root);
+      this.props.push(root);
     }
+  }
+
+  /**
+   * The pieces of deck the Bridge Collapse can drop (GAME_DESIGN §9): every
+   * floor tile with its instance index, and every static prop. Handed out
+   * rather than animated here — the renderer owns geometry, `BridgeSet` owns
+   * what match state does to it.
+   */
+  deckGeometry(): { layers: FloorLayer[]; props: THREE.Object3D[] } {
+    return { layers: this.floorLayers, props: this.props };
   }
 
   private buildFloor(map: MapDef): void {
@@ -245,6 +265,7 @@ export class GameRenderer {
         inst.setMatrixAt(i, m4);
       });
       this.scene.add(inst);
+      this.floorLayers.push({ inst, positions, tileScale: scl.clone() });
     };
     placeTiles(map.floor.tile, (c, r) => !masked(c, r) && (c * 7 + r * 13) % 9 !== 0);
     placeTiles(map.floor.accentTile, (c, r) => !masked(c, r) && (c * 7 + r * 13) % 9 === 0);

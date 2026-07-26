@@ -680,6 +680,8 @@ export class SnapshotEncoder {
       );
       w.u16(clampU16(q10(ev.tLeft)));
       w.u16(clampU16(q10(ev.tTotal)));
+      w.i16(q100(ev.x));
+      w.i16(q100(ev.z));
     }
     if (m.nextEvent === null) {
       w.u8(0xff);
@@ -1001,6 +1003,8 @@ export class SnapshotDecoder {
         phase: (head & 0x20) !== 0 ? 'active' : 'announced',
         tLeft: r.u16() / 10,
         tTotal: r.u16() / 10,
+        x: r.i16() / 100,
+        z: r.i16() / 100,
       });
     }
     const nextHead = r.u8();

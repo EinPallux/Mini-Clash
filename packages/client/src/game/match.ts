@@ -1,4 +1,5 @@
 import {
+  BRIDGE,
   CHAMPION_LIST,
   CHAMPIONS,
   SHATTERBRIDGE_MAP,
@@ -138,7 +139,12 @@ export class MatchRuntime {
     this.numbers = new DamageNumbers(this.renderer.scene);
     this.actors = new ActorManager(this.renderer.scene, SELF_PLAYER, 0, this.particles);
     // Online, the server assigns the seat — actors learn it after connect.
-    if (mode === 'bridge') this.bridge = new BridgeSet(this.renderer.scene, map);
+    if (mode === 'bridge') {
+      this.bridge = new BridgeSet(this.renderer.scene, map);
+      // The collapse throws real floor tiles off the map, so it needs the
+      // geometry the renderer built (GAME_DESIGN §9).
+      this.bridge.setDeck(this.renderer.deckGeometry());
+    }
     this.aim = new AimIndicator(
       this.renderer.scene,
       paletteColors(useSettings.getState().palette).ally,
@@ -189,9 +195,17 @@ export class MatchRuntime {
     // ?rig=win pre-damages enemy structures AND idles the enemy seats — offline
     // smoke hook so acceptance tests reach the win sequence in ~2 minutes
     // (harmless vs bots, and the v0.3 server ignores rig).
-    const rigged =
-      mode === 'bridge' && new URLSearchParams(window.location.search).get('rig') === 'win';
-    const rig = rigged ? { enemyCoreHp: 1, enemyTowerHp: 1 } : undefined;
+    const params = new URLSearchParams(window.location.search);
+    const rigged = mode === 'bridge' && params.get('rig') === 'win';
+    // ?clock=<seconds> starts an offline bridge match at that point on the
+    // timetable — the Living Bridge runs on match minutes, and a smoke should
+    // not have to idle through two of them to photograph an event (§9).
+    const clockAt = mode === 'bridge' ? Number(params.get('clock')) : Number.NaN;
+    const clock = Number.isFinite(clockAt) && clockAt > 0 ? clockAt : undefined;
+    const rig =
+      rigged || clock !== undefined
+        ? { ...(rigged ? { enemyCoreHp: 1, enemyTowerHp: 1 } : {}), clock }
+        : undefined;
     await this.link.start({
       mode,
       seed: (Math.random() * 0xffffffff) >>> 0,
@@ -351,9 +365,15 @@ export class MatchRuntime {
   /** Lane-strip minimap payload (drawn by the HUD at ~10 Hz). */
   minimap(): {
     width: number;
+    /** The *drawn* half-width — stays at the map's, so a collapsing deck reads
+     * as the strip shrinking inside a fixed frame rather than the world zooming. */
     deckHalf: number;
+    /** Live walkable half-width; below `deckHalf` once the Collapse starts. */
+    liveHalf: number;
     selfTeam: 0 | 1;
     marks: { x: number; z: number; kind: string; team: number; self: boolean; dead?: boolean }[];
+    /** Live map events, so the strip can glow where the action is about to be. */
+    events: { kind: string; x: number; z: number; phase: string; elder: boolean }[];
   } {
     const snap = this.buffer.current;
     const marks: {
@@ -383,8 +403,29 @@ export class MatchRuntime {
           });
         }
       }
+      // Coin Rain gold shows on the strip too — it is the whole reason to go.
+      for (const e of snap.entities) {
+        if (e.kind === 'pickup' && e.unitId === 'coin') {
+          marks.push({ x: e.x, z: e.z, kind: 'coin', team: 0, self: false });
+        } else if (e.kind === 'golem') {
+          marks.push({ x: e.x, z: e.z, kind: 'golem', team: e.owner ?? -1, self: false });
+        }
+      }
     }
-    return { width: SHATTERBRIDGE_MAP.width, deckHalf: 11, selfTeam: this.selfTeam, marks };
+    return {
+      width: SHATTERBRIDGE_MAP.width,
+      deckHalf: 11,
+      liveHalf: snap?.match.deckHalf ?? 9,
+      selfTeam: this.selfTeam,
+      marks,
+      events: (snap?.match.events ?? []).map((e) => ({
+        kind: e.kind,
+        x: e.x,
+        z: e.z,
+        phase: e.phase,
+        elder: e.elder,
+      })),
+    };
   }
 
   trainer(cmd: TrainerCmd): void {
@@ -671,6 +712,32 @@ export class MatchRuntime {
         rtt: Math.round(this.link?.rttMs ?? 0),
         calls: this.renderer.renderer.info.render.calls,
         tris: this.renderer.renderer.info.render.triangles,
+        // The Living Bridge (§9): enough for a smoke to prove an event really
+        // happened rather than just that the HUD drew a chip.
+        match: this.buffer.current
+          ? {
+              deckHalf: this.buffer.current.match.deckHalf,
+              collapseStage: this.buffer.current.match.collapseStage,
+              events: this.buffer.current.match.events.map((e) => ({
+                kind: e.kind,
+                phase: e.phase,
+                tLeft: Math.round(e.tLeft * 10) / 10,
+              })),
+            }
+          : null,
+        golems: this.buffer.current?.entities.filter((e) => e.kind === 'golem').length ?? 0,
+        coins:
+          this.buffer.current?.entities.filter((e) => e.kind === 'pickup' && e.unitId === 'coin')
+            .length ?? 0,
+        /** Isle platforms raised in the scene, and the orbs riding them. */
+        isles: {
+          raised: this.bridge?.islesRaised() ?? false,
+          rise: Math.round((this.bridge?.isleRise() ?? -1) * 100) / 100,
+          orbs:
+            this.buffer.current?.entities.filter(
+              (e) => e.kind === 'orb' && Math.abs(e.z) > BRIDGE.collapse.deckHalves[0],
+            ).length ?? 0,
+        },
       };
       (globalThis as Record<string, unknown>).__mc = this.renderer;
     }

@@ -50,7 +50,7 @@ Attribution is not required but we do it anyway: maintain `CREDITS.md` (create a
 
 | Need | Plan | License target |
 |---|---|---|
-| **Clash Golem** (event boss) | Quaternius "Ultimate Monsters" golem (CC0) — restyle with team-palette ramp | CC0 |
+| ~~**Clash Golem** (event boss)~~ | **Shipped in v0.6 as a kitbash, not a sourced mesh.** Quaternius "Ultimate Monsters" was the plan; it needs a network fetch this repo's build environment cannot make, and a golem was not worth blocking the phase on. Built instead from vendored CC0 Kenney stone — `arena/block` legs + torso, `castle/rocks-large` fists, `castle/rocks-small` shoulders and head, `castle/wall-corner-half` chest plate — on the hand-keyed in-engine rig §4 already specifies for it, with an amber objective core that re-tints to the captor's colour. Revisit only if the kitbash stops reading at match camera distance. | CC0 |
 | VFX sprite atlas (smoke, sparks, rings, ribbons) | Kenney *Particle Pack* (CC0) + authored procedural shaders | CC0 |
 | UI icons (abilities, stats, items) | Kenney *Game Icons* + game-icons.net (CC-BY 3.0, attribution in CREDITS) | CC0 / CC-BY |
 | Fonts | Google Fonts: Lilita One, Nunito | OFL |

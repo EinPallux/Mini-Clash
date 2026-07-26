@@ -13,6 +13,8 @@ type Battle = NonNullable<MapDef['battle']>;
 
 /** Seconds a unit waits before re-attempting a search that already failed. */
 const REPATH_BACKOFF = 0.5;
+/** Within this range, an unobstructed goal is walked at directly — no A*. */
+const DIRECT_STEER_RANGE = 14;
 
 export function spawnWave(w: World, battle: Battle, waveIndex: number): void {
   const withRam = waveIndex % BRIDGE.wave.ramEvery === 0;
@@ -299,6 +301,27 @@ function moveToward(
   // measured at 12 full searches per tick and 25 ms of the budget. So a failure
   // backs off, and only the nav grid changing (or the goal moving) retries early.
   m.repathIn = Math.max(0, (m.repathIn ?? 0) - dt);
+
+  // Straight shot beats a plan. A mini chasing a moving target — another mini,
+  // a champion, the golem — sees its goal drift past the re-path threshold
+  // almost every tick, so it would run a full A* every tick forever. When the
+  // goal is close and there is nothing in the way, steering at it directly is
+  // both correct and ~50× cheaper. This is what keeps a 120-unit mid-lane brawl
+  // off the frame budget: A* was 64% of a full bot match before it.
+  const toGoal = dist(e.x, e.z, gx, gz);
+  if (toGoal < DIRECT_STEER_RANGE && w.nav.lineWalkable(e.x, e.z, gx, gz)) {
+    m.path.length = 0;
+    m.goalX = gx;
+    m.goalZ = gz;
+    const step = Math.min(speed * dt, toGoal);
+    const [dx, dz] = norm(gx - e.x, gz - e.z);
+    e.x += dx * step;
+    e.z += dz * step;
+    e.fx = dx;
+    e.fz = dz;
+    return;
+  }
+
   const goalMoved = dist(m.goalX, m.goalZ, gx, gz) > 1.2;
   const navChanged = m.pathVersion !== w.nav.version;
   if ((m.path.length === 0 && m.repathIn <= 0) || navChanged || goalMoved) {

@@ -13,6 +13,8 @@ import { AugmentPips3D, HealthBar } from './ui3d';
 const CHAMP_HEIGHT = 1.55;
 const DUMMY_HEIGHT = 1.5;
 const MINI_HEIGHT = 1.05;
+/** Objective amber (ART_DIRECTION §3): the golem, orbs and Coin Rain gold. */
+const OBJECTIVE = 0xffc24b;
 
 export interface Actor {
   root: THREE.Group;
@@ -1406,17 +1408,21 @@ class PickupActor implements Actor {
   private model: THREE.Group;
   private glow: THREE.Sprite;
   private bob = 0;
+  private coin: boolean;
 
   constructor(snap: EntitySnap & { kind: 'pickup' }, scene: THREE.Scene) {
     const def = UNITS[snap.unitId];
-    const key = def?.visual.model ?? 'dungeon/plate-full';
+    // Coin Rain coins ride the pickup kind but have no unit def — they are
+    // spawned by the event, not summoned by a kit (§9).
+    this.coin = snap.unitId === 'coin';
+    const key = this.coin ? 'dungeon/coin' : (def?.visual.model ?? 'dungeon/plate-full');
     const { root: model } = instantiate(key);
-    model.scale.setScalar(normScale(key, 0.4, def?.visual.scale ?? 1));
+    model.scale.setScalar(normScale(key, this.coin ? 0.34 : 0.4, def?.visual.scale ?? 1));
     this.model = model;
     this.root.add(model);
     const mat = new THREE.SpriteMaterial({
       map: softGlow(),
-      color: 0xf2c46a,
+      color: this.coin ? OBJECTIVE : 0xf2c46a,
       transparent: true,
       opacity: 0.5,
       blending: THREE.AdditiveBlending,
@@ -1438,12 +1444,17 @@ class PickupActor implements Actor {
     if (snap.tossPhase !== undefined && snap.tossPhase < 1) {
       this.model.position.y = Math.sin(snap.tossPhase * Math.PI) * 1.5;
       this.model.rotation.x += dt * 7;
+    } else if (this.coin) {
+      // Coins stand on edge and spin like coins, not like plates.
+      this.model.position.y = 0.3 + Math.sin(this.bob * 4.2) * 0.08;
+      this.model.rotation.x = Math.PI / 2;
+      this.model.rotation.z += dt * 4.5;
     } else {
       this.model.position.y = 0.18 + Math.sin(this.bob * 3.4) * 0.06;
       this.model.rotation.y += dt * 1.4;
       this.model.rotation.x = 0;
     }
-    // Urgency as the fox tax approaches.
+    // Urgency as the timer (fox tax, or the coin dissolving) approaches.
     const urgency = 1 - Math.min(1, Math.max(0, snap.tLeft) / 2);
     this.glow.material.opacity = 0.4 + Math.sin(this.bob * (6 + urgency * 10)) * 0.2;
   }
@@ -1451,6 +1462,210 @@ class PickupActor implements Actor {
   flash(): void {}
   dispose(scene: THREE.Scene): void {
     scene.remove(this.root);
+  }
+}
+
+/* --------------------------------- Golem ----------------------------------- */
+
+/**
+ * The Clash Golem (GAME_DESIGN §9) — a stone construct kitbashed from the
+ * vendored Kenney castle/arena stone (ASSET_CATALOG §3) on the hand-keyed rig
+ * that document specifies for it: a three-part stack (legs, torso, arms) driven
+ * by walk and slam poses rather than an imported clip library.
+ *
+ * The amber core in its chest is the read that matters: **amber means nobody
+ * owns it**. The instant somebody lands the killing blow the core, the eyes and
+ * the shoulder banners re-tint to that team, so a glance at mid tells you
+ * whether the objective is still on the table.
+ */
+const GOLEM_SCALE = 1.15;
+
+class GolemActor implements Actor {
+  kind = 'golem' as const;
+  root = new THREE.Group();
+  private body = new THREE.Group();
+  private torso = new THREE.Group();
+  private armL = new THREE.Group();
+  private armR = new THREE.Group();
+  private legL: THREE.Group;
+  private legR: THREE.Group;
+  private core: THREE.Sprite;
+  private eyes: THREE.Sprite;
+  private bar: HealthBar;
+  private flasher: Flasher;
+  private ctx: ActorCtx;
+  private tinted: THREE.MeshToonMaterial[] = [];
+  private t = 0;
+  private stride = 0;
+  /** 0 = idle; counts down through the wind-up + smash of one slam. */
+  private slamT = 0;
+  private wasSlamming = false;
+  private owner: number | null = null;
+  private lastX: number;
+  private lastZ: number;
+
+  constructor(snap: EntitySnap & { kind: 'golem' }, scene: THREE.Scene, ctx: ActorCtx) {
+    this.ctx = ctx;
+    const stone = 0xb9bfcb;
+    const part = (key: string, tint: number): THREE.Group => {
+      const { root } = instantiate(key, { tint, flat: true });
+      return root;
+    };
+
+    // Legs: two stone stumps that take the stride.
+    this.legL = part('arena/block', stone);
+    this.legR = part('arena/block', stone);
+    for (const [leg, side] of [
+      [this.legL, -1],
+      [this.legR, 1],
+    ] as const) {
+      leg.scale.set(0.42, 1.5, 0.42);
+      leg.position.set(side * 0.32, 0, 0);
+      this.body.add(leg);
+    }
+
+    // Torso + chest plate.
+    const trunk = part('arena/block', stone);
+    trunk.scale.set(1.15, 1.7, 0.9);
+    this.torso.add(trunk);
+    const plate = part('castle/wall-corner-half', 0x8d95a4);
+    plate.scale.set(0.5, 0.42, 0.5);
+    plate.position.set(0, 0.28, 0.3);
+    this.torso.add(plate);
+    // Shoulders + head, in rougher rock so the silhouette breaks up.
+    for (const [side, arm] of [
+      [-1, this.armL],
+      [1, this.armR],
+    ] as const) {
+      const shoulder = part('castle/rocks-small', 0xa6adba);
+      shoulder.scale.setScalar(0.75);
+      arm.add(shoulder);
+      const fist = part('castle/rocks-large', stone);
+      fist.scale.setScalar(0.62);
+      fist.position.y = -0.85;
+      arm.add(fist);
+      arm.position.set(side * 0.85, 0.62, 0);
+      this.torso.add(arm);
+    }
+    const head = part('castle/rocks-small', 0xc6ccd8);
+    head.scale.setScalar(0.62);
+    head.position.y = 0.92;
+    this.torso.add(head);
+    this.torso.position.y = 0.78;
+    this.body.add(this.torso);
+
+    this.body.scale.setScalar(GOLEM_SCALE * (snap.elder ? 1.28 : 1));
+    this.root.add(this.body);
+
+    // Amber core + eyes: the ownership read (§9).
+    const spriteMat = (color: number, opacity: number): THREE.SpriteMaterial =>
+      new THREE.SpriteMaterial({
+        map: softGlow(),
+        color,
+        transparent: true,
+        opacity,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+      });
+    this.core = new THREE.Sprite(spriteMat(OBJECTIVE, 0.85));
+    this.core.scale.setScalar(1.5);
+    this.core.position.set(0, 1.1, 0.42);
+    this.root.add(this.core);
+    this.eyes = new THREE.Sprite(spriteMat(OBJECTIVE, 0.9));
+    this.eyes.scale.set(0.7, 0.34, 1);
+    this.eyes.position.set(0, 1.95, 0.3);
+    this.root.add(this.eyes);
+
+    this.bar = new HealthBar(1.9, OBJECTIVE);
+    this.bar.group.position.y = 2.75;
+    this.root.add(this.bar.group);
+    this.flasher = new Flasher(this.body);
+    this.body.traverse((o) => {
+      const m = o as THREE.Mesh;
+      if (!m.isMesh) return;
+      const list = Array.isArray(m.material) ? m.material : [m.material];
+      for (const x of list) this.tinted.push(x as THREE.MeshToonMaterial);
+    });
+
+    this.root.position.set(snap.x, 0, snap.z);
+    this.lastX = snap.x;
+    this.lastZ = snap.z;
+    scene.add(this.root);
+  }
+
+  /** Re-skin to the captor's colours — the one visual that says "it is ours now". */
+  private setOwner(owner: number | null): void {
+    this.owner = owner;
+    const color = owner === null ? OBJECTIVE : teamColor(this.ctx, owner);
+    this.core.material.color.setHex(color);
+    this.eyes.material.color.setHex(color);
+    this.bar.setColor(color);
+  }
+
+  update(re: RenderEntity, dt: number, camera: THREE.Camera): void {
+    const snap = re.snap;
+    if (snap.kind !== 'golem') return;
+    this.t += dt;
+    if (snap.owner !== this.owner) this.setOwner(snap.owner);
+
+    const moved = Math.hypot(re.x - this.lastX, re.z - this.lastZ);
+    this.lastX = re.x;
+    this.lastZ = re.z;
+    this.root.position.set(re.x, 0, re.z);
+    if (Math.abs(re.fx) + Math.abs(re.fz) > 0.01) {
+      this.root.rotation.y = Math.atan2(re.fx, re.fz);
+    }
+
+    // Slam: a wind-up you can react to, then the smash. The sim tells us it is
+    // swinging; the pose is ours, so a dropped frame never desyncs the read.
+    if (snap.slamming && !this.wasSlamming) this.slamT = 0.55;
+    this.wasSlamming = snap.slamming;
+    this.slamT = Math.max(0, this.slamT - dt);
+
+    if (this.slamT > 0) {
+      // 0.55 → 0.3 raise, 0.3 → 0 drive down.
+      const raise = this.slamT > 0.3 ? 1 - (this.slamT - 0.3) / 0.25 : this.slamT / 0.3;
+      const lift = raise * raise;
+      this.armL.rotation.x = -1.9 * lift;
+      this.armR.rotation.x = -1.9 * lift;
+      this.torso.position.y = 0.78 + lift * 0.22;
+      this.torso.rotation.x = -0.25 * lift;
+      this.legL.rotation.x = 0;
+      this.legR.rotation.x = 0;
+    } else {
+      // Walk cycle driven by distance covered, so it never moonwalks.
+      this.stride += moved * 2.6;
+      const swing = Math.sin(this.stride);
+      const walking = moved > 0.001;
+      const amp = walking ? 0.5 : 0;
+      this.legL.rotation.x = swing * amp;
+      this.legR.rotation.x = -swing * amp;
+      this.armL.rotation.x = -swing * amp * 0.7;
+      this.armR.rotation.x = swing * amp * 0.7;
+      // Heavy bob: it lands on each step rather than gliding.
+      this.torso.position.y = 0.78 + Math.abs(Math.cos(this.stride)) * (walking ? 0.07 : 0);
+      this.torso.rotation.x = 0;
+      if (!walking) {
+        // Idle: slow breathing so a neutral golem never looks like a prop.
+        this.torso.position.y = 0.78 + Math.sin(this.t * 1.6) * 0.035;
+      }
+    }
+
+    const pulse = this.owner === null ? 0.6 + Math.sin(this.t * 2.4) * 0.25 : 0.85;
+    this.core.material.opacity = pulse;
+    this.eyes.material.opacity = 0.55 + pulse * 0.4;
+
+    this.bar.update(Math.max(0, snap.hp / Math.max(1, snap.hpMax)), dt, camera);
+    this.flasher.update(dt);
+  }
+
+  flash(): void {
+    this.flasher.flash();
+  }
+
+  dispose(scene: THREE.Scene): void {
+    scene.remove(this.root);
+    for (const m of this.tinted) m.dispose();
   }
 }
 
@@ -1569,6 +1784,8 @@ export class ActorManager {
         return new PetActor(snap, this.scene);
       case 'pickup':
         return new PickupActor(snap, this.scene);
+      case 'golem':
+        return new GolemActor(snap, this.scene, this.ctx);
       default:
         return new ProjectileActor(snap as EntitySnap & { kind: 'projectile' }, this.scene);
     }

@@ -1,5 +1,5 @@
-import { type Slot, UNITS } from '@mini-clash/data';
-import type { ChampionSnap, Snapshot } from '@mini-clash/protocol';
+import { type EventKind, type Slot, UNITS } from '@mini-clash/data';
+import type { ChampionSnap, EventSnap, Snapshot } from '@mini-clash/protocol';
 import { create } from 'zustand';
 
 /** HUD-facing view of the match state, refreshed from snapshots (rounded to avoid re-render churn). */
@@ -51,6 +51,16 @@ export interface HudMatch {
   nextOrbIn: number | null;
   overtime: boolean;
   suddenDeath: boolean;
+  /* ------------------ The Living Bridge (GAME_DESIGN §9) ------------------ */
+  /** Announced or running map events — the banner and the live ticker chip. */
+  events: EventSnap[];
+  /** The next window and its countdown, for the "up next" line. */
+  nextEvent: { kind: EventKind; elder: boolean; inSeconds: number } | null;
+  /** Half-width of the walkable deck; the minimap strip narrows with it. */
+  deckHalf: number;
+  collapseStage: number;
+  /** Highlight lines for the Tab log ("Elder Golem — East"). */
+  eventLog: { at: number; kind: EventKind | 'collapse'; team: number | null; text: string }[];
 }
 
 /** Team-frame / scoreboard row. Brush-hidden enemies keep their last-known values. */
@@ -203,6 +213,11 @@ export const useHud = create<HudState>()((set, get) => ({
       nextOrbIn: snap.match.nextOrbIn === null ? null : Math.ceil(snap.match.nextOrbIn),
       overtime: snap.match.overtime,
       suddenDeath: snap.match.suddenDeath,
+      events: snap.match.events,
+      nextEvent: snap.match.nextEvent,
+      deckHalf: snap.match.deckHalf,
+      collapseStage: snap.match.collapseStage,
+      eventLog: snap.match.eventLog,
     };
     let champion: HudChampion | null = null;
     let selfTeam = get().selfTeam;

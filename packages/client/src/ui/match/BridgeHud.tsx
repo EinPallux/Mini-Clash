@@ -1,13 +1,15 @@
 import {
   AUGMENTS,
   CHAMPIONS,
+  EVENTS,
+  type EventKind,
   ITEMS,
   type ItemDef,
   QUICK_CHAT,
   RELICS,
   STRINGS,
 } from '@mini-clash/data';
-import type { PingKind } from '@mini-clash/protocol';
+import type { EventSnap, PingKind } from '@mini-clash/protocol';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { uiSound } from '../../game/audio';
 import { type FeedEntry, type HudChampion, type HudSeat, useHud } from '../../game/hudStore';
@@ -46,6 +48,103 @@ function fmtClock(t: number): string {
 
 function champLetter(id: string): string {
   return CHAMPIONS[id]?.name.slice(0, 1) ?? '?';
+}
+
+/* --------------------------- The Living Bridge ---------------------------- */
+
+/** One glyph per event kind — the ticker and minimap read at a glance (§9). */
+const EVENT_GLYPH: Record<EventKind, string> = {
+  flankIsles: '⛰',
+  coinRain: '◈',
+  stormFront: '⚡',
+  clashGolem: '☗',
+};
+
+function eventName(kind: EventKind, elder: boolean): string {
+  return elder && kind === 'clashGolem' ? 'ELDER GOLEM' : EVENTS[kind].name;
+}
+
+/**
+ * The 8 s announce banner (UI_UX §9): name, what it does to you, and a bar that
+ * empties as the window opens. Sits under the match strip so it never covers
+ * the clock or a champion's own bars — you have to be able to keep fighting
+ * through it, which is the whole point of a live announce.
+ */
+function EventBanner(): React.ReactElement | null {
+  const match = useHud((s) => s.match);
+  const pending = match?.events.find((e) => e.phase === 'announced');
+  if (!match || !pending || match.over) return null;
+  const def = EVENTS[pending.kind];
+  const frac = Math.max(0, Math.min(1, pending.tLeft / Math.max(0.001, pending.tTotal)));
+  return (
+    <div className={`event-banner ${pending.kind}`} role="status">
+      <span className="ev-glyph" aria-hidden="true">
+        {EVENT_GLYPH[pending.kind]}
+      </span>
+      <span className="text">
+        <b>{eventName(pending.kind, pending.elder)}</b>
+        <em>{def.blurb}</em>
+      </span>
+      <span className="count">{Math.ceil(pending.tLeft)}</span>
+      <span className="fuse">
+        <span className="fill" style={{ transform: `scaleX(${frac})` }} />
+      </span>
+    </div>
+  );
+}
+
+/**
+ * Live-event chips + the "up next" line, stacked under the minimap. This is the
+ * surface that makes the timetable *plannable*: you can see how long the golem
+ * window has left and how long until the next one, which is what turns an event
+ * into a decision instead of a surprise.
+ */
+function EventTicker(): React.ReactElement | null {
+  const match = useHud((s) => s.match);
+  if (match?.mode !== 'bridge' || match.over) return null;
+  const live = match.events.filter((e) => e.phase === 'active');
+  const next = match.nextEvent;
+  if (live.length === 0 && !next && !match.overtime) return null;
+  return (
+    <div className="event-ticker">
+      {live.map((ev) => (
+        <LiveChip key={`${ev.kind}-${ev.elder}`} ev={ev} />
+      ))}
+      {match.overtime && (
+        <div className="event-chip collapse">
+          <span className="ev-glyph" aria-hidden="true">
+            ▽
+          </span>
+          <span className="name">DECK {(match.deckHalf * 2).toFixed(0)}u</span>
+        </div>
+      )}
+      {next && !match.overtime && (
+        <div className="event-next">
+          <span className="ev-glyph" aria-hidden="true">
+            {EVENT_GLYPH[next.kind]}
+          </span>
+          <span className="name">{eventName(next.kind, next.elder)}</span>
+          <span className="in">{fmtClock(Math.max(0, next.inSeconds))}</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function LiveChip({ ev }: { ev: EventSnap }): React.ReactElement {
+  const frac = Math.max(0, Math.min(1, ev.tLeft / Math.max(0.001, ev.tTotal)));
+  return (
+    <div className={`event-chip live ${ev.kind}`}>
+      <span className="ev-glyph" aria-hidden="true">
+        {EVENT_GLYPH[ev.kind]}
+      </span>
+      <span className="name">{eventName(ev.kind, ev.elder)}</span>
+      <span className="left">{Math.ceil(ev.tLeft)}s</span>
+      <span className="fuse">
+        <span className="fill" style={{ transform: `scaleX(${frac})` }} />
+      </span>
+    </div>
+  );
 }
 
 export function BridgeHud({ runtime }: { runtime: () => MatchRuntime | null }): React.ReactElement {
@@ -135,6 +234,9 @@ export function BridgeHud({ runtime }: { runtime: () => MatchRuntime | null }): 
           <span>A BOT HOLDS YOUR SEAT</span> — move or cast to take back control
         </div>
       )}
+
+      <EventBanner />
+      <EventTicker />
 
       <TeamFrames />
       <Killfeed />
@@ -318,24 +420,51 @@ function Minimap({ runtime }: { runtime: () => MatchRuntime | null }): React.Rea
       if (!cv || !rt) return;
       const g = cv.getContext('2d');
       if (!g) return;
-      const { width, deckHalf, marks, selfTeam } = rt.minimap();
+      const { width, deckHalf, liveHalf, marks, selfTeam, events } = rt.minimap();
       const W = cv.width;
       const H = cv.height;
       const colors = paletteColors(useSettings.getState().palette);
       const hex = (n: number): string => `#${n.toString(16).padStart(6, '0')}`;
       g.clearRect(0, 0, W, H);
-      // Deck strip.
-      g.fillStyle = 'rgba(255,255,255,0.10)';
-      const deckY = H * 0.2;
-      const deckH = H * 0.6;
-      g.fillRect(2, deckY, W - 4, deckH);
       // Team 1 sees the strip mirrored — your base is always on the left.
       const flip = selfTeam === 1;
       const px = (x: number): number => {
         const v = 2 + ((x + width / 2) / width) * (W - 4);
         return flip ? W - v : v;
       };
+      const deckY = H * 0.2;
+      const deckH = H * 0.6;
       const pz = (z: number): number => deckY + ((z + deckHalf) / (deckHalf * 2)) * deckH;
+      // Deck strip, drawn to the *live* half-width: the Collapse visibly eats it
+      // (§9), so the map tells you the fight space is shrinking without a banner.
+      g.fillStyle = 'rgba(255,255,255,0.10)';
+      g.fillRect(2, pz(-liveHalf), W - 4, pz(liveHalf) - pz(-liveHalf));
+
+      // Event glow: a soft amber band under whatever is happening right now.
+      for (const ev of events) {
+        const announced = ev.phase === 'announced';
+        g.globalAlpha = announced ? 0.28 + Math.sin(Date.now() / 160) * 0.16 : 0.34;
+        g.fillStyle = ev.kind === 'stormFront' ? '#bfe4ff' : '#ffc24b';
+        if (ev.kind === 'stormFront') {
+          const bandW = Math.max(3, (EVENTS.stormFront.params.depth / width) * (W - 4));
+          g.fillRect(px(ev.x) - bandW / 2, deckY, bandW, deckH);
+        } else if (ev.kind === 'flankIsles') {
+          const p = EVENTS.flankIsles.params;
+          const w = (p.width / width) * (W - 4);
+          for (const sign of [-1, 1]) {
+            const top = pz(sign * (p.offsetZ - p.depth / 2));
+            const bot = pz(sign * (p.offsetZ + p.depth / 2));
+            g.fillRect(px(0) - w / 2, Math.min(top, bot), w, Math.abs(bot - top));
+          }
+        } else {
+          const r = ev.kind === 'coinRain' ? EVENTS.coinRain.params.radius : 4;
+          g.beginPath();
+          g.arc(px(ev.x), pz(ev.z), Math.max(4, (r / width) * (W - 4)), 0, Math.PI * 2);
+          g.fill();
+        }
+        g.globalAlpha = 1;
+      }
+
       for (const m of marks) {
         const teamColor = m.team === selfTeam ? colors.ally : colors.enemy;
         if (m.kind === 'tower') {
@@ -361,6 +490,19 @@ function Minimap({ runtime }: { runtime: () => MatchRuntime | null }): React.Rea
           g.globalAlpha = 0.55;
           g.fillRect(px(m.x) - 1, pz(m.z) - 1, 2, 2);
           g.globalAlpha = 1;
+        } else if (m.kind === 'coin') {
+          g.fillStyle = '#ffc24b';
+          g.fillRect(px(m.x) - 1, pz(m.z) - 1, 2, 2);
+        } else if (m.kind === 'golem') {
+          // Amber while nobody owns it; the captor's colour once it converts.
+          g.fillStyle =
+            m.team < 0 ? '#ffc24b' : hex(m.team === selfTeam ? colors.ally : colors.enemy);
+          const cx = px(m.x);
+          const cz = pz(m.z);
+          g.fillRect(cx - 3.5, cz - 3.5, 7, 7);
+          g.strokeStyle = 'rgba(0,0,0,0.5)';
+          g.lineWidth = 1;
+          g.strokeRect(cx - 3.5, cz - 3.5, 7, 7);
         } else {
           // champion
           g.fillStyle = m.dead ? 'rgba(255,255,255,0.3)' : hex(m.self ? colors.self : teamColor);
@@ -770,6 +912,40 @@ function Scoreboard(): React.ReactElement | null {
             ))}
         </div>
       ))}
+      <EventLog />
+    </div>
+  );
+}
+
+/**
+ * The Living Bridge highlight reel (§9), on the scoreboard. Who took which
+ * golem and how far the deck has fallen are the two facts that decide a late
+ * game, and neither survives in the killfeed — this is where you go to check.
+ */
+function EventLog(): React.ReactElement | null {
+  const log = useHud((s) => s.match?.eventLog ?? []);
+  const selfTeam = useHud((s) => s.selfTeam);
+  if (log.length === 0) return null;
+  return (
+    <div className="sb-events">
+      <div className="sb-head">
+        <span>MAP EVENTS</span>
+      </div>
+      {[...log]
+        .slice(-8)
+        .reverse()
+        .map((l) => (
+          <div
+            key={`${l.at}-${l.text}`}
+            className={`sb-event ${l.team === null ? '' : l.team === selfTeam ? 'ally' : 'enemy'}`}
+          >
+            <span className="at">{fmtClock(l.at)}</span>
+            <span className="ev-glyph" aria-hidden="true">
+              {l.kind === 'collapse' ? '▽' : EVENT_GLYPH[l.kind]}
+            </span>
+            <span className="what">{l.text}</span>
+          </div>
+        ))}
     </div>
   );
 }
