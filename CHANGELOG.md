@@ -28,6 +28,10 @@ Entry categories: `Added` · `Changed` · `Fixed` · `Balance` · `Content` · `
 - **The champion grid's role filter had quietly dropped two roles.** It was a hand-written list that never learned about Slayer or Bruiser, so three champions could not be filtered to. Derived from the roster now.
 - The champion viewer threw on first use if the hub was the first screen to touch the asset pipeline (the manifest was not warm), and again the moment an ability's timeline dropped a prop it had not preloaded. Both are preloaded from the data now.
 
+### Fixed (deployment)
+- **The Docker build could not install its own dependencies.** `colyseus` declares every transport as a peer without marking any optional, so pnpm's auto-install-peers pulls in `@colyseus/uwebsockets-transport`, whose `uWebSockets.js` resolves from GitHub rather than the npm registry — and `node:22-alpine` has no `git`. `pnpm install --frozen-lockfile` died partway through with `ENOENT not found: git`, on a package the game never loads (it appears **zero** times in the built server bundle; the server uses `@colyseus/ws-transport`). The build stage installs `git`; it is not in any runtime image. Reproduced locally by running the same install against a PATH with git removed, and confirmed fixed by restoring it.
+- **CI now builds the images on feature branches too.** `deploy-stack` is the only job that exercises the real Dockerfile, and it ran only on `main` — so the first genuine test of a deploy was the deploy itself. That is exactly how the missing `git` reached a production box.
+
 ### Changed
 - **`packages/sim` gains a `damageDealt` tally.** Nothing in the sim reads it, so determinism is untouched — and the scoreboard finally has the damage column GAME_DESIGN §18 has always asked for.
 - **The edge serves the api and the client on one origin.** Caddy routes `/api/*` alongside `/ws/*`, and vite's dev server proxies the same path, so the session cookie is first-party in development and production alike and there is no CORS configuration to get wrong.

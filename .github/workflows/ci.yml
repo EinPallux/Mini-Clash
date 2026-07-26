@@ -2,7 +2,12 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    # Feature branches too. `deploy-stack` builds the real Docker images, and
+    # it is the only job that can catch a Dockerfile that works nowhere but a
+    # developer's machine — running it only on main means the first real test
+    # of a deploy is the deploy. That is how a missing `git` in the build image
+    # reached a production box.
+    branches: [main, 'claude/**']
   pull_request:
 
 jobs:

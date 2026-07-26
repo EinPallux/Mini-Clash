@@ -231,6 +231,7 @@ anywhere in `deploy/` that touches anything outside the project.
 | Matches do not pay out | `MC_INTERNAL_SECRET` differs between the `api` and `game` containers, or is under 16 characters. `./deploy/logs.sh api` logs a rejected internal request with the reason. |
 | Coins look wrong | `./deploy/status.sh` re-derives every balance from the transaction ledger and reports any that disagree. |
 | Build killed | Out of memory. `free -h`; add swap (`setup.sh` prints the commands). |
+| `ENOENT not found: git` during the build | Fixed — the build stage installs `git`. `git pull` and retry. The dependency tree reaches GitHub for one package the game never loads. |
 | Out of disk | `docker builder prune` clears build cache only and is safe on a shared box. |
 
 ---
