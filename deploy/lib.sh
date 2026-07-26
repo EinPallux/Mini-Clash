@@ -80,8 +80,77 @@ load_env() {
 }
 
 # `docker compose` with the repo's file, from anywhere.
+#
+# The project name is pinned in compose.yaml, so every command here is confined
+# to Mini Clash's own containers, volumes and network — there is no invocation
+# in deploy/ that can reach another stack on the same box. `COMPOSE_OVERRIDE`
+# layers on compose.behind-proxy.yaml when deploy.sh is asked for it.
 compose() {
-  docker compose --project-directory "${REPO_ROOT}" -f "${REPO_ROOT}/compose.yaml" "$@"
+  local files=(-f "${REPO_ROOT}/compose.yaml")
+  [[ -n "${COMPOSE_OVERRIDE:-}" ]] && files+=(-f "${COMPOSE_OVERRIDE}")
+  docker compose --project-directory "${REPO_ROOT}" "${files[@]}" "$@"
+}
+
+# ---------------------------------------------------------------------------
+# Who is listening on a port?
+#
+# Three methods, because getting this wrong is dangerous in one direction only:
+# a check that cannot see a listener reports the port FREE, and then a deploy
+# walks into a collision it was supposed to prevent. `ss` is normally there on
+# Ubuntu, but "normally" is not good enough for the one guard protecting
+# somebody else's running service — so there is a fallback that needs no
+# binaries at all, and a hard failure if even that is unavailable.
+# ---------------------------------------------------------------------------
+
+# /proc stores the address little-endian hex; render the common cases so the
+# output reads like an address rather than like a memory dump.
+decode_addr() {
+  local hex="$1"
+  case "${hex}" in
+  00000000 | 00000000000000000000000000000000) echo "0.0.0.0" ;;
+  0100007F) echo "127.0.0.1" ;;
+  *0000000000000000FFFF0000*) echo "v4-mapped" ;;
+  *) if [[ "${#hex}" -eq 8 ]]; then
+    printf '%d.%d.%d.%d' 0x"${hex:6:2}" 0x"${hex:4:2}" 0x"${hex:2:2}" 0x"${hex:0:2}" 2>/dev/null ||
+      echo "${hex}"
+  else
+    echo "[ipv6]"
+  fi ;;
+  esac
+}
+
+# Parse /proc/net/tcp{,6}: hex local address, state 0A = LISTEN. Always present
+# on Linux, needs nothing installed.
+proc_listeners() {
+  local port="$1" hex
+  hex="$(printf '%04X' "${port}")"
+  local found=""
+  for f in /proc/net/tcp /proc/net/tcp6; do
+    [[ -r "${f}" ]] || continue
+    while read -r _ local_addr _ state _; do
+      [[ "${state}" == "0A" ]] || continue
+      [[ "${local_addr##*:}" == "${hex}" ]] || continue
+      found="${found}$(decode_addr "${local_addr%%:*}"):${port} (pid unknown)"$'\n'
+    done < <(tail -n +2 "${f}")
+  done
+  printf '%s' "${found}"
+}
+
+# True when we have *some* way to see listeners. Callers must check this.
+can_inspect_ports() {
+  have_cmd ss || have_cmd netstat || [[ -r /proc/net/tcp ]]
+}
+
+# Print one line per listener on `port`, or nothing when it is free.
+listeners_on() {
+  local port="$1"
+  if have_cmd ss; then
+    ss -lntpH "sport = :${port}" 2>/dev/null | awk '{print $4, $6}'
+  elif have_cmd netstat; then
+    netstat -lntp 2>/dev/null | awk -v p=":${port}\$" '$4 ~ p {print $4, $7}'
+  else
+    proc_listeners "${port}"
+  fi
 }
 
 # Poll a compose service's health endpoint until it answers, or give up loudly.

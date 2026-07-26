@@ -28,10 +28,32 @@ export DEBIAN_FRONTEND=noninteractive
 apt-get update -qq
 
 step "Installing prerequisites"
-apt-get install -y -qq ca-certificates curl gnupg git ufw >/dev/null
+# iproute2 gives us `ss`. The deploy scripts have a /proc fallback, but a
+# readable port check is the guard that keeps this stack off somebody else's
+# ports, and it should not be running on the fallback by accident.
+apt-get install -y -qq ca-certificates curl gnupg git ufw iproute2 >/dev/null
 
 if have_cmd docker && docker compose version >/dev/null 2>&1; then
   ok "Docker with the compose plugin is already installed ($(docker --version))"
+  info "Left completely alone — no daemon restart, no container bounce."
+elif have_cmd docker; then
+  # Docker is here but the compose plugin is not — most likely Ubuntu's
+  # `docker.io` package. Installing docker-ce over it replaces the daemon and
+  # restarts it, which bounces every container on the box including anything
+  # else running here. That is the user's call, not this script's.
+  running="$(docker ps -q 2>/dev/null | wc -l)"
+  step "Docker is installed, but without the compose plugin"
+  warn "Found $(docker --version), and ${running} container(s) currently running."
+  warn "Replacing this with docker-ce restarts the daemon and every container"
+  warn "on the box. Not doing that to a running service without being asked."
+  echo
+  echo "        Add just the plugin (no daemon restart, recommended):"
+  echo "          sudo apt-get install -y docker-compose-plugin"
+  echo
+  echo "        Or migrate to Docker's own packages, accepting the restart:"
+  echo "          https://docs.docker.com/engine/install/ubuntu/"
+  echo
+  die "Install the compose plugin, then re-run: sudo ./deploy/setup.sh"
 else
   step "Installing Docker Engine from Docker's apt repository"
   install -m 0755 -d /etc/apt/keyrings
@@ -63,19 +85,55 @@ if [[ -n "${SUDO_USER:-}" && "${SUDO_USER}" != "root" ]]; then
 fi
 
 step "Configuring the firewall"
+# Rules are only ever ADDED here. Nothing below deletes, resets or re-orders an
+# existing rule, because on a shared box those rules are how somebody else's
+# service is reachable.
+#
 # Explicitly allow SSH first: enabling ufw with a default-deny policy and no SSH
 # rule is the classic way to lock yourself out of a remote box.
 ufw allow OpenSSH >/dev/null 2>&1 || ufw allow 22/tcp >/dev/null
 ufw allow 80/tcp >/dev/null
 ufw allow 443/tcp >/dev/null
+
 if ufw status | grep -q "Status: active"; then
-  ok "Firewall already active — SSH, 80 and 443 allowed"
+  ok "Firewall already active — SSH, 80 and 443 allowed (existing rules kept)"
 else
-  ufw --force enable >/dev/null
-  ok "Firewall enabled — SSH, 80 and 443 allowed"
+  # Turning ufw ON is the one step here that can break something already
+  # running: anything listening on a port without an ALLOW rule stops being
+  # reachable the moment the default-deny policy takes effect. Find those
+  # first and say so by name, rather than discovering it as an outage.
+  exposed=()
+  if have_cmd ss; then
+    while read -r port; do
+      [[ -z "${port}" ]] && continue
+      case "${port}" in 22 | 80 | 443) continue ;; esac
+      ufw status | grep -qE "(^|[[:space:]])${port}(/tcp)?[[:space:]]+ALLOW" && continue
+      exposed+=("${port}")
+    done < <(
+      ss -lntH 2>/dev/null | awk '{print $4}' |
+        grep -vE '^(127\.0\.0\.1|\[::1\])' | sed 's/.*://' | sort -un
+    )
+  fi
+
+  if [[ "${#exposed[@]}" -gt 0 ]]; then
+    warn "Enabling the firewall would cut off these ports, which are listening now:"
+    for port in "${exposed[@]}"; do
+      owner="$(ss -lntpH "sport = :${port}" 2>/dev/null | sed 's/.*users:((//;s/).*//' | head -1)"
+      echo "          ${port}  ${owner:-unknown}"
+    done
+    warn "That may be your other service. Nothing has been enabled."
+    echo
+    echo "        Allow them and enable:   sudo ufw allow <port>/tcp   (each)"
+    echo "                                 sudo ufw enable"
+    echo "        Or skip the firewall:    leave it as it is; the rest still works."
+    echo
+  else
+    ufw --force enable >/dev/null
+    ok "Firewall enabled — SSH, 80 and 443 allowed"
+  fi
 fi
-warn "The status page on :3001 is NOT opened. Reach it over an SSH tunnel:"
-echo "        ssh -L 3001:localhost:3001 ${SUDO_USER:-root}@$(hostname -I | awk '{print $1}')"
+info "The status page is bound to loopback and needs no firewall hole."
+echo "        Reach it with: ssh -L 3001:localhost:3001 ${SUDO_USER:-root}@$(hostname -I | awk '{print $1}')"
 
 step "Checking swap"
 if [[ "$(swapon --show --noheadings | wc -l)" -gt 0 ]]; then
@@ -106,10 +164,14 @@ else
 #   MC_INTERNAL_SECRET  breaks the signed link between the game server and the
 #                       api, so finished matches stop paying out
 
-# The domain Caddy will get a certificate for. Point its A/AAAA record at this
-# box FIRST — Let's Encrypt validates over port 80 and will fail otherwise.
-# Leave it as :80 to serve plain HTTP for a local or IP-only trial.
-DOMAIN=:80
+# The domain Caddy gets a certificate for. Its A/AAAA record must already point
+# at this box — Let's Encrypt validates over port 80 and will fail otherwise.
+# Set it to :80 to serve plain HTTP for a local or IP-only trial.
+DOMAIN=${MC_DOMAIN:-moba.pathlands.cc}
+
+# Behind another reverse proxy (./deploy/deploy.sh --behind-proxy), Caddy binds
+# only this loopback port and leaves :80/:443 to whoever already has them.
+EDGE_PORT=8090
 
 POSTGRES_PASSWORD=$(generate_secret 24)
 MC_INTERNAL_SECRET=$(generate_secret 48)
@@ -122,5 +184,6 @@ echo
 ok "Host ready."
 echo
 echo "  Next:"
-echo "    1. Edit ${ENV_FILE} and set DOMAIN=your.domain (after the DNS record exists)"
-echo "    2. ./deploy/deploy.sh"
+echo "    1. Check ${ENV_FILE} — DOMAIN should be the hostname whose DNS points here"
+echo "    2. ./deploy/preflight.sh   (what else is on this box, and what collides)"
+echo "    3. ./deploy/deploy.sh      (add --behind-proxy if :80 is already taken)"

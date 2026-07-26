@@ -1,6 +1,14 @@
-# Mini Clash single-box deploy (TECH §1/§15): `DOMAIN=play.example.com docker
-# compose up -d --build` on a VPS is the whole production story through beta.
-# Staging = the same file on a second box with its own DOMAIN.
+# Mini Clash single-box deploy (TECH §1/§15). Use `./deploy/deploy.sh` rather
+# than raw compose — it backs the database up first and waits for health.
+#
+# **This box may not be ours alone.** Everything here is namespaced under the
+# `mini-clash` project so no command in deploy/ can reach another stack's
+# containers, volumes, networks or images. The only genuinely shared resources
+# are the host ports below; `deploy/preflight.sh` reports on them before
+# anything starts, and `compose.behind-proxy.yaml` removes the need for them
+# entirely when another reverse proxy already owns :80/:443.
+name: mini-clash
+
 services:
   game:
     build:
@@ -58,9 +66,11 @@ services:
       context: .
       target: web
     restart: unless-stopped
+    # Overridable so this can live alongside another stack that already owns
+    # :80/:443 — see compose.behind-proxy.yaml, which drops them entirely.
     ports:
-      - "80:80"
-      - "443:443"
+      - "${HTTP_PORT:-80}:80"
+      - "${HTTPS_PORT:-443}:443"
     environment:
       - DOMAIN=${DOMAIN:-:80}
     depends_on:
@@ -70,13 +80,17 @@ services:
       - caddy-data:/data
       - caddy-config:/config
 
-  # Status page (TECH §14) — point it at http://game:2567/healthz and publish
-  # it on a status. subdomain (or keep :3001 firewalled to the team).
+  # Status page (TECH §14) — point it at http://game:2567/healthz.
+  #
+  # Bound to loopback rather than 0.0.0.0: it is an internal tool, it has no
+  # business on the public internet, and on a shared box a wildcard bind on
+  # 3001 is one more port to collide with somebody else's service. Reach it
+  # over an SSH tunnel:  ssh -L 3001:localhost:3001 you@your-vps
   status:
     image: louislam/uptime-kuma:1
     restart: unless-stopped
     ports:
-      - "3001:3001"
+      - "${STATUS_BIND:-127.0.0.1}:3001:3001"
     volumes:
       - kuma-data:/app/data
 

@@ -102,6 +102,81 @@ else
   warn "docker is not installed — skipping the compose checks"
 fi
 
+step "Shared-box safety"
+# These are the invariants that keep this stack off another one's toes. They
+# are checked mechanically because every one of them is a single careless edit
+# away from being untrue.
+
+grep -qx 'name: mini-clash' "${REPO_ROOT}/compose.yaml"
+check $? "compose.yaml pins the project name, so nothing here is unscoped"
+
+# Match *invocations*, not prose: these scripts talk about pruning in their
+# comments and in the text preflight prints, and a grep that cannot tell the
+# difference fails on its own documentation.
+prune_calls() {
+  grep -rhnE '(^|[[:space:]]|\$\()docker[[:space:]]+(system|volume|image|builder)[[:space:]]+prune' \
+    "${REPO_ROOT}/deploy/"*.sh 2>/dev/null |
+    grep -vE '^[0-9]+:[[:space:]]*#' |
+    grep -vE '(info|warn|ok|echo|printf|die)[[:space:]]+["'"'"']'
+}
+
+! prune_calls | grep -qE 'docker[[:space:]]+(system|volume)[[:space:]]+prune'
+check $? "no script ever runs a system-wide or volume prune"
+
+# Every image prune that IS invoked must carry the project filter.
+unfiltered="$(prune_calls | grep 'image prune' | grep -vc 'com.docker.compose.project')"
+[[ "${unfiltered}" -eq 0 ]]
+check $? "every image prune is filtered to the mini-clash project"
+
+[[ "$(prune_calls | grep -c 'image prune')" -ge 1 ]]
+check $? "…and that filtered prune is actually there (the check has teeth)"
+
+! grep -rnE 'docker (stop|rm|kill)[^|]*\$' "${REPO_ROOT}/deploy/"*.sh >/dev/null 2>&1
+check $? "no script stops or removes containers by raw docker command"
+
+grep -q 'STATUS_BIND:-127.0.0.1' "${REPO_ROOT}/compose.yaml"
+check $? "the status page binds loopback, not a public port"
+
+[[ -f "${REPO_ROOT}/compose.behind-proxy.yaml" ]]
+check $? "the behind-proxy override exists for a box that already owns :80"
+! grep -qE '"(80|443):' "${REPO_ROOT}/compose.behind-proxy.yaml"
+check $? "…and it binds neither 80 nor 443"
+grep -q '127.0.0.1:\${EDGE_PORT' "${REPO_ROOT}/compose.behind-proxy.yaml"
+check $? "…binding loopback only"
+
+if have_cmd docker; then
+  DOMAIN=x POSTGRES_PASSWORD=pw MC_INTERNAL_SECRET=0123456789abcdef \
+    docker compose -f "${REPO_ROOT}/compose.yaml" -f "${REPO_ROOT}/compose.behind-proxy.yaml" \
+    config 2>/dev/null | grep -q 'published: "8090"'
+  check $? "…and the merged config really publishes 8090 instead"
+fi
+
+step "Port detection"
+# The guard that protects another service is only worth having if it can
+# actually see. A silent "everything is free" is the failure mode that matters.
+can_inspect_ports
+check $? "this host can be inspected for listening ports"
+
+if have_cmd python3; then
+  python3 -c "
+import socket, time, sys
+s = socket.socket(); s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+s.bind(('127.0.0.1', 45999)); s.listen(1)
+sys.stderr.write('up\n'); sys.stderr.flush()
+time.sleep(8)
+" 2>/dev/null &
+  probe_pid=$!
+  sleep 1
+  [[ -n "$(listeners_on 45999)" ]]
+  check $? "a real listener on 45999 is detected"
+  [[ -z "$(listeners_on 45998)" ]]
+  check $? "a free port reports free"
+  kill "${probe_pid}" 2>/dev/null
+  wait "${probe_pid}" 2>/dev/null
+else
+  warn "python3 missing — skipping the live listener probe"
+fi
+
 step "Secrets stay out of git"
 grep -qx '.env' "${REPO_ROOT}/.gitignore"
 check $? ".env is gitignored"

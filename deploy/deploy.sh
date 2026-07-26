@@ -2,9 +2,15 @@
 #
 # Build and roll out Mini Clash.
 #
-#   ./deploy/deploy.sh              build from the current working tree
-#   ./deploy/deploy.sh --pull       git pull first, then build
-#   ./deploy/deploy.sh --no-build   restart with the images already built
+#   ./deploy/deploy.sh                  build from the current working tree
+#   ./deploy/deploy.sh --pull           git pull first, then build
+#   ./deploy/deploy.sh --no-build       restart with the images already built
+#   ./deploy/deploy.sh --behind-proxy   listen on 127.0.0.1:8090, not :80/:443
+#   ./deploy/deploy.sh --skip-preflight skip the shared-box conflict check
+#
+# Everything runs under the `mini-clash` compose project, so no command here can
+# reach another stack's containers, volumes, images or networks. Run
+# ./deploy/preflight.sh first on a box that hosts anything else.
 #
 # The database is the one thing here that cannot be rebuilt, so this takes a
 # dump before it touches anything and tells you where it put it. Migrations run
@@ -16,14 +22,20 @@ readonly REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # shellcheck source=lib.sh
 source "${REPO_ROOT}/deploy/lib.sh"
 
+readonly PROJECT=mini-clash
+
 DO_PULL=0
 DO_BUILD=1
+BEHIND_PROXY=0
+SKIP_PREFLIGHT=0
 for arg in "$@"; do
   case "${arg}" in
   --pull) DO_PULL=1 ;;
   --no-build) DO_BUILD=0 ;;
+  --behind-proxy) BEHIND_PROXY=1 ;;
+  --skip-preflight) SKIP_PREFLIGHT=1 ;;
   -h | --help)
-    sed -n '2,12p' "${BASH_SOURCE[0]}" | sed 's/^# \?//'
+    sed -n '2,16p' "${BASH_SOURCE[0]}" | sed 's/^# \?//'
     exit 0
     ;;
   *) die "Unknown option '${arg}'. Try --help." ;;
@@ -32,6 +44,24 @@ done
 
 require_docker
 load_env "${REPO_ROOT}/.env"
+
+# Behind another proxy, Mini Clash's Caddy listens on loopback and never binds
+# :80/:443 — so two stacks can share the box instead of taking turns.
+if [[ "${BEHIND_PROXY}" -eq 1 ]]; then
+  export COMPOSE_OVERRIDE="${REPO_ROOT}/compose.behind-proxy.yaml"
+  step "Behind-proxy mode"
+  ok "Caddy will listen on 127.0.0.1:${EDGE_PORT:-8090} only"
+  info "Point your existing proxy there for ${DOMAIN:-your domain}."
+  info "The nginx/Caddy snippet is at the top of compose.behind-proxy.yaml."
+fi
+
+# A shared box is the normal case, not the exception. Look before touching it.
+if [[ "${SKIP_PREFLIGHT}" -eq 0 ]]; then
+  if ! "${REPO_ROOT}/deploy/preflight.sh"; then
+    die "Preflight found a conflict. Read the advice above, then re-run.
+     If you have already handled it: ./deploy/deploy.sh --skip-preflight"
+  fi
+fi
 
 step "Configuration"
 if [[ "${DOMAIN:-:80}" == ":80" ]]; then
@@ -93,22 +123,37 @@ wait_for_http "game server" game http://127.0.0.1:2567/healthz 60 ||
   die "The game server never became healthy. Check: ./deploy/logs.sh game"
 
 step "Checking the edge"
-edge_url="http://127.0.0.1/api/healthz"
+if [[ "${BEHIND_PROXY}" -eq 1 ]]; then
+  edge_url="http://127.0.0.1:${EDGE_PORT:-8090}/api/healthz"
+else
+  edge_url="http://127.0.0.1:${HTTP_PORT:-80}/api/healthz"
+fi
 if curl -fsS --max-time 10 "${edge_url}" >/dev/null 2>&1; then
-  ok "Caddy is routing /api to the api"
+  ok "Caddy is routing /api to the api (${edge_url})"
+elif [[ "${BEHIND_PROXY}" -eq 1 ]]; then
+  warn "Caddy did not answer on ${edge_url}. Check: ./deploy/logs.sh web"
 else
   warn "Caddy did not answer on ${edge_url} yet."
   warn "On a fresh domain it is still getting a certificate; give it a minute."
 fi
 
-step "Pruning old build layers"
-docker image prune -f >/dev/null
-ok "Reclaimed dangling layers"
+step "Reclaiming space"
+# Scoped with a filter, NOT `docker image prune -f`. That prunes every dangling
+# image on the daemon, which on a shared box means somebody else's build layers
+# — and if their build is mid-flight, the layers it is standing on. Compose
+# labels every image it builds with the project, so we can be precise.
+reclaimed="$(docker image prune -f --filter "label=com.docker.compose.project=${PROJECT}" 2>/dev/null |
+  tail -1)"
+ok "${reclaimed:-nothing to reclaim} (Mini Clash images only)"
+info "Other projects' images, volumes and build cache are untouched."
 
 echo
 ok "Deployed $(git -C "${REPO_ROOT}" rev-parse --short HEAD 2>/dev/null || echo 'working tree')"
 echo
-if [[ "${DOMAIN:-:80}" == ":80" ]]; then
+if [[ "${BEHIND_PROXY}" -eq 1 ]]; then
+  echo "  Serving:   http://127.0.0.1:${EDGE_PORT:-8090}  ← point your proxy here"
+  echo "  Play at:   https://${DOMAIN:-your-domain}/  (once the proxy is routing)"
+elif [[ "${DOMAIN:-:80}" == ":80" ]]; then
   echo "  Play at:   http://$(hostname -I | awk '{print $1}')/"
 else
   echo "  Play at:   https://${DOMAIN}/"
