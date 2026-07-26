@@ -8,7 +8,12 @@
 
 No install, no launcher. Open a link, invite three friends (bots fill the rest), and clash.
 
-> **Status: 📐 Planning phase.** This repository currently contains the complete design & technical documentation plus the CC0 3D asset library. No game code exists yet — implementation begins with Roadmap Phase v0.1.
+> **Status: 🎮 v0.7 “The Hub”.** The game plays end to end: Training Grounds, 4v4
+> Bridge Brawl against bots, authoritative online play with custom lobbies and
+> reconnect, the Tag Team duo system, the Power Surge augment draft, the Living
+> Bridge event system — and now accounts, the Clash Coin economy, unlocks,
+> quests, mastery and server-side match history. Roster: 10 champions.
+> Next up is `v0.8` in [ROADMAP.md](ROADMAP.md).
 
 ---
 
@@ -31,21 +36,61 @@ The client's own `build` script runs the asset pipeline first (`pnpm -w
 assets:build`), so there is no host configuration that can skip it. The
 pipeline launches through esbuild (`run.mjs`), making it independent of the
 host's Node TypeScript support; any Node ≥20 works. Static hosting covers
-offline/vs-bots play only — online needs the game server below.
+offline/vs-bots play only, with no account and no rewards — online play, coins,
+unlocks, quests and match history all need the stack below.
 
-### Online stack (one VPS, Docker Compose)
+### Online stack (one VPS, Ubuntu 24.04 LTS)
+
+Everything runs on one box under Docker Compose. **[DEPLOY.md](DEPLOY.md) is the
+runbook** — including how to share a box that already hosts something else. The
+short version, from a fresh Ubuntu 24.04 server:
 
 ```bash
-DOMAIN=play.example.com docker compose up -d --build
+git clone <this repo> /srv/mini-clash && cd /srv/mini-clash
+sudo ./deploy/setup.sh      # Docker, firewall, and a .env with fresh secrets
+./deploy/preflight.sh       # what else is here, and what would collide
+./deploy/deploy.sh          # build, migrate, roll out, verify
 ```
 
-Three services (see `compose.yaml`): **game** — the Colyseus server as a single
-self-contained bundle (`packages/server/build.mjs`); **web** — Caddy with
-automatic HTTPS serving the built client and reverse-proxying everything under
-`/ws` (websockets, Colyseus matchmake calls, lobby-code lookups) to the game;
-**status** — an uptime-kuma status page on `:3001` (point a monitor at
-`http://game:2567/healthz`). Leave `DOMAIN` unset for a plain-HTTP local run
-on `:80`. Staging is the same file on a second box with its own `DOMAIN`.
+**Sharing the box.** Everything runs under the `mini-clash` compose project, so
+no command in `deploy/` can reach another stack's containers, volumes, images or
+networks — there is no `docker system prune`, no volume prune, and the image
+prune is filtered to this project's own layers. `preflight.sh` reports port
+conflicts before anything starts, `setup.sh` only ever *adds* firewall rules and
+refuses to enable ufw while that would cut off a listening port, and
+`deploy.sh --behind-proxy` puts Mini Clash on `127.0.0.1:8090` so it can run
+**alongside** whatever already owns `:80`. `selftest.sh` checks all of that
+mechanically.
+
+| Script | What it does |
+|---|---|
+| `deploy/setup.sh` | One-time host prep: Docker Engine from Docker's own apt repo (and it refuses to replace a *working* Docker that would restart your other containers), additive `ufw` rules only, a swap warning on small boxes, and a `.env` with generated secrets. Idempotent; never overwrites an existing `.env`. |
+| `deploy/preflight.sh` | **Reads only.** Other compose projects, port conflicts and who holds them, firewall state, RAM/swap/disk, and whether your DNS points here. `deploy.sh` will not run until it passes. |
+| `deploy/deploy.sh` | Backs up the database, builds, starts, waits for both health endpoints, checks the edge. `--pull`, `--no-build`, `--behind-proxy` (listen on `127.0.0.1:8090` instead of `:80/:443`). |
+| `deploy/start.sh` / `stop.sh` | Bring the stack up or down. `stop.sh --destroy` also deletes the database volume, and makes you type the word. |
+| `deploy/status.sh` | Containers, health, account/match counts, **and a ledger reconciliation** — the same invariant the api's tests assert, run against live data. |
+| `deploy/logs.sh [service] [lines]` | Follow the logs. The api and game server write pino JSON; pipe through `jq`. |
+| `deploy/backup.sh [dir]` | `pg_dump` inside the container, gzipped, newest 14 kept. Verifies the dump is not empty before trusting it. Cron-friendly. |
+| `deploy/restore.sh <dump>` | Stops the writers, takes a safety dump of what it is about to replace, then loads the file. |
+| `deploy/selftest.sh` | 51 checks over the scripts themselves — argument handling, config guards, secret generation, compose validity, and the shared-box invariants (project pinned, no unscoped prune, loopback-only status page, live port-detection probe). Touches nothing; safe on a live box. |
+
+Five services (see `compose.yaml`): **api** — accounts, the coin ledger,
+unlocks, quests and match history (Fastify + Postgres, migrations applied on
+boot); **db** — Postgres 17 on a named volume; **game** — the Colyseus server as
+a single self-contained bundle; **web** — Caddy with automatic HTTPS serving the
+built client, proxying `/ws` to the game and `/api` to the api **on the same
+origin**, which is what keeps the session cookie first-party and means there is
+no CORS configuration to get wrong; **status** — an uptime-kuma page on `:3001`
+(firewalled; reach it over an SSH tunnel).
+
+Two secrets live in `.env` and neither is recoverable — keep a copy:
+`POSTGRES_PASSWORD`, and `MC_INTERNAL_SECRET`, which signs the link between the
+game server and the api. Without a valid one the api **refuses** to record
+matches rather than accepting unsigned ones, so a misconfigured deploy pays
+nobody instead of letting anybody post fabricated results.
+
+Set `DOMAIN` to `:80` for a plain-HTTP local or IP-only trial. Staging is the
+same repo on a second box with its own `DOMAIN`.
 
 Observability (TECH §14): the game server writes pino JSON logs to stdout
 (`docker compose logs game`) and exposes Prometheus metrics at
@@ -63,6 +108,7 @@ open the client with `?online=1`.
 |---|---|
 | [ROADMAP.md](ROADMAP.md) | Release phases v0.1 → v1.0, each shipping complete features, with acceptance criteria |
 | [TECHNICAL_ARCHITECTURE.md](TECHNICAL_ARCHITECTURE.md) | Stack, monorepo layout, deterministic simulation, netcode, backend, deployment |
+| [DEPLOY.md](DEPLOY.md) | VPS runbook: first deploy, day-to-day operation, backups, and sharing a box with other services |
 | [docs/GAME_DESIGN.md](docs/GAME_DESIGN.md) | The GDD: core loop, match rules, map spec, combat math, items, signature systems |
 | [docs/CHAMPIONS.md](docs/CHAMPIONS.md) | Full launch roster (12 champions): kits, numbers, asset & animation specs |
 | [docs/AUGMENTS.md](docs/AUGMENTS.md) | Power Surge system rules + the generic Augment catalog |

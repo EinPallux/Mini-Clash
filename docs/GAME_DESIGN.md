@@ -141,11 +141,22 @@ The map runs a seeded event schedule (all clients/server share the seed; bots pl
 | **Flank Isles** | 2:00 (fixed), later via pool | Two floating platforms (10×6 u) rise N and S of mid for 60 s, connected by light-bridges — opening flank/ambush routes. Each carries a health orb. Rise/fall is fully animated (rumble, dust, chunks). |
 | **Coin Rain** | pool (4:00 / 12:30 windows) | A marked 8 u zone showers ~30 coins over 20 s (2–6 g each, pickup on touch). Risk/reward scramble magnet. |
 | **Storm Front** | pool (4:00 / 8:30 windows) | A crackling storm wall (4 u deep, full width) sweeps the bridge end-to-end over 25 s; standing in it deals 2.5%/s max-HP arcane and slows 15%. Forces the whole map to rotate. |
-| **Clash Golem** | 6:00 and 10:30 | Neutral golem (600→ scaled HP, heavy slam attacks) wakes at the center altar. The team that **lands the killing blow** converts it: it walks their lane as a siege engine (taunts towers, 40% tower-damage resist, buffs nearby Minis). #2 is the Elder Golem: +60% stats, its siege aura also shields allied champions. |
+| **Clash Golem** | 6:00 and 10:30 | Neutral golem (600→ scaled HP, heavy slam attacks) wakes at the center altar. The team that **lands the killing blow** converts it: it walks their lane as a siege engine (taunts towers, 40% tower-damage resist, buffs nearby Minis) for up to **90 s**, then crumbles. *(In practice it is focused down in ~18 s — see §9.1.)* #2 is the Elder Golem: +60% stats, its siege aura also shields allied champions. |
 | **Bridge Collapse (Overtime)** | 15:00 | Every 60 s the outer 3 u of BOTH long edges crumble into the void (animated chunk-fall), narrowing the deck 18→12→8 u. Brush and cover fall away first; escape space vanishes; fights become unavoidable. Simultaneously **Corebreaker**: Cores take +200% damage and every wave carries 5 Rams. |
 | **Sudden Death** | 17:30 | Both Cores decay 1.5%/s. Higher-HP Core wins; exact tie → team with more structure damage dealt. |
 
 Design intent: the schedule gives ARAM the *objective heartbeat* of a full MOBA (dragon/baron tempo) without a jungle, and the seeded pools mean match rhythm varies run-to-run.
+
+### 9.1 Rules the timetable runs on (v0.6)
+
+- **The reveal window is 30 s.** Inside it the HUD ticker names the next event and counts it down; outside it, the timetable is something you have to *remember*. This is what makes Orb Sense (+10 s, AUGMENTS §3.7) a card worth taking rather than a duplicate of the default HUD — and it keeps the ticker from being a permanent to-do list.
+- **A window you miss is missed.** The 8 s announce is the whole warning; nothing re-announces.
+- **Overtime ends the timetable.** No new event is announced once the Bridge Collapse starts, and any event still holding *terrain* (the Flank Isles) is retired the moment the deck begins to fall. The two systems both rewrite the walkable map and the last writer would win — an isle retiring after a collapse would hand back walkable void where the bridge used to be.
+- **The Flank Isles sit clear of the deck.** Platform centres are 14.5 u out, so the near edge is 2.5 u past the 18 u deck and the light-bridge spans a real gap. A flank route you could already walk is not a flank route. (Implementation: the navgrid is 38 u deep for this — the isles are carved out of void that has to exist before it can be opened.)
+- **The Storm Front is not outrun, it is crossed.** The wall is 4 u deep and sweeps at ~5.3 u/s; a champion moves 3.6. Running with it keeps you inside for ~2.4 s, standing still ~0.76 s, walking *into* the oncoming edge ~0.45 s. Bots from Veteran up know this, and so should players — it is the event's one piece of hidden depth.
+- **The golem starts from where it stands.** A converted golem picks up the owner's lane at the waypoint nearest the altar, not at step 0 — which for the eastern team is its own gate.
+- **A converted golem sieges for 90 s and then crumbles** — a safety net, not a balance lever. Measured in v0.6: **every converted golem is killed, mean life 18 s**, so nothing has ever reached the timer. It exists so a golem that somehow survives cannot march for the rest of the match.
+- **Open question the v0.6 harness raised: the golem is not sieging.** Eighteen seconds is not "walks their lane as a siege engine". The team that takes it wins **69%** of the time (78 takes over 40 matches, against a 65% rail), but that is dominated by *correlation* — winning the altar fight predicts winning the match — rather than by anything the golem does afterwards. Making it durable enough to actually siege would push that number up, not down, so the two goals are in tension and the resolution needs its own design pass, not a number nudge.
 
 ## 10. Combat system
 
@@ -305,8 +316,9 @@ Full screen specs in UI_UX.md; economy summary:
 
 - **Clash Coins** earned: win 120 / loss 70 · first win of day +150 · quests (3 daily 50–80 each, 1 weekly 200) · mastery milestones · match-performance bonus (±20% by score, capped so losses still pay).
 - **Champions:** 4 starters owned by every account (Rook, Fathom, Mortis, Sylva — one per role family) + 4-champion weekly free rotation. Unlock prices 3500 (early roster) / 5500 (later) / 8000 (newest). Average active player unlocks a champion roughly weekly at launch cadence.
-- **Cosmetics (earn-only at 1.0):** champion palettes 800 (each champion ships with 2 unlockable palettes built from its asset pack's texture variants), emote stickers 400, victory poses 600.
-- **Mastery:** per-champion XP → levels 1–10; rewards at 3 (palette), 5 (coins), 7 (sticker), 10 (animated podium title).
+- **Cosmetics (earn-only at 1.0):** champion palettes 800 (each champion ships with 2 unlockable palettes), emote stickers 400, victory poses 600. **As of v0.7 only palettes exist** — 20 of them, a multiply tint over each champion's own materials so the silhouette never changes, previewing live in the champion viewer. Stickers and poses are priced but have no catalog: they need art and animation that does not exist, and the api returns `unknown_item` for both rather than selling a placeholder.
+- **Name changes:** the first is free, then 300 coins — deliberately the cheapest thing in the shop. The price is friction against name-churn, not a penalty for a typo.
+- **Mastery:** per-champion XP → levels 1–10; rewards at 3 (palette), 5 (coins), 7 (sticker), 10 (animated podium title). **v0.7 pays the coin milestones (5 → 300, 10 → 750), claimed by the player and paid once.** The palette, sticker and title milestones wait on the cosmetics they hand out.
 - **Match history:** last 30 matches: result, duo played, augments drafted, K/D/A, damage, per-event outcomes; expandable full scoreboard.
 - **Profile:** level (account XP), banner, favorite duo showcase, lifetime stats.
 

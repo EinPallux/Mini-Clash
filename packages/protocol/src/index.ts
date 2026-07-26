@@ -4,7 +4,7 @@
  * ride the binary delta-snapshot codec in ./codec (TECH §6 — quantized, dirty-
  * masked, baseline-keyed, ≤ 12 KB/s per client, enforced by test).
  */
-import type { Slot, Team } from '@mini-clash/data';
+import type { EventKind, Slot, Team } from '@mini-clash/data';
 
 export { PROTOCOL_VERSION } from '@mini-clash/data';
 
@@ -82,6 +82,13 @@ export interface MatchConfig {
     enemyTowerHp?: number;
     /** Balance A/B: bots on this team never Tag Swap (ROADMAP v0.4 acceptance). */
     noSwapTeam?: Team;
+    /**
+     * Start the match clock here instead of 0:00 (ROADMAP v0.6). The Living
+     * Bridge timetable runs on match minutes, so a smoke that has to *see* an
+     * event would otherwise idle for two of them. Skips the wave/orb/event
+     * backlog rather than replaying it.
+     */
+    clock?: number;
   };
 }
 
@@ -293,6 +300,20 @@ export interface PickupSnap extends EntityBase {
   tLeft: number;
   /** Toss arc phase 0..1 while it is still in the air. */
   tossPhase?: number;
+  /** Coin Rain coin: gold value, so the client can size the sparkle. */
+  coinGold?: number;
+}
+
+/** The Clash Golem (GAME_DESIGN §9). */
+export interface GolemSnap extends EntityBase {
+  kind: 'golem';
+  elder: boolean;
+  /** null while neutral; the owning team once somebody takes it. */
+  owner: Team | null;
+  /** Current aggro target — the client draws the tether like a tower's. */
+  aggro: EntityId | null;
+  /** True while winding up a slam (telegraph). */
+  slamming: boolean;
 }
 
 export type EntitySnap =
@@ -308,7 +329,8 @@ export type EntitySnap =
   | FlowerSnap
   | ZoneSnap
   | PetSnap
-  | PickupSnap;
+  | PickupSnap
+  | GolemSnap;
 
 /* --------------------------------- Events --------------------------------- */
 
@@ -326,6 +348,34 @@ export interface MatchStateSnap {
   overtime: boolean;
   /** 20:00 Core decay active. */
   suddenDeath: boolean;
+  /* --------------------- The Living Bridge (§9) --------------------- */
+  /** Events announced or running right now (banner, ticker, minimap glow). */
+  events: EventSnap[];
+  /** The next scheduled event and when it lands — the ticker's countdown. */
+  nextEvent: { kind: EventKind; elder: boolean; inSeconds: number } | null;
+  /** Half-width of the walkable deck; shrinks as the Collapse eats the edges. */
+  deckHalf: number;
+  /** 0 = intact. Drives which edge strips the client drops into the void. */
+  collapseStage: number;
+  /** Highlight reel for the Tab log and the match summary. */
+  eventLog: { at: number; kind: EventKind | 'collapse'; team: Team | null; text: string }[];
+}
+
+/** One announced or running map event. */
+export interface EventSnap {
+  kind: EventKind;
+  elder: boolean;
+  phase: 'announced' | 'active';
+  /** Seconds left in this phase. */
+  tLeft: number;
+  tTotal: number;
+  /**
+   * Where the event is, for the minimap glow and the world band: the Coin Rain
+   * zone centre, the Storm Front wall's current position, the altar for the
+   * golem, mid for the isles (which are symmetric about it).
+   */
+  x: number;
+  z: number;
 }
 
 export type SimEvent =
@@ -377,6 +427,16 @@ export type SimEvent =
     }
   | { t: 'barrierDown' }
   | { t: 'overtime' }
+  /* The Living Bridge (GAME_DESIGN §9). */
+  | { t: 'eventAnnounced'; kind: EventKind; elder: boolean; inSeconds: number }
+  | { t: 'eventStarted'; kind: EventKind; elder: boolean }
+  | { t: 'eventEnded'; kind: EventKind }
+  /** Somebody landed the killing blow and the golem changed sides. */
+  | { t: 'golemTaken'; team: Team; elder: boolean }
+  | { t: 'golemExpired'; team: Team; elder: boolean }
+  /** A golem was killed. `team` is its owner, or null if it died still neutral. */
+  | { t: 'golemDied'; team: Team | null; elder: boolean }
+  | { t: 'collapse'; stage: number; deckHalf: number }
   | { t: 'suddenDeath' }
   | { t: 'ping'; player: PlayerId; team: Team; kind: PingKind; x: number; z: number }
   | { t: 'surrendered'; team: Team }
@@ -477,3 +537,4 @@ export type WorkerToClient =
   | { t: 'snapshot'; snap: Snapshot }
   | { t: 'fatal'; message: string };
 export { BASELINE_EVERY, SnapshotDecoder, SnapshotEncoder } from './codec';
+export * from './service';

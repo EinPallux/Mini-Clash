@@ -76,6 +76,11 @@ function snap(entities: EntitySnap[], tick = 100, over: Partial<Snapshot> = {}):
       nextOrbIn: 12.5,
       overtime: false,
       suddenDeath: false,
+      events: [],
+      nextEvent: null,
+      deckHalf: 9,
+      collapseStage: 0,
+      eventLog: [],
     },
     entities,
     events: [],
@@ -293,6 +298,97 @@ describe('snapshot codec', () => {
     // Unpatched frames carry no ack.
     const out2 = new SnapshotDecoder().decode(enc.encode(snap([champ(1)], 103)));
     void out2; // delta after fresh decoder → null; just ensure no throw
+  });
+
+  it('carries live map events in the header, not the match blob', () => {
+    const { enc, dec } = pair();
+    const withEvents = (tick: number, tLeft: number): Snapshot =>
+      snap([champ(1)], tick, {
+        match: {
+          ...snap([]).match,
+          events: [
+            { kind: 'clashGolem', elder: true, phase: 'active', tLeft, tTotal: 180, x: 0, z: 0 },
+            {
+              kind: 'stormFront',
+              elder: false,
+              phase: 'announced',
+              tLeft: 4.2,
+              tTotal: 8,
+              x: -42.5,
+              z: 0,
+            },
+          ],
+          nextEvent: { kind: 'coinRain', elder: false, inSeconds: 91 },
+          deckHalf: 6,
+          collapseStage: 1,
+          eventLog: [{ at: 630, kind: 'clashGolem', team: 1, text: 'Elder Golem — East' }],
+        },
+      });
+
+    const first = dec.decode(enc.encode(withEvents(100, 42.5)));
+    expect(first?.match.events).toHaveLength(2);
+    expect(first?.match.events[0]).toMatchObject({
+      kind: 'clashGolem',
+      elder: true,
+      phase: 'active',
+    });
+    expect(first?.match.events[0].tLeft).toBeCloseTo(42.5, 1);
+    expect(first?.match.events[1]).toMatchObject({ kind: 'stormFront', phase: 'announced' });
+    expect(first?.match.events[1].x).toBeCloseTo(-42.5, 2);
+    expect(first?.match.nextEvent).toMatchObject({ kind: 'coinRain', inSeconds: 91 });
+    expect(first?.match.deckHalf).toBe(6);
+    expect(first?.match.eventLog).toHaveLength(1);
+
+    // A ticking timer must not re-send the whole match blob: the delta that
+    // only advances `tLeft` stays tiny.
+    const delta = enc.encode(withEvents(103, 42.35));
+    expect(delta[0]).toBe(2);
+    expect(delta.length).toBeLessThan(60);
+    const second = dec.decode(delta);
+    expect(second?.match.events[0].tLeft).toBeCloseTo(42.35, 1);
+    expect(second?.match.eventLog).toHaveLength(1); // still known from the baseline
+  });
+
+  it('round-trips the golem and Coin Rain coins', () => {
+    const { enc, dec } = pair();
+    const golem: EntitySnap = {
+      kind: 'golem',
+      id: 77,
+      x: 0.5,
+      z: -1.25,
+      fx: -1,
+      fz: 0,
+      hp: 812.5,
+      hpMax: 1140,
+      radius: 1.1,
+      team: 1,
+      elder: true,
+      owner: 1,
+      aggro: 3,
+      slamming: true,
+    };
+    const coin: EntitySnap = {
+      kind: 'pickup',
+      id: 78,
+      x: -4.5,
+      z: 2.25,
+      fx: 1,
+      fz: 0,
+      hp: 1,
+      hpMax: 1,
+      radius: 0.6,
+      team: 0,
+      unitId: 'coin',
+      tLeft: 5.5,
+      coinGold: 4,
+    };
+    const out = dec.decode(enc.encode(snap([golem, coin])));
+    const g = out?.entities.find((e) => e.id === 77);
+    expect(g?.kind).toBe('golem');
+    expect(g).toMatchObject({ elder: true, owner: 1, slamming: true });
+    expect(Math.abs((g?.hp ?? 0) - 812.5)).toBeLessThanOrEqual(1); // HP quantizes to whole points
+    const c = out?.entities.find((e) => e.id === 78);
+    expect(c).toMatchObject({ kind: 'pickup', unitId: 'coin', coinGold: 4 });
   });
 
   it('emits periodic baselines that resync a drifted decoder', () => {

@@ -338,6 +338,15 @@ export const ASSET_MANIFEST: AssetEntry[] = [
     group: 'match-core',
   },
   { key: 'castle/flag', src: 'Kenney_CastleKit/GLB format/flag.glb', group: 'match-core' },
+  // Living Bridge events (§9): Coin Rain pickups, and the stone the Clash Golem
+  // and the collapsing deck are built from.
+  { key: 'dungeon/coin', src: 'Kenney_Minidungeon/GLB format/coin.glb', group: 'match-core' },
+  { key: 'dungeon/rocks', src: 'Kenney_Minidungeon/GLB format/rocks.glb', group: 'match-core' },
+  {
+    key: 'castle/wall-corner-half',
+    src: 'Kenney_CastleKit/GLB format/wall-corner-half.glb',
+    group: 'match-core',
+  },
   {
     key: 'castle/flag-banner',
     src: 'Kenney_CastleKit/GLB format/flag-banner-long.glb',

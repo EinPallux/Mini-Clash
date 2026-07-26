@@ -9,6 +9,7 @@ import type {
 } from '@mini-clash/protocol';
 import { SnapshotDecoder } from '@mini-clash/protocol';
 import { Client as ColyseusClient, type Room } from 'colyseus.js';
+import { request } from '../state/api';
 
 /**
  * Net adapter (TECH §2): one interface, two transports. The game client cannot
@@ -98,6 +99,26 @@ export class WorkerLink implements NetLink {
 }
 
 /** Server endpoint: same-origin wss in production, localhost in dev, ?server= override. */
+/**
+ * Ask the api for a room ticket.
+ *
+ * Undefined on any failure — signed out, offline, or an api with no service
+ * secret configured. That is not an error path: an unlinked game server accepts
+ * a tokenless join, and a linked one will refuse it with a message the join
+ * flow already surfaces.
+ */
+async function playTicket(): Promise<string | undefined> {
+  try {
+    const res = await request<{ ticket: string }>('/play/ticket', {
+      method: 'POST',
+      body: { mode: 'bridge' },
+    });
+    return res.ticket;
+  } catch {
+    return undefined;
+  }
+}
+
 export function serverEndpoint(): string {
   const override = new URLSearchParams(window.location.search).get('server');
   if (override) return override;
@@ -174,6 +195,11 @@ export class SocketLink implements NetLink {
 
   async start(config: MatchConfig): Promise<void> {
     const client = new ColyseusClient(this.opts.endpoint ?? serverEndpoint());
+    // Identity for the match comes from the api, not from us: the ticket names
+    // the account and the champions it may field, and the game server trusts
+    // that rather than anything this client sends (TECH §10). A server running
+    // unlinked issues no tickets and needs none.
+    const ticket = await playTicket();
     // Lobby matches join a reserved seat by token; solo online creates a room.
     let room: Room;
     try {
@@ -181,12 +207,14 @@ export class SocketLink implements NetLink {
         ? await client.joinById(this.opts.join.roomId, {
             name: this.opts.name,
             token: this.opts.join.token,
+            ticket,
           })
         : await client.create('bridge', {
             name: this.opts.name,
             roster: config.players,
             seed: config.seed,
             rig: config.rig,
+            ticket,
           });
     } catch (err) {
       // Dead room / spent token: burn the ticket so boot stops retrying it.

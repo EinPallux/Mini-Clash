@@ -1,7 +1,16 @@
-import { BRIDGE, CORE_DEF, type DamageType, TAG_SWAP, TOWER_DEF } from '@mini-clash/data';
-import { augmentDamageMul, augParam, special } from './augments';
+import {
+  BRIDGE,
+  CORE_DEF,
+  type DamageType,
+  EVENT_INSURANCE_WINDOW,
+  TAG_SWAP,
+  TOWER_DEF,
+} from '@mini-clash/data';
+import { augmentDamageMul, augParam, economyMods, special } from './augments';
 import { absorbShields, applyBuff, applyCc, consumeBlock } from './buffs';
 import { creditKill, onMiniKilled } from './economy';
+import { onGolemKilled } from './eventKinds';
+import { golemTowerResist } from './golem';
 import { championStats, hasItemPassive, mitigate, unitStats } from './stats';
 import { dist } from './vec';
 import type { Entity, World } from './world';
@@ -170,6 +179,9 @@ export function dealDamage(
   if (target.mini && (ctx.source.kind === 'tower' || ctx.source.kind === 'core')) {
     amount *= target.mini.def.mini?.fromStructures ?? 1;
   }
+  // A converted golem shrugs off structure fire (§9) — applied here rather than
+  // as a stat so it only ever blunts towers, never champions.
+  amount *= golemTowerResist(target, ctx.source);
   // Juggernaut Mail: reduced damage from Minis and towers.
   if (target.champ && tag === 'unit') {
     const jug = hasItemPassive(target, 'juggernaut');
@@ -265,7 +277,10 @@ export function dealDamage(
   }
   if (srcChamp) {
     srcChamp.lastCombatAt = w.time;
-    if (target.kind === 'champion') srcChamp.lastChampHitAt = w.time;
+    if (target.kind === 'champion') {
+      srcChamp.lastChampHitAt = w.time;
+      srcChamp.damageDealt += dealt;
+    }
   }
 
   // Overtime Corebreaker: Cores take double damage (GAME_DESIGN §5).
@@ -550,8 +565,22 @@ function undyingContract(w: World, target: Entity): boolean {
   return true;
 }
 
+/** Did a Living Bridge window open in the last few seconds? (Event Insurance) */
+function recentEventStart(w: World): boolean {
+  for (const ev of w.match?.events ?? []) {
+    if (ev.phase !== 'active') continue;
+    if (ev.tTotal - ev.tLeft <= EVENT_INSURANCE_WINDOW) return true;
+  }
+  return false;
+}
+
 export function kill(w: World, target: Entity, by?: Entity): void {
   if (target.dead) return;
+  // The Clash Golem does not die to its first killer — it changes sides (§9).
+  if (target.golem && target.golem.owner === null) {
+    onGolemKilled(w, target, by);
+    return;
+  }
   // Undying Contract: once a match, the bench tears up the paperwork and comes
   // up on the spot instead. Checked before anything else in the death path —
   // no recap is frozen and no kill is credited, because nobody actually died.
@@ -652,6 +681,13 @@ export function kill(w: World, target: Entity, by?: Entity): void {
       BRIDGE.respawnCap,
       BRIDGE.respawnBase + BRIDGE.respawnPerLevel * c.level,
     );
+    // Event Insurance (AUGMENTS §3.8): the rebate only pays out if you died
+    // *contesting* something — inside the window that opens when a Living Bridge
+    // event starts. A flat respawn cut would be a much stronger card than the
+    // one the catalog describes.
+    if (c.augments.length > 0 && recentEventStart(w)) {
+      c.respawnIn *= economyMods(target).respawnMul;
+    }
     c.cast = null;
     c.leap = null;
     c.order = null;

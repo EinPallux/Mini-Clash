@@ -9,6 +9,12 @@ import type { MapDef } from '@mini-clash/data';
 
 const CLEARANCE = 0.5;
 
+/** Receipt from `openRegion` — the cells touched and what they were before. */
+export interface RegionPatch {
+  cells: number[];
+  prev: number[];
+}
+
 export class NavGrid {
   readonly cols: number;
   readonly rows: number;
@@ -179,6 +185,74 @@ export class NavGrid {
     for (const i of cells) {
       const v = this.blocked[i];
       if (v >= 2) this.blocked[i] = v === 2 ? 0 : v - 1;
+    }
+    this.version++;
+  }
+
+  /**
+   * Open a rectangle that is currently *statically* blocked — the Flank Isles
+   * rising out of the void (GAME_DESIGN §9). Stamping cannot express this:
+   * `stampDisc` deliberately never disturbs static blockers, because a wall
+   * that could erase the map edge would be a hole in the world. So this saves
+   * the exact prior value of every cell it touches and hands back a receipt.
+   *
+   * Pair every call with `restoreRegion`. Nothing else may write these cells
+   * while the region is open, or the receipt is a lie.
+   */
+  openRegion(cx: number, cz: number, w: number, d: number): RegionPatch {
+    const cells: number[] = [];
+    const prev: number[] = [];
+    const c0 = this.toCol(cx - w / 2);
+    const c1 = this.toCol(cx + w / 2);
+    const r0 = this.toRow(cz - d / 2);
+    const r1 = this.toRow(cz + d / 2);
+    for (let row = r0; row <= r1; row++) {
+      for (let col = c0; col <= c1; col++) {
+        // The border safety ring stays shut: it is what stops pathing from
+        // walking off the array.
+        if (col <= 0 || col >= this.cols - 1 || row <= 0 || row >= this.rows - 1) continue;
+        const i = this.idx(col, row);
+        // ONLY static geometry (1) opens. Cells carrying a live stamp (>= 2)
+        // are somebody's wall or bunker and are left exactly as they are.
+        //
+        // This is not a nicety, it is the correctness condition. Restoring a
+        // stamped value later would resurrect an obstacle whose owner has since
+        // unstamped it — the count leaks, the cell never reopens, and the deck
+        // slowly walls itself off until pathing fails everywhere. Measured:
+        // 259 leaked cells over one match, and 155 of 171 Minis frozen.
+        if (this.blocked[i] !== 1) continue;
+        cells.push(i);
+        prev.push(1);
+        this.blocked[i] = 0;
+      }
+    }
+    this.version++;
+    return { cells, prev };
+  }
+
+  /**
+   * Close a rectangle permanently as *static* geometry — the deck edges falling
+   * into the void during the Bridge Collapse. Unlike a stamp this cannot be
+   * lifted, which is the point: the bridge does not grow back.
+   */
+  closeRegion(cx: number, cz: number, w: number, d: number): void {
+    const c0 = this.toCol(cx - w / 2);
+    const c1 = this.toCol(cx + w / 2);
+    const r0 = this.toRow(cz - d / 2);
+    const r1 = this.toRow(cz + d / 2);
+    for (let row = r0; row <= r1; row++) {
+      for (let col = c0; col <= c1; col++) {
+        if (col < 0 || col >= this.cols || row < 0 || row >= this.rows) continue;
+        this.blocked[this.idx(col, row)] = 1;
+      }
+    }
+    this.version++;
+  }
+
+  /** Put an `openRegion` back exactly as it was. */
+  restoreRegion(patch: RegionPatch): void {
+    for (let i = 0; i < patch.cells.length; i++) {
+      this.blocked[patch.cells[i]] = patch.prev[i];
     }
     this.version++;
   }

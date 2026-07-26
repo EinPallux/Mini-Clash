@@ -48,7 +48,14 @@ export function run() {
   }
   const bridge = new Sim({ mode: 'bridge', seed: 24681357, mapId: 'shatterbridge', players });
   for (let i = 0; i < 90 * 30; i++) bridge.tick();
-  return trainingHash + ':' + stateHash(bridge);
+
+  // The Living Bridge timetable (ROADMAP v0.6 acceptance): the same seed has to
+  // produce the identical event timeline, or a replay is not a replay. Rolled
+  // once at construction, so it is comparable without simulating 13 minutes.
+  const timeline = bridge.world.match.schedule
+    .map((s) => s.at + s.kind + (s.elder ? 'E' : ''))
+    .join('|');
+  return trainingHash + ':' + stateHash(bridge) + ':' + timeline;
 }
 `;
 

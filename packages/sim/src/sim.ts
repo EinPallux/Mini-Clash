@@ -3,9 +3,14 @@ import {
   CHAMPIONS,
   type ChampionDef,
   DRAFT,
+  EVENT_ANNOUNCE_LEAD,
+  EVENT_REVEAL_SECONDS,
+  EVENTS,
   type MapDef,
+  ORB_SENSE_BONUS_SECONDS,
   SHATTERBRIDGE_MAP,
   TICK_DT,
+  TICK_RATE,
   TRAINING_MAP,
   UNITS,
 } from '@mini-clash/data';
@@ -33,13 +38,16 @@ import {
   updateChampionPassive,
 } from './abilities';
 import { healEntity, plantFlower } from './actions';
-import { augParam } from './augments';
+import { augParam, economyMods } from './augments';
 import { type BotBrain, makeBrain, thinkBots } from './bots';
 import { isHiddenFrom, updateBrushState, updateDiscovery } from './brush';
 import { applyBuff, applyBuffById, applyCc, applyFear, shieldTotal, tickBuffs } from './buffs';
 import { dealDamage } from './combat';
 import { openDraft, pickAugment, rerollDraft, updateDrafts } from './draft';
 import { levelUpChamp, updateIncome, updateOrbs } from './economy';
+import { EVENT_HOOKS, updateCoins } from './eventKinds';
+import { nextEvent, rollSchedule, updateCollapse, updateEvents } from './events';
+import { updateGolem } from './golem';
 import { tryBuy, tryBuyRelic, trySell, tryUseRelic, updateItemPassives } from './items';
 import { spawnWave, updateMini } from './minis';
 import { applySeparation, updateMovement } from './movement';
@@ -50,7 +58,7 @@ import { Pcg32 } from './rng';
 import { championStats, hastedCooldown, resolveScaling } from './stats';
 import { spawnStructures, updateCore, updateTower } from './structures';
 import { dist } from './vec';
-import { type Entity, World } from './world';
+import { type Entity, type MatchState, World } from './world';
 
 interface TrainerFlags {
   noCooldowns: boolean;
@@ -102,7 +110,7 @@ export class Sim {
 
     if (bridge && map.battle) {
       const battle = map.battle;
-      w.match = {
+      const m: MatchState = {
         mode: 'bridge',
         barrierDown: false,
         barrierCells: battle.gates.flatMap((g) => w.nav.stampWall(g.x, g.z, 1, 0, map.height, 0.8)),
@@ -115,7 +123,18 @@ export class Sim {
         waveIndex: 0,
         overtime: false,
         suddenDeath: false,
+        // The timetable is rolled once, here, off the match seed — that is what
+        // makes it reproducible in replay and plannable by bots (§9).
+        schedule: rollSchedule(w.rng),
+        scheduleIdx: 0,
+        events: [],
+        collapseStage: 0,
+        nextCollapseAt: null,
+        deckHalf: BRIDGE.collapse.deckHalves[0],
+        eventLog: [],
+        lane: battle.lane.map((pt) => [pt[0], pt[1]] as [number, number]),
       };
+      w.match = m;
       spawnStructures(w, battle);
       // Offline test hook: pre-damage the enemy core so smokes can reach the win
       // sequence in seconds. The authoritative server (v0.3) never honors rig.
@@ -129,6 +148,23 @@ export class Sim {
           }
           if (ent.kind === 'tower' && config.rig.enemyTowerHp !== undefined) {
             ent.hp = Math.max(1, Math.min(ent.hpMax, config.rig.enemyTowerHp));
+          }
+        }
+        // Fast-forward the clock past everything that already "happened". Every
+        // catch-up timer here fires once per tick until it is level with the
+        // clock, so without this a jump to 2:00 dumps five waves in five ticks
+        // and announces every event window at once.
+        if (config.rig.clock !== undefined && config.rig.clock > 0) {
+          const at = config.rig.clock;
+          w.tick = Math.round(at * TICK_RATE);
+          w.time = w.tick * TICK_DT;
+          if (m.nextWaveAt !== null) m.nextWaveAt = w.time + battle.waveEvery;
+          if (m.nextOrbAt !== null) m.nextOrbAt = w.time + battle.orbEvery;
+          while (
+            m.scheduleIdx < m.schedule.length &&
+            m.schedule[m.scheduleIdx].at - EVENT_ANNOUNCE_LEAD <= w.time
+          ) {
+            m.scheduleIdx++;
           }
         }
       }
@@ -146,6 +182,14 @@ export class Sim {
         waveIndex: 0,
         overtime: false,
         suddenDeath: false,
+        schedule: [],
+        scheduleIdx: 0,
+        events: [],
+        collapseStage: 0,
+        nextCollapseAt: null,
+        deckHalf: BRIDGE.collapse.deckHalves[0],
+        eventLog: [],
+        lane: [],
       };
     }
 
@@ -183,6 +227,7 @@ export class Sim {
           xp: 0,
           gold: bridge ? BRIDGE.startingGold : 0,
           kills: 0,
+          damageDealt: 0,
           deaths: 0,
           assists: 0,
           streak: 0,
@@ -638,7 +683,16 @@ export class Sim {
     // 7. Open augment drafts tick down (the match never pauses for them).
     updateDrafts(w, dt);
 
-    // 8. Match orchestration: barrier, waves, orbs.
+    for (const e of [...w.entities]) {
+      if (e.golem && battle) updateGolem(w, e, battle, dt);
+    }
+    updateCoins(w, dt);
+
+    // 8. The Living Bridge (§9): the timetable, then the deck falling away.
+    updateEvents(w, dt, EVENT_HOOKS);
+    updateCollapse(w, EVENT_HOOKS);
+
+    // 9. Match orchestration: barrier, waves, orbs.
     this.updateMatchFlow();
   }
 
@@ -1102,7 +1156,13 @@ export class Sim {
       }
       entities.push(snap);
     }
-    return { tick: w.tick, time: w.time, match: this.matchSnap(), entities, events: w.events };
+    return {
+      tick: w.tick,
+      time: w.time,
+      match: this.matchSnap(team),
+      entities,
+      events: w.events,
+    };
   }
 
   /**
@@ -1129,7 +1189,26 @@ export class Sim {
     this.world.events = [];
   }
 
-  private matchSnap(): MatchStateSnap {
+  /**
+   * Orb Sense (AUGMENTS §3.7) is the reason this is per-viewer: everyone sees
+   * the ticker name the next window inside 30 s, and the card buys 10 s more.
+   * A card that shows you something already on everyone's HUD is not a card.
+   *
+   * It reveals for the whole **team**, not the one seat. Snapshots are built
+   * per team (the server encodes two views, not eight), so a personal reveal
+   * would work offline and quietly become team-wide online — and a compass
+   * that one player can call out is a shared timer either way.
+   */
+  private revealWindow(team: 0 | 1): number {
+    for (const e of this.world.entities) {
+      const c = e.champ;
+      if (!c || e.team !== team || c.augments.length === 0) continue;
+      if (economyMods(e).orbSense) return EVENT_REVEAL_SECONDS + ORB_SENSE_BONUS_SECONDS;
+    }
+    return EVENT_REVEAL_SECONDS;
+  }
+
+  private matchSnap(team: 0 | 1 = this.viewerTeam): MatchStateSnap {
     const w = this.world;
     const m = w.match;
     if (!m) {
@@ -1143,8 +1222,14 @@ export class Sim {
         nextOrbIn: null,
         overtime: false,
         suddenDeath: false,
+        events: [],
+        nextEvent: null,
+        deckHalf: 9,
+        collapseStage: 0,
+        eventLog: [],
       };
     }
+    const up = nextEvent(w);
     return {
       mode: m.mode,
       time: w.time,
@@ -1155,6 +1240,25 @@ export class Sim {
       nextOrbIn: m.nextOrbAt !== null ? Math.max(0, m.nextOrbAt - w.time) : null,
       overtime: m.overtime,
       suddenDeath: m.suddenDeath,
+      events: m.events.map((ev) => ({
+        kind: ev.kind,
+        elder: ev.elder,
+        phase: ev.phase,
+        tLeft: Math.max(0, Math.ceil(ev.tLeft * 10) / 10),
+        tTotal: ev.tTotal,
+        // Where to point the minimap glow and draw the world band. The storm
+        // writes its sweep position here every tick; everything else is fixed
+        // for the window (mid for the isles, which straddle it).
+        x: ev.data.centre ?? ev.data.x ?? 0,
+        z: ev.data.z ?? 0,
+      })),
+      nextEvent:
+        up && up.at - w.time <= this.revealWindow(team)
+          ? { kind: up.kind, elder: up.elder, inSeconds: Math.max(0, Math.ceil(up.at - w.time)) }
+          : null,
+      deckHalf: m.deckHalf,
+      collapseStage: m.collapseStage,
+      eventLog: m.eventLog.map((l) => ({ ...l })),
     };
   }
 
@@ -1309,6 +1413,26 @@ export class Sim {
         unitId: e.pickup.def.id,
         tLeft: Math.max(0, e.pickup.tLeft),
         tossPhase: e.pickup.tossPhase < 1 ? e.pickup.tossPhase : undefined,
+      };
+    }
+    if (e.coin) {
+      // Coin Rain coins ride the pickup kind — same actor family, no heal.
+      return {
+        ...base,
+        kind: 'pickup',
+        unitId: 'coin',
+        tLeft: Math.max(0, e.coin.tLeft),
+        coinGold: e.coin.gold,
+      };
+    }
+    if (e.golem) {
+      return {
+        ...base,
+        kind: 'golem',
+        elder: e.golem.elder,
+        owner: e.golem.owner,
+        aggro: e.golem.targetId,
+        slamming: e.golem.atkCd > EVENTS.clashGolem.params.attackEvery - 0.35,
       };
     }
     if (e.zone) {

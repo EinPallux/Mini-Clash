@@ -11,7 +11,8 @@ COPY scripts ./scripts
 RUN pnpm install --frozen-lockfile
 RUN pnpm assets:build \
   && pnpm --filter @mini-clash/client build \
-  && node packages/server/build.mjs
+  && node packages/server/build.mjs \
+  && node packages/api/build.mjs
 
 FROM node:22-alpine AS game
 WORKDIR /srv
@@ -20,6 +21,15 @@ ENV NODE_ENV=production PORT=2567
 EXPOSE 2567
 USER node
 CMD ["node", "server.mjs"]
+
+FROM node:22-alpine AS api
+WORKDIR /srv
+COPY --from=build /app/packages/api/dist/api.mjs ./api.mjs
+COPY --from=build /app/packages/api/dist/migrations ./migrations
+ENV NODE_ENV=production PORT=3000
+EXPOSE 3000
+USER node
+CMD ["node", "api.mjs"]
 
 FROM caddy:2-alpine AS web
 COPY Caddyfile /etc/caddy/Caddyfile

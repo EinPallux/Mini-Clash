@@ -3,6 +3,7 @@ import {
   BRIDGE,
   type ChampionDef,
   DRAFT,
+  EVENTS,
   ITEMS,
   type MapDef,
   RELICS,
@@ -98,7 +99,7 @@ export interface BotBrain {
   offset: number;
   buildIdx: number;
   relicBought: boolean;
-  goal: 'push' | 'fight' | 'retreat' | 'orb';
+  goal: 'push' | 'fight' | 'retreat' | 'orb' | 'event';
   /** Ally-ping reaction window (world.time) + the honored ping. */
   pingUntil: number;
   pingKind: 'danger' | 'omw' | 'attack' | 'help' | null;
@@ -249,7 +250,75 @@ export function thinkBots(w: World, map: MapDef, brains: Map<PlayerId, BotBrain>
     const intents = e.dead ? shop(e, brain) : act(w, e, brain, tp, map);
     for (const intent of intents) out.push({ seq: 0, player: brain.player, intent });
   }
+  // Bridge Collapse (§9): once the deck starts falling, no bot walks onto a
+  // strip that is about to be void. Applied here rather than inside `act` so it
+  // catches every destination on every path out of the brain — the sim's
+  // sweep-inward is a safety net, and a bot should never need it.
+  if (w.match.overtime) {
+    const half = Math.max(1, w.match.deckHalf - 1);
+    for (const msg of out) {
+      const i = msg.intent;
+      if ((i.t === 'move' || i.t === 'attackMove') && Math.abs(i.z) > half) {
+        i.z = Math.sign(i.z) * half;
+      }
+    }
+  }
   return out;
+}
+
+/**
+ * The Clash Golem, if this bot should be hitting it right now (§9).
+ *
+ * The killing blow converts it, so the read that matters is *its health*, not
+ * the fight around it: a low golem is worth diving for, a full one is worth
+ * committing to only when we are healthy and it is on our way. Recruits skip
+ * the whole objective — they do not know the timetable exists.
+ */
+function eventGolem(
+  w: World,
+  e: Entity,
+  brain: BotBrain,
+  tp: TierParams,
+  hpFrac: number,
+): Entity | undefined {
+  if (brain.tier === 'recruit') return undefined;
+  for (const g of w.entities) {
+    const gs = g.golem;
+    if (!gs || g.dead || gs.owner === e.team) continue;
+    const d = dist(e.x, e.z, g.x, g.z) - g.radius;
+    const stealable = gs.owner === null && g.hp / g.hpMax < 0.25;
+    // Steal range is generous: a converted golem is a lost objective, and a
+    // bot that only ever fights it at melee range never lands a killing blow.
+    const reach = stealable ? tp.engageRange + 6 : tp.engageRange;
+    if (d > reach) continue;
+    if (stealable) return g;
+    if (hpFrac < 0.55) continue; // do not feed the altar
+    // A converted enemy golem is a siege engine — kill it or lose the tower.
+    if (gs.owner !== null) return g;
+    if (brain.personality === 'objective' || brain.tier === 'elite') return g;
+  }
+  return undefined;
+}
+
+/**
+ * Where to run when the Storm Front is on top of us, or null.
+ *
+ * The wall is 4 u deep and crosses at ~5.3 u/s — faster than any champion — so
+ * "run away" is the trap: it keeps you inside for 2.4 s instead of 0.45 s.
+ * Walking into the oncoming edge is the play, and it is the sort of thing a
+ * good player learns and a bot should already know (§9).
+ */
+function stormEscape(w: World, e: Entity): { x: number; z: number } | null {
+  const ev = w.match?.events.find((x) => x.kind === 'stormFront' && x.phase === 'active');
+  if (!ev) return null;
+  const centre = ev.data.centre ?? 0;
+  const half = EVENTS.stormFront.params.depth / 2;
+  const inside = Math.abs(e.x - centre) <= half + e.radius + 1.5;
+  if (!inside) return null;
+  // `dir` is the sweep direction; move against it, and keep our z so we do not
+  // wander off the lane while crossing.
+  const dir = ev.data.dir ?? 1;
+  return { x: e.x - dir * 8, z: e.z };
 }
 
 function findChamp(w: World, player: PlayerId): Entity | undefined {
@@ -411,6 +480,13 @@ function act(w: World, e: Entity, brain: BotBrain, tp: TierParams, map: MapDef):
     if (nearest && nearestD < 5 && !commit) siege = undefined; // point-blank threat → deal with them
   }
 
+  // --- The Living Bridge (GAME_DESIGN §9) -----------------------------------
+  // The events are only interesting if somebody contests them. Recruits ignore
+  // the timetable entirely (a beginner does not know it exists); veterans go for
+  // what is in front of them; elites read the golem's health bar.
+  const golem = eventGolem(w, e, brain, tp, hpFrac);
+  const storm = stormEscape(w, e);
+
   // --- Pings (GAME_DESIGN §comms: pings must matter even vs bots) -----------
   // Adopt the newest ally ping: Danger near us forces a disengage window; Attack /
   // Help / On-my-way set a rally point that outranks the default core march.
@@ -442,6 +518,17 @@ function act(w: World, e: Entity, brain: BotBrain, tp: TierParams, map: MapDef):
     // stay committed to the retreat
   } else if (hpFrac < retreatAt || (towerOnMe && hpFrac < 0.55)) {
     brain.goal = 'retreat';
+  } else if (storm) {
+    // A 4 u wall crossing at 5.3 u/s cannot be outrun by a 3.6 u/s champion, so
+    // running *with* it is the worst option and standing still is second worst.
+    // Walking into the oncoming edge cuts the time inside it to a third.
+    brain.goal = 'event';
+    out.push({ t: 'move', x: storm.x, z: storm.z });
+    return out;
+  } else if (golem) {
+    brain.goal = 'event';
+    out.push({ t: 'attackTarget', target: golem.id });
+    return out;
   } else if (siege) {
     brain.goal = 'push';
     out.push({ t: 'attackTarget', target: siege.id });
@@ -466,6 +553,25 @@ function act(w: World, e: Entity, brain: BotBrain, tp: TierParams, map: MapDef):
       if (orb && orbD < 25 * pm.orb) {
         brain.goal = 'orb';
         out.push({ t: 'attackMove', x: orb.x, z: orb.z });
+      }
+    }
+    // Coin Rain: free gold lying on the floor beats another 3 s of marching, but
+    // only if it is genuinely on the way — a bot that sprints across the map for
+    // 4 gold is a bot that loses the lane (§9 "risk/reward scramble").
+    if (brain.goal === 'push' && brain.tier !== 'recruit') {
+      let coin: Entity | undefined;
+      let coinD = Number.POSITIVE_INFINITY;
+      for (const ent of w.entities) {
+        if (!ent.coin || ent.dead) continue;
+        const d = dist(e.x, e.z, ent.x, ent.z);
+        if (d < coinD) {
+          coinD = d;
+          coin = ent;
+        }
+      }
+      if (coin && coinD < 14 * pm.orb) {
+        brain.goal = 'event';
+        out.push({ t: 'attackMove', x: coin.x, z: coin.z });
       }
     }
   }

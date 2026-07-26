@@ -11,6 +11,12 @@
 		reverse_proxy game:2567
 	}
 
+	# Same origin as the client, so the session cookie is a first-party cookie
+	# and needs no CORS story at all (TECH §10).
+	handle_path /api/* {
+		reverse_proxy api:3000
+	}
+
 	handle {
 		root * /srv/client
 		try_files {path} /index.html

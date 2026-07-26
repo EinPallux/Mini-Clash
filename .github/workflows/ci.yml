@@ -58,8 +58,27 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Build the compose images (game + web)
+      - name: Build the compose images (game + api + web)
         run: docker compose build
+        env:
+          POSTGRES_PASSWORD: ci-not-a-real-password
+          MC_INTERNAL_SECRET: ci-not-a-real-secret-0123456789
+      - name: Deployment scripts self-test
+        run: ./deploy/selftest.sh
+
+  api-load:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # ROADMAP v0.7 acceptance: p95 < 120 ms for hub endpoints at 100 rps.
+      - name: Hub api load (100 rps, 40 accounts)
+        run: node scripts/api-load.mjs --rps 100 --seconds 20 --users 40
 
   build-and-smoke:
     runs-on: ubuntu-latest
@@ -99,6 +118,16 @@ jobs:
         run: node scripts/shot-draft.mjs
         env:
           SHOT_CHROME: ''
+      - name: Event smoke (announce, isles, golem, coins, storm, collapse)
+        run: node scripts/shot-events.mjs
+        env:
+          SHOT_CHROME: ''
+      # The hub against a real api on one origin, ending in the two-device
+      # sign-in that is v0.7's headline acceptance box.
+      - name: Hub smoke (account, viewer, purchase, quests, two-device sign-in)
+        run: node scripts/shot-hub.mjs
+        env:
+          SHOT_CHROME: ''
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -110,4 +139,6 @@ jobs:
             test-results/smoke-lobby
             test-results/smoke-reconnect
             test-results/draft
+            test-results/events
+            test-results/hub
           retention-days: 14

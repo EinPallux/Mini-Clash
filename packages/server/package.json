@@ -20,6 +20,7 @@
   },
   "devDependencies": {
     "colyseus.js": "^0.16.0",
-    "esbuild": "^0.28.1"
+    "esbuild": "^0.28.1",
+    "@mini-clash/api": "workspace:*"
   }
 }

@@ -2,6 +2,7 @@ import type {
   CastSnap,
   ChampionSnap,
   EntitySnap,
+  EventSnap,
   MatchStateSnap,
   SimEvent,
   Snapshot,
@@ -34,9 +35,17 @@ const KINDS = [
   'zone',
   'pet',
   'pickup',
+  'golem',
 ] as const;
 type Kind = (typeof KINDS)[number];
 const KIND_INDEX = new Map<string, number>(KINDS.map((k, i) => [k, i]));
+
+/**
+ * Wire order for map-event kinds. Append only — the index *is* the encoding, so
+ * reordering this silently reinterprets every frame in flight.
+ */
+const EVENT_KINDS = ['flankIsles', 'coinRain', 'stormFront', 'clashGolem'] as const;
+const EVENT_KIND_INDEX = new Map<string, number>(EVENT_KINDS.map((k, i) => [k, i]));
 
 const CAST_KINDS = ['q', 'w', 'r', 'aa', 'recast'] as const;
 const SLOTS = ['q', 'w', 'r'] as const;
@@ -238,6 +247,13 @@ function encVital(w: Writer, e: EntitySnap): void {
     case 'orb':
       w.u16(clampU16(e.hp));
       break;
+    case 'golem':
+      w.u16(clampU16(e.hp));
+      // Allegiance is 0/1/2 (2 = still neutral) — it flips once, on conversion.
+      w.u8(e.owner === null ? 2 : e.owner);
+      w.u16(e.aggro === null ? NONE16 : e.aggro);
+      w.u8(e.slamming ? 1 : 0);
+      break;
   }
 }
 
@@ -416,6 +432,16 @@ function rareJson(e: EntitySnap): string {
         radius: e.radius,
         hp: e.hp,
         hpMax: e.hpMax,
+        coinGold: e.kind === 'pickup' ? e.coinGold : undefined,
+      });
+    case 'golem':
+      // Identity and allegiance only: HP rides VITAL, the slam telegraph and
+      // aggro tether ride STATE, both of which change every few frames.
+      return JSON.stringify({
+        elder: e.elder,
+        team: e.team,
+        radius: e.radius,
+        hpMax: e.hpMax,
       });
     case 'dummy':
       return JSON.stringify({
@@ -447,6 +473,10 @@ function blocksFor(kind: Kind): number {
       return B_VITAL | B_RARE;
     case 'orb':
       return B_VITAL | B_RARE;
+    case 'golem':
+      // It walks (POS), it fights (VITAL carries hp/aggro/slam), and its
+      // identity never changes (RARE).
+      return B_POS | B_VITAL | B_RARE;
   }
 }
 
@@ -532,8 +562,16 @@ export class SnapshotEncoder {
     }
     this.sinceBaseline++;
 
-    // Match state (minus the ticking fields carried in the header).
-    const matchJson = JSON.stringify({ ...snap.match, time: 0, nextOrbIn: null });
+    // Match state (minus the ticking fields carried in the header). The live
+    // event timers tick every frame; leaving them in the JSON would mark the
+    // whole blob — event log included — dirty 20× a second and cost ~3 KB/s.
+    const matchJson = JSON.stringify({
+      ...snap.match,
+      time: 0,
+      nextOrbIn: null,
+      events: [],
+      nextEvent: null,
+    });
     const matchDirty = matchJson !== this.prevMatch;
     this.prevMatch = matchJson;
 
@@ -596,6 +634,7 @@ export class SnapshotEncoder {
     w.u16(clampU16(q10(snap.time)));
     w.i16(snap.match.nextOrbIn === null ? -1 : q10(snap.match.nextOrbIn));
     w.u8(matchDirty ? 1 : 0);
+    this.encodeLiveEvents(w, snap.match);
 
     // String table additions (baselines carry the whole table).
     w.u8(this.pendingStrings.length);
@@ -624,6 +663,32 @@ export class SnapshotEncoder {
 
     w.bytes(ew.take());
     return w.take();
+  }
+
+  /**
+   * Live map events + the next one on the timetable, in ~8 bytes a frame.
+   * These are the only match fields that change continuously, so they ride the
+   * header instead of the JSON blob (see `matchJson` above).
+   */
+  private encodeLiveEvents(w: Writer, m: MatchStateSnap): void {
+    w.u8(m.events.length);
+    for (const ev of m.events) {
+      w.u8(
+        (EVENT_KIND_INDEX.get(ev.kind) ?? 0) |
+          (ev.elder ? 0x10 : 0) |
+          (ev.phase === 'active' ? 0x20 : 0),
+      );
+      w.u16(clampU16(q10(ev.tLeft)));
+      w.u16(clampU16(q10(ev.tTotal)));
+      w.i16(q100(ev.x));
+      w.i16(q100(ev.z));
+    }
+    if (m.nextEvent === null) {
+      w.u8(0xff);
+      return;
+    }
+    w.u8((EVENT_KIND_INDEX.get(m.nextEvent.kind) ?? 0) | (m.nextEvent.elder ? 0x10 : 0));
+    w.u16(clampU16(m.nextEvent.inSeconds));
   }
 
   private encodeEvents(w: Writer, events: SimEvent[]): void {
@@ -682,6 +747,7 @@ export class SnapshotDecoder {
     const time = r.u16() / 10;
     const nextOrbRaw = r.i16();
     const matchDirty = r.u8() === 1;
+    const live = this.decodeLiveEvents(r);
 
     if (frameKind === 1) {
       this.entities.clear();
@@ -704,6 +770,8 @@ export class SnapshotDecoder {
       ...(this.match as MatchStateSnap),
       time,
       nextOrbIn: nextOrbRaw < 0 ? null : nextOrbRaw / 10,
+      events: live.events,
+      nextEvent: live.next,
     };
 
     const removed = r.u16();
@@ -795,6 +863,15 @@ export class SnapshotDecoder {
         e.tLeft = r.u16() / 10;
         e.tossPhase = r.u8() / 200;
         break;
+      case 'golem': {
+        e.hp = r.u16();
+        const own = r.u8();
+        e.owner = own === 2 ? null : own;
+        const aggro = r.u16();
+        e.aggro = aggro === NONE16 ? null : aggro;
+        e.slamming = r.u8() === 1;
+        break;
+      }
       case 'dummy': {
         e.hp = r.u16();
         e.dps = r.u16();
@@ -910,6 +987,36 @@ export class SnapshotDecoder {
       if (duo && benchId) e.duo = { ...duo, championId: benchId };
     }
     Object.assign(e, data);
+  }
+
+  private decodeLiveEvents(r: Reader): {
+    events: EventSnap[];
+    next: MatchStateSnap['nextEvent'];
+  } {
+    const n = r.u8();
+    const events: EventSnap[] = [];
+    for (let i = 0; i < n; i++) {
+      const head = r.u8();
+      events.push({
+        kind: EVENT_KINDS[head & 0x0f],
+        elder: (head & 0x10) !== 0,
+        phase: (head & 0x20) !== 0 ? 'active' : 'announced',
+        tLeft: r.u16() / 10,
+        tTotal: r.u16() / 10,
+        x: r.i16() / 100,
+        z: r.i16() / 100,
+      });
+    }
+    const nextHead = r.u8();
+    if (nextHead === 0xff) return { events, next: null };
+    return {
+      events,
+      next: {
+        kind: EVENT_KINDS[nextHead & 0x0f],
+        elder: (nextHead & 0x10) !== 0,
+        inSeconds: r.u16(),
+      },
+    };
   }
 
   private decodeEvents(r: Reader): SimEvent[] {

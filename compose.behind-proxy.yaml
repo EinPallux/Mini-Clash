@@ -1,0 +1,48 @@
+# Run Mini Clash behind a reverse proxy that already owns :80 and :443.
+#
+#   ./deploy/deploy.sh --behind-proxy
+#
+# Use this when something else on the box — another game's nginx or Caddy, a
+# Traefik, a Cloudflare tunnel — is already the edge. Mini Clash's own Caddy
+# stops binding the public ports and listens on loopback instead, so **both
+# stacks can run at the same time** rather than taking turns.
+#
+# Point your existing proxy at http://127.0.0.1:${EDGE_PORT:-8090} for
+# moba.pathlands.cc and it will serve the client, `/api/*` and `/ws/*` exactly
+# as it would if it owned the edge itself. Your proxy terminates TLS; Caddy
+# here speaks plain HTTP to it, which is why DOMAIN is forced to `:80` below —
+# two things trying to get a certificate for one hostname would fight, and only
+# the one holding port 80 can win.
+#
+# Two lines for an existing nginx:
+#
+#   location / {
+#     proxy_pass http://127.0.0.1:8090;
+#     proxy_http_version 1.1;
+#     proxy_set_header Upgrade $http_upgrade;      # websockets: /ws/* needs
+#     proxy_set_header Connection "upgrade";       # both of these
+#     proxy_set_header Host $host;
+#     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+#     proxy_set_header X-Forwarded-Proto $scheme;
+#   }
+#
+# …or for an existing Caddy:
+#
+#   moba.pathlands.cc {
+#     reverse_proxy 127.0.0.1:8090
+#   }
+#
+services:
+  web:
+    ports: !override
+      - "127.0.0.1:${EDGE_PORT:-8090}:80"
+    environment:
+      # Plain HTTP behind the real edge — see the note above about certificates.
+      - DOMAIN=:80
+
+  api:
+    environment:
+      # One more proxy hop in front, so the client address arrives two deep.
+      # Without this the rate limiter would key every request on the front
+      # proxy's own address and throttle the whole site as if it were one player.
+      - TRUST_PROXY=2

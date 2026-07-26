@@ -9,3 +9,8 @@ playwright-report/
 coverage/
 *.local
 packages/server/.dev/
+packages/api/.dev/
+
+# Deployment secrets and database dumps — never in git.
+.env
+backups/

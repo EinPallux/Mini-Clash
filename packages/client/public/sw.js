@@ -31,6 +31,12 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(req.url);
   if (url.origin !== self.location.origin) return;
 
+  // Never the platform api (v0.7). It is dynamic, personal and cookie-scoped:
+  // a cache hit would show a stale coin balance that never corrects itself, and
+  // on a shared browser it could hand one account's profile to the next player.
+  // Straight to the network, and nothing kept.
+  if (url.pathname === '/api' || url.pathname.startsWith('/api/')) return;
+
   // Navigations: network-first so deploys land, cached shell when offline.
   if (req.mode === 'navigate') {
     event.respondWith(

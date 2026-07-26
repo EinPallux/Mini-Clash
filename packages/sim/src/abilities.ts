@@ -27,6 +27,10 @@ export type DenyReason = 'cooldown' | 'energy' | 'dead' | 'casting' | 'level';
 export function canAttack(w: World, attacker: Entity, target: Entity): boolean {
   if (target.dead) return false;
   if (target.kind === 'keg') return true;
+  // The golem carries a `team` even while neutral (the field is not nullable),
+  // so ownership decides, not the team tag — otherwise half the map could not
+  // hit the objective it is supposed to be racing for.
+  if (target.golem) return target.golem.owner !== attacker.team;
   if (target.team === attacker.team) return false;
   if (isUntargetable(target)) return false; // Wisp Cold Spot morph window
   if (target.kind === 'champion' || target.kind === 'dummy' || target.kind === 'mini') return true;

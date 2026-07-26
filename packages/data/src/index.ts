@@ -12,6 +12,8 @@ export { SYLVA } from './champions/sylva';
 export { VEX } from './champions/vex';
 export { WISP } from './champions/wisp';
 export * from './constants';
+export * from './cosmetics';
+export * from './events';
 export { FX } from './fx';
 export {
   ITEM_SLOTS,
@@ -24,6 +26,7 @@ export {
 } from './items';
 export { SHATTERBRIDGE_MAP } from './maps/shatterbridge';
 export { TRAINING_MAP } from './maps/training';
+export * from './meta';
 export { PROJECTILES } from './projectiles';
 export * from './schemas';
 export { QUICK_CHAT, STRINGS, type StringKey } from './strings';

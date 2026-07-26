@@ -50,17 +50,21 @@ function swapsByTeam(sim: Sim, seconds: number): [number, number] {
 }
 
 describe('bot Tag Swap', () => {
-  it('elite bots swap during a real match', () => {
+  // 150 s of match now runs the Living Bridge timetable too (v0.6), so these
+  // are minute-scale simulations rather than the 3 s they used to be.
+  it('elite bots swap during a real match', { timeout: 30_000 }, () => {
     const [t0, t1] = swapsByTeam(bridge('elite'), 150);
     expect(t0 + t1).toBeGreaterThan(10);
   });
 
-  it('recruits never swap — a beginner plays one half (tier-appropriate)', () => {
+  it('recruits never swap — a beginner plays one half (tier-appropriate)', {
+    timeout: 30_000,
+  }, () => {
     const [t0, t1] = swapsByTeam(bridge('recruit'), 150);
     expect(t0 + t1).toBe(0);
   });
 
-  it('veterans and elites both swap actively', () => {
+  it('veterans and elites both swap actively', { timeout: 30_000 }, () => {
     const vet = swapsByTeam(bridge('veteran'), 150).reduce((a, b) => a + b, 0);
     const elite = swapsByTeam(bridge('elite'), 150).reduce((a, b) => a + b, 0);
     expect(vet).toBeGreaterThan(0);
@@ -74,13 +78,13 @@ describe('bot Tag Swap', () => {
     // that is what scripts/swap-ab.mjs measures head-to-head.
   });
 
-  it('rig.noSwapTeam pins exactly one side — the A/B is honest', () => {
+  it('rig.noSwapTeam pins exactly one side — the A/B is honest', { timeout: 30_000 }, () => {
     const [t0, t1] = swapsByTeam(bridge('elite', { noSwapTeam: 1 }), 150);
     expect(t1).toBe(0);
     expect(t0).toBeGreaterThan(5);
   });
 
-  it('a swapping bot keeps its shared HP pool intact across the match', () => {
+  it('a swapping bot keeps its shared HP pool intact across the match', { timeout: 30_000 }, () => {
     const sim = bridge('elite');
     const seat = sim.world.entities.find((e) => e.champ?.player === 1);
     if (!seat) throw new Error('no seat');

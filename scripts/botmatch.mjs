@@ -31,7 +31,7 @@ mkdirSync(outDir, { recursive: true });
 const driverPath = join(outDir, '.botmatch-driver.mjs');
 writeFileSync(
   driverPath,
-  `export { Sim } from '@mini-clash/sim';\nexport { AUGMENTS, CHAMPION_LIST } from '@mini-clash/data';\n`,
+  `export { Sim } from '@mini-clash/sim';\nexport { AUGMENTS, CHAMPION_LIST, EVENTS } from '@mini-clash/data';\n`,
 );
 const esbuild = await import('esbuild');
 const bundlePath = join(outDir, '.botmatch-bundle.mjs');
@@ -50,7 +50,10 @@ await esbuild.build({
     '@mini-clash/protocol': join(process.cwd(), 'packages/protocol/src/index.ts'),
   },
 });
-const { Sim, AUGMENTS, CHAMPION_LIST } = await import(`file://${process.cwd()}/${bundlePath}`);
+const { Sim, AUGMENTS, CHAMPION_LIST, EVENTS } = await import(
+  `file://${process.cwd()}/${bundlePath}`
+);
+const EVENTS_SIEGE = EVENTS.clashGolem.params.siegeSeconds;
 
 const TIERS = ['recruit', 'veteran', 'elite'];
 // Tiny deterministic LCG for roster shuffles (harness-side only; sim stays seeded).
@@ -136,6 +139,25 @@ const duoStats = new Map();
  * against the winrate of the seats that were offered it and passed.
  */
 const augStats = new Map();
+
+/**
+ * Event report (ROADMAP v0.6 acceptance). Three questions:
+ *  - does the Living Bridge resolve, or does it stall matches past Sudden Death?
+ *  - does taking the golem win you the game *too* reliably (< 65%)?
+ *  - does a Collapse stage ever strand a unit on ground that has gone?
+ */
+const eventStats = new Map();
+const eventRow = (kind) => {
+  const r = eventStats.get(kind) ?? { ran: 0 };
+  eventStats.set(kind, r);
+  return r;
+};
+const golemGames = { total: 0, takerWon: 0, elderTotal: 0, elderWon: 0 };
+const golemEnds = { expired: 0, killed: 0 };
+const golemLives = [];
+let strandedTotal = 0;
+let stampOverlaps = 0;
+let collapseStages = 0;
 const augRow = (id) =>
   augStats.get(id) ??
   augStats
@@ -151,6 +173,8 @@ for (let m = 0; m < MATCHES; m++) {
   /** player -> set of augment ids that were ever put in front of them. */
   const offeredTo = new Map();
   const t0 = performance.now();
+  const golemTakers = [];
+  const golemTakenAt = new Map();
   let over = null;
   let ticks = 0;
   let events = 0;
@@ -172,6 +196,49 @@ for (let m = 0; m < MATCHES; m++) {
         const seen = offeredTo.get(ev.player) ?? new Set();
         for (const id of ev.offers) seen.add(id);
         offeredTo.set(ev.player, seen);
+      }
+      // The Living Bridge (v0.6).
+      if (ev.t === 'eventStarted') eventRow(ev.kind).ran++;
+      if (ev.t === 'golemTaken') {
+        golemTakers.push({ team: ev.team, elder: ev.elder });
+        golemTakenAt.set(`${ev.team}:${ev.elder}`, sim.world.time);
+      }
+      // How a converted golem ends: crumbled on its own timer, or killed. If
+      // nothing ever crumbles the 90 s siege window is not doing any work.
+      if (ev.t === 'golemExpired') {
+        const at = golemTakenAt.get(`${ev.team}:${ev.elder}`);
+        golemEnds.expired++;
+        if (at !== undefined) golemLives.push(sim.world.time - at);
+      }
+      if (ev.t === 'golemDied' && ev.team !== null) {
+        const at = golemTakenAt.get(`${ev.team}:${ev.elder}`);
+        golemEnds.killed++;
+        if (at !== undefined) golemLives.push(sim.world.time - at);
+      }
+      if (ev.t === 'collapse') {
+        collapseStages++;
+        // Acceptance: a stage must never leave a unit standing on ground that
+        // is now void, or pathing into it. Checked on the tick it happens.
+        // Stranded = left standing on ground the stage just deleted. A unit
+        // inside an ally's wall stamp is a different (and normal) thing — that
+        // cell comes back when the wall expires, and pathing already handles
+        // it — so it is counted separately rather than failing the rail.
+        const voided = [];
+        let inStamp = 0;
+        for (const u of sim.world.entities) {
+          if (u.kind !== 'champion' && u.kind !== 'mini' && u.kind !== 'golem') continue;
+          if (u.dead) continue;
+          if (Math.abs(u.z) > ev.deckHalf)
+            voided.push(`${u.kind}@${u.x.toFixed(1)},${u.z.toFixed(1)}`);
+          else if (sim.world.nav.isBlockedAt(u.x, u.z)) inStamp++;
+        }
+        stampOverlaps += inStamp;
+        if (voided.length > 0) {
+          strandedTotal += voided.length;
+          console.info(
+            `  ! collapse stage ${ev.stage} (deck ±${ev.deckHalf}) stranded ${voided.length}: ${voided.slice(0, 6).join(' ')}`,
+          );
+        }
       }
     }
     if (playerOfEntity.size === 0) {
@@ -234,6 +301,15 @@ for (let m = 0; m < MATCHES; m++) {
     if (over) {
       const side = over.over.winner === e.team ? 'win' : 'loss';
       duoSwaps[side].push(swapsByPlayer.get(c.player) ?? 0);
+    }
+  }
+  // Golem advantage: did landing the killing blow decide the match?
+  for (const g of golemTakers) {
+    golemGames.total++;
+    if (over && over.over.winner === g.team) golemGames.takerWon++;
+    if (g.elder) {
+      golemGames.elderTotal++;
+      if (over && over.over.winner === g.team) golemGames.elderWon++;
     }
   }
   const kills = over ? over.teamKills.join('-') : '?';
@@ -341,6 +417,45 @@ if (augStats.size > 0) {
   }
 }
 
+/* ------------------ The Living Bridge report (v0.6) ---------------------- */
+// Acceptance rails: no stalemate past Sudden Death, golem-winner advantage
+// under 65%, and not one unit stranded by a Collapse stage.
+const GOLEM_WIN_CAP = 0.65;
+const stalemates = results.length - done.length;
+const pastSuddenDeath = done.filter((r) => r.mins * 60 >= 1050).length;
+console.info('\n  living bridge report');
+for (const [kind, r] of [...eventStats.entries()].sort()) {
+  console.info(`  ${kind.padEnd(12)} ran ${String(r.ran).padStart(3)}×`);
+}
+console.info(
+  `  collapse stages ${collapseStages}, units stranded on void: ${strandedTotal}` +
+    (strandedTotal === 0 ? ' ✓' : ' ⚠') +
+    `  (standing inside a live wall stamp, unrelated: ${stampOverlaps})`,
+);
+if (golemGames.total > 0) {
+  const wr = golemGames.takerWon / golemGames.total;
+  const ewr = golemGames.elderTotal ? golemGames.elderWon / golemGames.elderTotal : 0;
+  console.info(
+    `  golem taken ${golemGames.total}× — taker won ${(100 * wr).toFixed(0)}%` +
+      (golemGames.elderTotal
+        ? ` (Elder ${golemGames.elderTotal}×, ${(100 * ewr).toFixed(0)}%)`
+        : '') +
+      (wr > GOLEM_WIN_CAP && golemGames.total >= 8 ? '  ⚠ over the 65% rail' : ' ✓'),
+  );
+  const mean = golemLives.length ? golemLives.reduce((a, b) => a + b, 0) / golemLives.length : 0;
+  console.info(
+    `  converted golems: ${golemEnds.expired} crumbled on the ${EVENTS_SIEGE}s timer` +
+      (golemLives.length ? ` (mean life ${mean.toFixed(0)}s)` : '') +
+      `, ${golemEnds.killed} killed, ${golemGames.total - golemEnds.expired - golemEnds.killed} still standing at the end`,
+  );
+} else {
+  console.info('  golem never taken — the objective is not being contested');
+}
+console.info(
+  `  matches reaching Sudden Death: ${pastSuddenDeath}/${done.length}; unresolved at the ${CAP_MIN} min cap: ${stalemates}` +
+    (stalemates === 0 ? ' ✓' : ' ⚠'),
+);
+
 if (JSON_OUT) {
   const champs = {};
   for (const [id, st] of champStats.entries()) champs[id] = st;
@@ -354,6 +469,10 @@ if (JSON_OUT) {
       t0wins,
       champs,
       augments: Object.fromEntries(augStats),
+      events: Object.fromEntries(eventStats),
+      golem: golemGames,
+      collapse: { stages: collapseStages, stranded: strandedTotal, stampOverlaps },
+      stalemates,
     }),
   );
   console.info(`json summary → ${JSON_OUT}`);

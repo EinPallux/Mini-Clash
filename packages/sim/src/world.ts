@@ -2,6 +2,7 @@ import type {
   AbilityDef,
   BuffDef,
   ChampionDef,
+  EventKind,
   ProjectileDef,
   RelicDef,
   Slot,
@@ -9,7 +10,7 @@ import type {
   UnitDef,
 } from '@mini-clash/data';
 import type { EntityId, PlayerId, SimEvent } from '@mini-clash/protocol';
-import type { NavGrid } from './navgrid';
+import type { NavGrid, RegionPatch } from './navgrid';
 import type { Pcg32 } from './rng';
 
 /** Internal entity model — richer than wire snapshots. */
@@ -72,6 +73,11 @@ export interface ChampState {
   kills: number;
   deaths: number;
   assists: number;
+  /**
+   * Damage dealt to enemy champions this match (GAME_DESIGN §18 scoreboard).
+   * A tally only: nothing in the sim reads it, so it cannot affect determinism.
+   */
+  damageDealt: number;
   /** Kills since last death (bounty streak). */
   streak: number;
   items: string[];
@@ -236,6 +242,8 @@ export interface MiniState {
   /** Current path goal (re-path when it drifts). */
   goalX: number;
   goalZ: number;
+  /** Cooldown before retrying a search that already failed (see minis.ts). */
+  repathIn?: number;
 }
 
 export interface TowerState {
@@ -379,6 +387,79 @@ export interface MatchState {
   overtime: boolean;
   /** 20:00 Core decay active. */
   suddenDeath: boolean;
+  /* ---------------------- The Living Bridge (§9) ---------------------- */
+  /** This match's timetable, rolled once from the seed at construction. */
+  schedule: ScheduledEvent[];
+  /** Index of the next slot to announce. */
+  scheduleIdx: number;
+  /** Events currently announced or running. */
+  events: EventState[];
+  /** Collapse stages already taken (0 = deck intact). */
+  collapseStage: number;
+  /** Seconds until the next collapse stage, once Overtime starts. */
+  nextCollapseAt: number | null;
+  /** Half-width of the walkable deck right now — shrinks as it falls away. */
+  deckHalf: number;
+  /** Per-team event outcomes for the Tab log / summary (golem kills, isles held). */
+  eventLog: EventLogEntry[];
+  /** The Mini marching route (team 0's ordering) — the golem walks it too. */
+  lane: [number, number][];
+}
+
+/** One rolled slot of the timetable: what runs, when, and whether it is Elder. */
+export interface ScheduledEvent {
+  at: number;
+  kind: EventKind;
+  elder: boolean;
+}
+
+/** A live event — announced (counting down) or active (running). */
+export interface EventState {
+  kind: EventKind;
+  elder: boolean;
+  phase: 'announced' | 'active';
+  /** Seconds until this phase ends (start, or finish). */
+  tLeft: number;
+  /** Total of the current phase, so clients can draw a progress ring. */
+  tTotal: number;
+  /** Entities this event owns and must clean up (platforms, coins, the golem). */
+  owned: EntityId[];
+  /** Nav patches to hand back when the event ends (isle platforms). */
+  patches: RegionPatch[];
+  /** Per-event scratch — sweep progress, coins dropped, spawn bookkeeping. */
+  data: Record<string, number>;
+}
+
+/** One line in the Tab event log / match summary (UI_UX §11–§12). */
+export interface EventLogEntry {
+  at: number;
+  kind: EventKind | 'collapse';
+  /** Team that came out ahead, or null for events nobody "wins". */
+  team: Team | null;
+  /** Short human line: "Clash Golem — West", "Deck narrowed to 12u". */
+  text: string;
+}
+
+/** The Clash Golem (§9): neutral until somebody lands the killing blow. */
+export interface GolemState {
+  elder: boolean;
+  /** null = still neutral. Set on conversion; it then sieges for that team. */
+  owner: Team | null;
+  damage: number;
+  atkCd: number;
+  targetId: EntityId | null;
+  /** Waypoint index along the owning team's lane. */
+  lane: number;
+  /** Elder aegis pulse timer. */
+  auraCd: number;
+  /** Seconds of siege left once converted; at 0 it crumbles (§9.1). */
+  siegeLeft: number;
+}
+
+/** A Coin Rain coin: gold on touch, gone when its timer runs out. */
+export interface CoinState {
+  gold: number;
+  tLeft: number;
 }
 
 export interface Entity {
@@ -396,7 +477,8 @@ export interface Entity {
     | 'flower'
     | 'zone'
     | 'pet'
-    | 'pickup';
+    | 'pickup'
+    | 'golem';
   team: Team;
   x: number;
   z: number;
@@ -422,6 +504,9 @@ export interface Entity {
   zone?: ZoneState;
   pet?: PetState;
   pickup?: PickupState;
+  golem?: GolemState;
+  /** Coin Rain pickup — rides `pickup` kind but pays gold, not health. */
+  coin?: CoinState;
   /** Recap attribution for spawned damage-dealers (projectiles, kegs): the
    * casting ability's slot, threaded to dealDamage when this entity hits. */
   srcLabel?: string;
@@ -515,12 +600,19 @@ export class World {
     for (const t of due) t.run(this);
   }
 
-  /** Alive, damageable units (champions + dummies + kegs + minis). */
+  /** Alive, damageable units (champions + dummies + kegs + minis + the golem). */
   *units(): IterableIterator<Entity> {
     for (const e of this.entities) {
       if (e.dead) continue;
-      if (e.kind === 'champion' || e.kind === 'dummy' || e.kind === 'keg' || e.kind === 'mini')
+      if (
+        e.kind === 'champion' ||
+        e.kind === 'dummy' ||
+        e.kind === 'keg' ||
+        e.kind === 'mini' ||
+        e.kind === 'golem'
+      ) {
         yield e;
+      }
     }
   }
 
@@ -532,8 +624,17 @@ export class World {
     }
   }
 
+  /**
+   * Everything `team` may attack. The neutral Clash Golem is hostile to both
+   * sides — it carries `team: 0` only because the field is not nullable, so it
+   * has to be matched on ownership instead (§9).
+   */
   *enemiesOf(team: Team): IterableIterator<Entity> {
     for (const e of this.units()) {
+      if (e.golem) {
+        if (e.golem.owner !== team) yield e;
+        continue;
+      }
       if (e.team !== team) yield e;
     }
   }

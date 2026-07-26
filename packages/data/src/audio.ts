@@ -103,6 +103,210 @@ export const SOUND_CUES: Record<string, SynthCue> = {
     ],
   },
 
+  /* The Living Bridge (§9) — the horn, the four events, and the deck falling. */
+  event_horn: {
+    id: 'event_horn',
+    // Two low brass notes a fifth apart: the "something is coming" call. Long
+    // enough to cut through a teamfight without becoming a sting.
+    layers: [
+      { wave: 'sawtooth', freq: 87, attack: 0.04, decay: 0.9, volume: 0.2, lowpass: 1400 },
+      { wave: 'sawtooth', freq: 131, attack: 0.05, decay: 0.85, volume: 0.16, lowpass: 1600 },
+      { wave: 'square', freq: 65, attack: 0.03, decay: 1, volume: 0.1, lowpass: 700 },
+      {
+        wave: 'sawtooth',
+        freq: 131,
+        freqEnd: 196,
+        attack: 0.05,
+        decay: 0.9,
+        volume: 0.17,
+        delay: 0.42,
+        lowpass: 1800,
+      },
+      { wave: 'noise', freq: 1, attack: 0.1, decay: 0.7, volume: 0.05, lowpass: 900, delay: 0.4 },
+    ],
+  },
+  event_isles_rise: {
+    id: 'event_isles_rise',
+    // Grinding stone hauling itself up out of nothing.
+    layers: [
+      { wave: 'noise', freq: 1, attack: 0.25, decay: 1.5, volume: 0.24, lowpass: 620 },
+      {
+        wave: 'sawtooth',
+        freq: 48,
+        freqEnd: 96,
+        attack: 0.3,
+        decay: 1.4,
+        volume: 0.16,
+        slide: 'exp',
+      },
+      { wave: 'sine', freq: 196, freqEnd: 294, attack: 0.4, decay: 1.2, volume: 0.1, delay: 0.5 },
+      {
+        wave: 'noise',
+        freq: 1,
+        attack: 0.01,
+        decay: 0.35,
+        volume: 0.14,
+        lowpass: 2600,
+        delay: 1.5,
+      },
+    ],
+  },
+  event_isles_fall: {
+    id: 'event_isles_fall',
+    layers: [
+      {
+        wave: 'sawtooth',
+        freq: 110,
+        freqEnd: 36,
+        attack: 0.02,
+        decay: 1.1,
+        volume: 0.18,
+        slide: 'exp',
+      },
+      { wave: 'noise', freq: 1, attack: 0.02, decay: 1.3, volume: 0.22, lowpass: 480 },
+      { wave: 'noise', freq: 1, attack: 0.01, decay: 0.4, volume: 0.1, lowpass: 3000, delay: 0.25 },
+    ],
+  },
+  event_coin_drop: {
+    id: 'event_coin_drop',
+    layers: [
+      { wave: 'triangle', freq: 1320, freqEnd: 1760, attack: 0.001, decay: 0.09, volume: 0.09 },
+      { wave: 'sine', freq: 2640, attack: 0.001, decay: 0.05, volume: 0.05, delay: 0.02 },
+    ],
+  },
+  event_coin_pickup: {
+    id: 'event_coin_pickup',
+    // A bright two-note chime — this one has to feel like getting paid.
+    layers: [
+      { wave: 'triangle', freq: 1046, attack: 0.001, decay: 0.1, volume: 0.16 },
+      { wave: 'triangle', freq: 1568, attack: 0.001, decay: 0.16, volume: 0.14, delay: 0.05 },
+      { wave: 'sine', freq: 2093, attack: 0.002, decay: 0.14, volume: 0.07, delay: 0.08 },
+    ],
+  },
+  event_storm_roll: {
+    id: 'event_storm_roll',
+    layers: [
+      { wave: 'noise', freq: 1, attack: 0.3, decay: 1.8, volume: 0.2, lowpass: 380 },
+      { wave: 'sine', freq: 44, attack: 0.2, decay: 1.6, volume: 0.14 },
+      {
+        wave: 'square',
+        freq: 2200,
+        freqEnd: 900,
+        attack: 0.001,
+        decay: 0.12,
+        volume: 0.1,
+        delay: 0.6,
+      },
+    ],
+  },
+  event_storm_crack: {
+    id: 'event_storm_crack',
+    layers: [
+      { wave: 'square', freq: 3200, freqEnd: 800, attack: 0.001, decay: 0.09, volume: 0.13 },
+      { wave: 'noise', freq: 1, attack: 0.001, decay: 0.22, volume: 0.12, lowpass: 5200 },
+    ],
+  },
+  golem_wake: {
+    id: 'golem_wake',
+    // Stone joints unlocking, then a bellow.
+    layers: [
+      { wave: 'noise', freq: 1, attack: 0.05, decay: 0.6, volume: 0.2, lowpass: 700 },
+      {
+        wave: 'sawtooth',
+        freq: 62,
+        freqEnd: 41,
+        attack: 0.08,
+        decay: 1.4,
+        volume: 0.24,
+        lowpass: 900,
+      },
+      { wave: 'square', freq: 82, freqEnd: 55, attack: 0.1, decay: 1.2, volume: 0.14, delay: 0.3 },
+      {
+        wave: 'noise',
+        freq: 1,
+        attack: 0.02,
+        decay: 0.5,
+        volume: 0.12,
+        lowpass: 1600,
+        delay: 0.75,
+      },
+    ],
+  },
+  golem_slam: {
+    id: 'golem_slam',
+    layers: [
+      { wave: 'noise', freq: 1, attack: 0.001, decay: 0.35, volume: 0.3, lowpass: 520 },
+      {
+        wave: 'sine',
+        freq: 90,
+        freqEnd: 38,
+        attack: 0.001,
+        decay: 0.4,
+        volume: 0.26,
+        slide: 'exp',
+      },
+      { wave: 'noise', freq: 1, attack: 0.001, decay: 0.16, volume: 0.14, lowpass: 3400 },
+    ],
+  },
+  golem_convert: {
+    id: 'golem_convert',
+    layers: [
+      {
+        wave: 'sine',
+        freq: 196,
+        freqEnd: 392,
+        attack: 0.01,
+        decay: 0.7,
+        volume: 0.2,
+        slide: 'exp',
+      },
+      { wave: 'square', freq: 98, attack: 0.01, decay: 0.5, volume: 0.14 },
+      { wave: 'triangle', freq: 784, attack: 0.005, decay: 0.5, volume: 0.12, delay: 0.12 },
+      { wave: 'triangle', freq: 1175, attack: 0.005, decay: 0.55, volume: 0.1, delay: 0.2 },
+      { wave: 'noise', freq: 1, attack: 0.02, decay: 0.6, volume: 0.08, lowpass: 2400 },
+    ],
+  },
+  golem_aegis: {
+    id: 'golem_aegis',
+    layers: [
+      { wave: 'sine', freq: 392, freqEnd: 523, attack: 0.02, decay: 0.4, volume: 0.11 },
+      { wave: 'triangle', freq: 1046, attack: 0.01, decay: 0.35, volume: 0.07, delay: 0.06 },
+    ],
+  },
+  golem_death: {
+    id: 'golem_death',
+    layers: [
+      { wave: 'noise', freq: 1, attack: 0.01, decay: 0.9, volume: 0.26, lowpass: 600 },
+      {
+        wave: 'sawtooth',
+        freq: 70,
+        freqEnd: 30,
+        attack: 0.02,
+        decay: 0.8,
+        volume: 0.18,
+        slide: 'exp',
+      },
+    ],
+  },
+  bridge_collapse: {
+    id: 'bridge_collapse',
+    // The deck tearing away: a long groan, then rubble falling forever.
+    layers: [
+      {
+        wave: 'sawtooth',
+        freq: 58,
+        freqEnd: 26,
+        attack: 0.15,
+        decay: 1.8,
+        volume: 0.24,
+        slide: 'exp',
+      },
+      { wave: 'noise', freq: 1, attack: 0.05, decay: 2.2, volume: 0.28, lowpass: 460 },
+      { wave: 'noise', freq: 1, attack: 0.3, decay: 1.6, volume: 0.12, lowpass: 1800, delay: 0.4 },
+      { wave: 'sine', freq: 33, attack: 0.2, decay: 2, volume: 0.16, delay: 0.2 },
+    ],
+  },
+
   rook_q_swing: {
     id: 'rook_q_swing',
     layers: [

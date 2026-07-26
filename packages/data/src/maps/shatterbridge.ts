@@ -8,7 +8,14 @@ import type { MapDef, MapObstacle, MapProp } from '../types';
 
 const LEN = 120; // playfield end to end
 const W = 132; // navgrid width incl. fountain plates
-const H = 26;
+/**
+ * Navgrid depth. The *deck* is 18 u (§6) and never changes; the grid is much
+ * taller because the Flank Isles float in the void north and south of it (§9,
+ * "event space"). Their cells have to exist in the grid before they can be
+ * opened, so the world extends to z ∈ [−19, 19] and everything beyond the deck
+ * rails is closed void until an event carves a platform out of it.
+ */
+const H = 38;
 const DECK_HALF = 9; // deck z ∈ [−9, 9]
 const CORE_X = LEN / 2 - 6; // 54
 const INNER_X = CORE_X - 20; // 34

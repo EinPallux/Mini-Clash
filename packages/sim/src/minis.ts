@@ -11,6 +11,11 @@ import type { Entity, MiniState, World } from './world';
 
 type Battle = NonNullable<MapDef['battle']>;
 
+/** Seconds a unit waits before re-attempting a search that already failed. */
+const REPATH_BACKOFF = 0.5;
+/** Within this range, an unobstructed goal is walked at directly — no A*. */
+const DIRECT_STEER_RANGE = 14;
+
 export function spawnWave(w: World, battle: Battle, waveIndex: number): void {
   const withRam = waveIndex % BRIDGE.wave.ramEvery === 0;
   for (const gate of battle.gates) {
@@ -290,23 +295,52 @@ function moveToward(
   speed: number,
   dt: number,
 ): void {
-  if (
-    m.path.length === 0 ||
-    m.pathVersion !== w.nav.version ||
-    dist(m.goalX, m.goalZ, gx, gz) > 1.2
-  ) {
+  // A *failed* search is the expensive one: A* has to exhaust the reachable
+  // set before it can say "no". Retrying that every tick for a goal that is
+  // genuinely unreachable is how a handful of stuck units can eat the frame —
+  // measured at 12 full searches per tick and 25 ms of the budget. So a failure
+  // backs off, and only the nav grid changing (or the goal moving) retries early.
+  m.repathIn = Math.max(0, (m.repathIn ?? 0) - dt);
+
+  // Straight shot beats a plan. A mini chasing a moving target — another mini,
+  // a champion, the golem — sees its goal drift past the re-path threshold
+  // almost every tick, so it would run a full A* every tick forever. When the
+  // goal is close and there is nothing in the way, steering at it directly is
+  // both correct and ~50× cheaper. This is what keeps a 120-unit mid-lane brawl
+  // off the frame budget: A* was 64% of a full bot match before it.
+  const toGoal = dist(e.x, e.z, gx, gz);
+  if (toGoal < DIRECT_STEER_RANGE && w.nav.lineWalkable(e.x, e.z, gx, gz)) {
+    m.path.length = 0;
+    m.goalX = gx;
+    m.goalZ = gz;
+    const step = Math.min(speed * dt, toGoal);
+    const [dx, dz] = norm(gx - e.x, gz - e.z);
+    e.x += dx * step;
+    e.z += dz * step;
+    e.fx = dx;
+    e.fz = dz;
+    return;
+  }
+
+  const goalMoved = dist(m.goalX, m.goalZ, gx, gz) > 1.2;
+  const navChanged = m.pathVersion !== w.nav.version;
+  if ((m.path.length === 0 && m.repathIn <= 0) || navChanged || goalMoved) {
     m.path = w.nav.findPath(e.x, e.z, gx, gz);
     m.pathVersion = w.nav.version;
     m.goalX = gx;
     m.goalZ = gz;
     if (m.path.length === 0) {
-      // Wedged in a blocked pocket (knocked into a stamp): step to open ground.
+      m.repathIn = REPATH_BACKOFF;
+      // Wedged in a blocked pocket (knocked into a stamp, or the deck fell out
+      // from under us): step to open ground and try again from there.
       if (w.nav.isBlockedAt(e.x, e.z)) {
         [e.x, e.z] = w.nav.nearestOpen(e.x, e.z);
+        m.repathIn = 0;
       }
       return;
     }
   }
+  if (m.path.length === 0) return;
   let remaining = speed * dt;
   while (remaining > 0.0001 && m.path.length > 0) {
     const [wx, wz] = m.path[0];
