@@ -45,6 +45,8 @@ const CHROME = process.env.SMOKE_CHROME || (existsSync(LOCAL_CHROME) ? LOCAL_CHR
 const platform = await startApi({ name: 'bridge' });
 
 const errors = [];
+/** What the page was showing when the offline reload gave up, if it did. */
+let lastScreen = null;
 let browser;
 try {
   await waitForServer();
@@ -185,10 +187,10 @@ try {
     // error page, a boot screen that never routed and a name screen, and those
     // are three different bugs — a CI failure that cannot tell them apart costs
     // a round trip to find out.
-    const seen = await page
-      .evaluate(() => (document.body.textContent ?? '').replace(/\s+/g, ' ').slice(0, 120))
+    lastScreen = await page
+      .evaluate(() => (document.body.textContent ?? '').replace(/\s+/g, ' ').slice(0, 200))
       .catch(() => '(page unreachable)');
-    errors.push(`offline reload did not reach the app shell — on screen: "${seen}"`);
+    errors.push('offline reload did not reach the app shell');
   }
   try {
     await page.getByText('Bridge Brawl', { exact: true }).click({ timeout: 8000 });
@@ -214,6 +216,9 @@ try {
 
 if (errors.length > 0) {
   console.error(`bridge smoke FAILED:\n  ${errors.join('\n  ')}`);
+  // Last, deliberately. A CI log is read from the bottom, and by the time this
+  // matters the question is always the same one: what was actually on screen?
+  if (lastScreen) console.error(`  last screen: "${lastScreen}"`);
   process.exit(1);
 }
 console.info('bridge smoke OK — select, rigged win, podium, summary, history, offline');
