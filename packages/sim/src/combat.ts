@@ -277,7 +277,10 @@ export function dealDamage(
   }
   if (srcChamp) {
     srcChamp.lastCombatAt = w.time;
-    if (target.kind === 'champion') srcChamp.lastChampHitAt = w.time;
+    if (target.kind === 'champion') {
+      srcChamp.lastChampHitAt = w.time;
+      srcChamp.damageDealt += dealt;
+    }
   }
 
   // Overtime Corebreaker: Cores take double damage (GAME_DESIGN §5).

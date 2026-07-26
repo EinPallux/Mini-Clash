@@ -227,6 +227,7 @@ export class Sim {
           xp: 0,
           gold: bridge ? BRIDGE.startingGold : 0,
           kills: 0,
+          damageDealt: 0,
           deaths: 0,
           assists: 0,
           streak: 0,

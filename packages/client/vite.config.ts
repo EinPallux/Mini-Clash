@@ -65,7 +65,20 @@ function injectSwPrecache(): Plugin {
 
 export default defineConfig({
   plugins: [react(), requireGameAssets(), injectSwPrecache()],
-  server: { host: true, port: 5173 },
+  server: {
+    host: true,
+    port: 5173,
+    // Proxy the platform api so dev and production are the *same origin*. That
+    // is not a convenience: session cookies are httpOnly + SameSite=Lax, and
+    // testing them across origins in dev would prove nothing about production.
+    proxy: {
+      '/api': {
+        target: process.env.MC_API_URL ?? 'http://127.0.0.1:3000',
+        changeOrigin: false,
+        rewrite: (path) => path.replace(/^\/api/, ''),
+      },
+    },
+  },
   build: {
     target: 'es2022',
     chunkSizeWarningLimit: 1200,

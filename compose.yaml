@@ -9,11 +9,49 @@ services:
     restart: unless-stopped
     environment:
       - PORT=2567
+      # Linked to the api: joins need a signed ticket and matches are recorded.
+      - MC_API_URL=http://api:3000
+      - MC_INTERNAL_SECRET=${MC_INTERNAL_SECRET:?set MC_INTERNAL_SECRET}
     expose:
       - "2567"
     # TECH §11: a 1 GB box runs 10+ concurrent matches; cap so a leak can't
     # take the edge down with it.
     mem_limit: 768m
+
+  # Platform api (TECH §9): accounts, coins, unlocks, quests, history. The game
+  # server posts finished matches here; nothing else may write the economy.
+  api:
+    build:
+      context: .
+      target: api
+    restart: unless-stopped
+    environment:
+      - PORT=3000
+      - DATABASE_URL=postgres://mc:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}@db:5432/miniclash
+      - MC_INTERNAL_SECRET=${MC_INTERNAL_SECRET:?set MC_INTERNAL_SECRET}
+      - NODE_ENV=production
+    expose:
+      - "3000"
+    depends_on:
+      db:
+        condition: service_healthy
+    mem_limit: 512m
+
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=mc
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+      - POSTGRES_DB=miniclash
+    volumes:
+      - pg-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mc -d miniclash"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    mem_limit: 512m
 
   web:
     build:
@@ -27,6 +65,7 @@ services:
       - DOMAIN=${DOMAIN:-:80}
     depends_on:
       - game
+      - api
     volumes:
       - caddy-data:/data
       - caddy-config:/config
@@ -42,6 +81,7 @@ services:
       - kuma-data:/app/data
 
 volumes:
+  pg-data:
   caddy-data:
   caddy-config:
   kuma-data:

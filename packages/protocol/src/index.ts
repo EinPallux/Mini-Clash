@@ -537,3 +537,4 @@ export type WorkerToClient =
   | { t: 'snapshot'; snap: Snapshot }
   | { t: 'fatal'; message: string };
 export { BASELINE_EVERY, SnapshotDecoder, SnapshotEncoder } from './codec';
+export * from './service';

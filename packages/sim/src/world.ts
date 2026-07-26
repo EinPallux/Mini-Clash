@@ -73,6 +73,11 @@ export interface ChampState {
   kills: number;
   deaths: number;
   assists: number;
+  /**
+   * Damage dealt to enemy champions this match (GAME_DESIGN §18 scoreboard).
+   * A tally only: nothing in the sim reads it, so it cannot affect determinism.
+   */
+  damageDealt: number;
   /** Kills since last death (bounty streak). */
   streak: number;
   items: string[];

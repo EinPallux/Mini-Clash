@@ -4,6 +4,7 @@ import { SnapshotEncoder } from '@mini-clash/protocol';
 import { Sim, stateHash } from '@mini-clash/sim';
 import type { Client } from 'colyseus';
 import { Room } from 'colyseus';
+import { linked, reportMatch, verifyJoinTicket } from '../api-client';
 import { log } from '../log';
 import {
   clientsGauge,
@@ -47,6 +48,7 @@ import {
   type MatchRuntimeState,
   validateRoster,
 } from '../match';
+import { buildReport, MatchTally } from '../report';
 
 /**
  * Authoritative Bridge Brawl room (TECH §6): seats up to 8 (humans + bots),
@@ -81,6 +83,15 @@ export class BridgeRoom extends Room {
   /** Seats bot-covered because their human idled (reclaim on next intent). */
   private afkSeats = new Set<number>();
   private simStartedAt = 0;
+  /** Objective and swap counters, folded in as the match runs (TECH §9). */
+  private tally = new MatchTally();
+  /** seat → account id, from the api-signed join ticket. Bots and unlinked
+   * play have none, and a seat with none is simply not paid. */
+  private users = new Map<number, string>();
+  /** Guards against reporting the same match twice if the room folds oddly. */
+  private reported = false;
+  /** Stable id for this match, minted when the sim starts. */
+  private matchId = '';
 
   override onCreate(options: JoinOptions): void {
     this.maxClients = 8;
@@ -185,7 +196,16 @@ export class BridgeRoom extends Room {
     });
   }
 
-  override onJoin(client: Client, options: JoinOptions & { token?: string }): void {
+  override async onJoin(
+    client: Client,
+    options: JoinOptions & { token?: string; ticket?: string },
+  ): Promise<void> {
+    // Identity comes from the api's signed ticket, never from what the browser
+    // says it is. Without a linked api there is no ticket and no payout — the
+    // match still plays, it just does not count for anything (TECH §10).
+    const claims = await verifyJoinTicket(options?.ticket);
+    if (linked() && !claims) throw new Error('sign in to play online');
+
     // Seat tokens: lobby handoff or a refresh-proof rejoin — either maps to the
     // exact seat it was minted for.
     const token = typeof options?.token === 'string' ? options.token : null;
@@ -201,7 +221,8 @@ export class BridgeRoom extends Room {
         this.afkSeats.delete(entry.player);
         this.match.reclaimSeat(this.sim, entry.player);
       }
-      this.sendSeat(client, entry.player, entry.name);
+      if (claims) this.users.set(entry.player, claims.sub);
+      this.sendSeat(client, entry.player, claims?.name ?? entry.name);
       if (this.everyoneReady()) this.startIfReady();
       return;
     }
@@ -210,12 +231,13 @@ export class BridgeRoom extends Room {
       throw new Error('this match is private');
     }
     // Solo flow: the creating human takes the first unclaimed human seat.
-    const seat = this.match.claimSeat(options?.name);
+    const seat = this.match.claimSeat(claims?.name ?? options?.name);
     if (seat === null) {
       throw new Error('room is full');
     }
     this.seats.set(client.sessionId, seat);
-    this.sendSeat(client, seat, options?.name ?? '');
+    if (claims) this.users.set(seat, claims.sub);
+    this.sendSeat(client, seat, claims?.name ?? options?.name ?? '');
   }
 
   private startIfReady(): void {
@@ -226,6 +248,7 @@ export class BridgeRoom extends Room {
     }
     this.sim = new Sim(this.match.config());
     this.simStartedAt = Date.now();
+    this.matchId = `m_${randomBytes(12).toString('hex')}`;
     log.info({ room: this.roomId, awaited: this.awaited.size }, 'sim started');
     // Reserved humans that never arrived: a bot stands in until they do.
     for (const player of this.awaited) {
@@ -253,10 +276,42 @@ export class BridgeRoom extends Room {
           { room: this.roomId, winner: sim.world.match.over.winner, time: sim.world.time },
           'match over',
         );
+        // Report before the podium rather than after: a player who closes the
+        // tab the moment they see VICTORY still gets paid.
+        void this.report();
         // Hold the room for the podium/summary, then fold it.
         this.clock.setTimeout(() => this.disconnect(), 90_000);
       }
     }, 1000 / 30);
+  }
+
+  /**
+   * Send the finished match to the api (TECH §9).
+   *
+   * Fire-and-forget from the tick loop, but never fire-and-forget in effect:
+   * `reportMatch` retries with backoff, and the api keys on the match id, so a
+   * retry that duplicates a report that actually landed pays nobody twice.
+   */
+  private async report(): Promise<void> {
+    const sim = this.sim;
+    if (!sim || this.reported) return;
+    this.reported = true;
+    // The final tick's events have not been broadcast yet — count them first.
+    this.tally.note(sim, sim.world.events);
+    if (!linked()) {
+      log.info({ room: this.roomId }, 'no api configured — match not recorded');
+      return;
+    }
+    if (this.users.size === 0) {
+      log.info({ room: this.roomId }, 'no signed-in players — match not recorded');
+      return;
+    }
+    const payload = buildReport(sim, this.match, this.tally, {
+      matchId: this.matchId,
+      startedAt: new Date(this.simStartedAt),
+      users: this.users,
+    });
+    await reportMatch(payload);
   }
 
   /** Did this client have a draft open last frame? (edge-triggers the clear). */
@@ -269,6 +324,7 @@ export class BridgeRoom extends Room {
       0: this.encoders[0].encode(this.filterView(sim.snapshotFor(0), 0)),
       1: this.encoders[1].encode(this.filterView(sim.snapshotFor(1), 1)),
     };
+    this.tally.note(sim, sim.world.events);
     sim.drainEvents();
     for (const client of this.clients) {
       const player = this.seats.get(client.sessionId);

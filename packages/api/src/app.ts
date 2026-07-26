@@ -8,6 +8,7 @@ import { ApiError } from './errors';
 import { log } from './log';
 import { authRoutes } from './routes/auth';
 import { hubRoutes } from './routes/hub';
+import { internalRoutes, playRoutes } from './routes/internal';
 
 /**
  * The Fastify app (TECH §9–§10).
@@ -155,6 +156,10 @@ export async function buildApp(opts: AppOptions = {}): Promise<FastifyInstance> 
 
   await app.register(authRoutes, { prefix: '/auth' });
   await app.register(hubRoutes);
+  await app.register(playRoutes);
+  // Registered last and in its own scope: it swaps the JSON parser for one that
+  // preserves the raw body, and that must not leak into any other route.
+  await app.register(internalRoutes);
 
   return app;
 }
