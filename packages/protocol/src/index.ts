@@ -434,6 +434,8 @@ export type SimEvent =
   /** Somebody landed the killing blow and the golem changed sides. */
   | { t: 'golemTaken'; team: Team; elder: boolean }
   | { t: 'golemExpired'; team: Team; elder: boolean }
+  /** A golem was killed. `team` is its owner, or null if it died still neutral. */
+  | { t: 'golemDied'; team: Team | null; elder: boolean }
   | { t: 'collapse'; stage: number; deckHalf: number }
   | { t: 'suddenDeath' }
   | { t: 'ping'; player: PlayerId; team: Team; kind: PingKind; x: number; z: number }

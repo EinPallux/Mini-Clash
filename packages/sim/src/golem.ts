@@ -27,6 +27,10 @@ export function updateGolem(w: World, e: Entity, battle: Battle, dt: number): vo
   const g = e.golem;
   if (!g) return;
   if (e.dead) {
+    // Killed. Worth an event of its own: a converted golem dying is a real
+    // objective swing, and without it the only way to notice was an entity
+    // quietly leaving the snapshot.
+    w.emit({ t: 'golemDied', team: g.owner, elder: g.elder });
     w.fx('event.golem.death', e.x, e.z, { source: e.id });
     w.remove(e.id);
     return;

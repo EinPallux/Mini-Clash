@@ -31,7 +31,7 @@ mkdirSync(outDir, { recursive: true });
 const driverPath = join(outDir, '.botmatch-driver.mjs');
 writeFileSync(
   driverPath,
-  `export { Sim } from '@mini-clash/sim';\nexport { AUGMENTS, CHAMPION_LIST } from '@mini-clash/data';\n`,
+  `export { Sim } from '@mini-clash/sim';\nexport { AUGMENTS, CHAMPION_LIST, EVENTS } from '@mini-clash/data';\n`,
 );
 const esbuild = await import('esbuild');
 const bundlePath = join(outDir, '.botmatch-bundle.mjs');
@@ -50,7 +50,10 @@ await esbuild.build({
     '@mini-clash/protocol': join(process.cwd(), 'packages/protocol/src/index.ts'),
   },
 });
-const { Sim, AUGMENTS, CHAMPION_LIST } = await import(`file://${process.cwd()}/${bundlePath}`);
+const { Sim, AUGMENTS, CHAMPION_LIST, EVENTS } = await import(
+  `file://${process.cwd()}/${bundlePath}`
+);
+const EVENTS_SIEGE = EVENTS.clashGolem.params.siegeSeconds;
 
 const TIERS = ['recruit', 'veteran', 'elite'];
 // Tiny deterministic LCG for roster shuffles (harness-side only; sim stays seeded).
@@ -150,6 +153,8 @@ const eventRow = (kind) => {
   return r;
 };
 const golemGames = { total: 0, takerWon: 0, elderTotal: 0, elderWon: 0 };
+const golemEnds = { expired: 0, killed: 0 };
+const golemLives = [];
 let strandedTotal = 0;
 let stampOverlaps = 0;
 let collapseStages = 0;
@@ -169,6 +174,7 @@ for (let m = 0; m < MATCHES; m++) {
   const offeredTo = new Map();
   const t0 = performance.now();
   const golemTakers = [];
+  const golemTakenAt = new Map();
   let over = null;
   let ticks = 0;
   let events = 0;
@@ -193,7 +199,22 @@ for (let m = 0; m < MATCHES; m++) {
       }
       // The Living Bridge (v0.6).
       if (ev.t === 'eventStarted') eventRow(ev.kind).ran++;
-      if (ev.t === 'golemTaken') golemTakers.push({ team: ev.team, elder: ev.elder });
+      if (ev.t === 'golemTaken') {
+        golemTakers.push({ team: ev.team, elder: ev.elder });
+        golemTakenAt.set(`${ev.team}:${ev.elder}`, sim.world.time);
+      }
+      // How a converted golem ends: crumbled on its own timer, or killed. If
+      // nothing ever crumbles the 90 s siege window is not doing any work.
+      if (ev.t === 'golemExpired') {
+        const at = golemTakenAt.get(`${ev.team}:${ev.elder}`);
+        golemEnds.expired++;
+        if (at !== undefined) golemLives.push(sim.world.time - at);
+      }
+      if (ev.t === 'golemDied' && ev.team !== null) {
+        const at = golemTakenAt.get(`${ev.team}:${ev.elder}`);
+        golemEnds.killed++;
+        if (at !== undefined) golemLives.push(sim.world.time - at);
+      }
       if (ev.t === 'collapse') {
         collapseStages++;
         // Acceptance: a stage must never leave a unit standing on ground that
@@ -420,6 +441,12 @@ if (golemGames.total > 0) {
         ? ` (Elder ${golemGames.elderTotal}×, ${(100 * ewr).toFixed(0)}%)`
         : '') +
       (wr > GOLEM_WIN_CAP && golemGames.total >= 8 ? '  ⚠ over the 65% rail' : ' ✓'),
+  );
+  const mean = golemLives.length ? golemLives.reduce((a, b) => a + b, 0) / golemLives.length : 0;
+  console.info(
+    `  converted golems: ${golemEnds.expired} crumbled on the ${EVENTS_SIEGE}s timer` +
+      (golemLives.length ? ` (mean life ${mean.toFixed(0)}s)` : '') +
+      `, ${golemEnds.killed} killed, ${golemGames.total - golemEnds.expired - golemEnds.killed} still standing at the end`,
   );
 } else {
   console.info('  golem never taken — the objective is not being contested');
