@@ -95,6 +95,11 @@ export const BRIDGE = {
   champVsMiniMul: 2,
   /** 16:00 Corebreaker: Cores take double damage, waves turn all-Ram (GAME_DESIGN §5/§9). */
   overtime: { at: 900, coreDamageMul: 3, waveRams: 5 },
+  /**
+   * Bridge Collapse (§9): from Overtime, the outer 3 u of both long edges fall
+   * every 60 s. Deck half-widths 9 → 6 → 4 (18 → 12 → 8 u wide).
+   */
+  collapse: { every: 60, deckHalves: [9, 6, 4] },
   /** 20:00 Sudden Death: both Cores decay; higher-HP Core survives (§5). */
   /** Surrender unlocks at 8:00 (UI_UX §8). Solo-vs-bots concedes immediately. */
   surrenderAt: 480,

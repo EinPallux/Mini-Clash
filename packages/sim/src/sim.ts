@@ -3,6 +3,7 @@ import {
   CHAMPIONS,
   type ChampionDef,
   DRAFT,
+  EVENTS,
   type MapDef,
   SHATTERBRIDGE_MAP,
   TICK_DT,
@@ -40,6 +41,9 @@ import { applyBuff, applyBuffById, applyCc, applyFear, shieldTotal, tickBuffs } 
 import { dealDamage } from './combat';
 import { openDraft, pickAugment, rerollDraft, updateDrafts } from './draft';
 import { levelUpChamp, updateIncome, updateOrbs } from './economy';
+import { EVENT_HOOKS, updateCoins } from './eventKinds';
+import { nextEvent, rollSchedule, updateCollapse, updateEvents } from './events';
+import { updateGolem } from './golem';
 import { tryBuy, tryBuyRelic, trySell, tryUseRelic, updateItemPassives } from './items';
 import { spawnWave, updateMini } from './minis';
 import { applySeparation, updateMovement } from './movement';
@@ -115,6 +119,16 @@ export class Sim {
         waveIndex: 0,
         overtime: false,
         suddenDeath: false,
+        // The timetable is rolled once, here, off the match seed — that is what
+        // makes it reproducible in replay and plannable by bots (§9).
+        schedule: rollSchedule(w.rng),
+        scheduleIdx: 0,
+        events: [],
+        collapseStage: 0,
+        nextCollapseAt: null,
+        deckHalf: BRIDGE.collapse.deckHalves[0],
+        eventLog: [],
+        lane: battle.lane.map((pt) => [pt[0], pt[1]] as [number, number]),
       };
       spawnStructures(w, battle);
       // Offline test hook: pre-damage the enemy core so smokes can reach the win
@@ -146,6 +160,14 @@ export class Sim {
         waveIndex: 0,
         overtime: false,
         suddenDeath: false,
+        schedule: [],
+        scheduleIdx: 0,
+        events: [],
+        collapseStage: 0,
+        nextCollapseAt: null,
+        deckHalf: BRIDGE.collapse.deckHalves[0],
+        eventLog: [],
+        lane: [],
       };
     }
 
@@ -638,7 +660,16 @@ export class Sim {
     // 7. Open augment drafts tick down (the match never pauses for them).
     updateDrafts(w, dt);
 
-    // 8. Match orchestration: barrier, waves, orbs.
+    for (const e of [...w.entities]) {
+      if (e.golem && battle) updateGolem(w, e, battle, dt);
+    }
+    updateCoins(w, dt);
+
+    // 8. The Living Bridge (§9): the timetable, then the deck falling away.
+    updateEvents(w, dt, EVENT_HOOKS);
+    updateCollapse(w, EVENT_HOOKS);
+
+    // 9. Match orchestration: barrier, waves, orbs.
     this.updateMatchFlow();
   }
 
@@ -1143,8 +1174,14 @@ export class Sim {
         nextOrbIn: null,
         overtime: false,
         suddenDeath: false,
+        events: [],
+        nextEvent: null,
+        deckHalf: 9,
+        collapseStage: 0,
+        eventLog: [],
       };
     }
+    const up = nextEvent(w);
     return {
       mode: m.mode,
       time: w.time,
@@ -1155,6 +1192,19 @@ export class Sim {
       nextOrbIn: m.nextOrbAt !== null ? Math.max(0, m.nextOrbAt - w.time) : null,
       overtime: m.overtime,
       suddenDeath: m.suddenDeath,
+      events: m.events.map((ev) => ({
+        kind: ev.kind,
+        elder: ev.elder,
+        phase: ev.phase,
+        tLeft: Math.max(0, Math.ceil(ev.tLeft * 10) / 10),
+        tTotal: ev.tTotal,
+      })),
+      nextEvent: up
+        ? { kind: up.kind, elder: up.elder, inSeconds: Math.max(0, Math.ceil(up.at - w.time)) }
+        : null,
+      deckHalf: m.deckHalf,
+      collapseStage: m.collapseStage,
+      eventLog: m.eventLog.map((l) => ({ ...l })),
     };
   }
 
@@ -1309,6 +1359,26 @@ export class Sim {
         unitId: e.pickup.def.id,
         tLeft: Math.max(0, e.pickup.tLeft),
         tossPhase: e.pickup.tossPhase < 1 ? e.pickup.tossPhase : undefined,
+      };
+    }
+    if (e.coin) {
+      // Coin Rain coins ride the pickup kind — same actor family, no heal.
+      return {
+        ...base,
+        kind: 'pickup',
+        unitId: 'coin',
+        tLeft: Math.max(0, e.coin.tLeft),
+        coinGold: e.coin.gold,
+      };
+    }
+    if (e.golem) {
+      return {
+        ...base,
+        kind: 'golem',
+        elder: e.golem.elder,
+        owner: e.golem.owner,
+        aggro: e.golem.targetId,
+        slamming: e.golem.atkCd > EVENTS.clashGolem.params.attackEvery - 0.35,
       };
     }
     if (e.zone) {

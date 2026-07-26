@@ -50,7 +50,10 @@ export class BridgeSet {
         depthWrite: false,
         side: THREE.DoubleSide,
       });
-      const span = map.height;
+      // Span the *deck*, not the navgrid: the grid runs out into the void where
+      // the Flank Isles rise, and a barrier hanging over open sky reads as a
+      // rendering bug rather than a gate.
+      const span = (map.floor.deckHalf ?? map.height / 2) * 2 + 2;
       const wall = new THREE.Mesh(new THREE.PlaneGeometry(span, BARRIER_H), mat);
       wall.position.y = BARRIER_H / 2;
       wall.rotation.y = Math.PI / 2;
