@@ -449,6 +449,23 @@ describe('clash golem', () => {
     expect(mini.buffs.some((b) => b.id === 'golem_march')).toBe(true);
   });
 
+  it('the siege is a window — it crumbles when the clock runs out', () => {
+    const { sim, golem } = wake();
+    convert(sim, golem, 0);
+    const life = EVENTS.clashGolem.params.siegeSeconds;
+    run(sim, life - 5);
+    expect(sim.world.get(golem.id), 'still sieging 5 s before the end').toBeDefined();
+    let expired: { team: number; elder: boolean } | null = null;
+    for (let i = 0; i < 30 * 8; i++) {
+      for (const ev of sim.tick().events) {
+        if (ev.t === 'golemExpired') expired = { team: ev.team, elder: ev.elder };
+      }
+      if (expired) break;
+    }
+    expect(expired).toMatchObject({ team: 0 });
+    expect(sim.world.get(golem.id)).toBeUndefined();
+  }, 30_000);
+
   it('the Elder is bigger and shields its team', () => {
     const p = EVENTS.clashGolem.params;
     const plain = wake(false);

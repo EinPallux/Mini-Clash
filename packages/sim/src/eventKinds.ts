@@ -227,6 +227,7 @@ function startGolem(w: World, ev: EventState): void {
       targetId: null,
       lane: 0,
       auraCd: 0,
+      siegeLeft: p.siegeSeconds,
     },
   });
   ev.owned.push(g.id);
@@ -251,6 +252,7 @@ export function onGolemKilled(w: World, g: Entity, by: Entity | undefined): void
   // send it home first — the altar is mid-lane, so step 0 is the *owner's own*
   // gate, and a siege engine that marches backwards is worse than no golem.
   gs.lane = laneStepNear(w, team, g.x, g.z);
+  gs.siegeLeft = EVENTS.clashGolem.params.siegeSeconds;
   g.dead = false;
   const s = golemStats(w, gs.elder);
   g.hpMax = s.hp;

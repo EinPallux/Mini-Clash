@@ -447,6 +447,8 @@ export interface GolemState {
   lane: number;
   /** Elder aegis pulse timer. */
   auraCd: number;
+  /** Seconds of siege left once converted; at 0 it crumbles (§9.1). */
+  siegeLeft: number;
 }
 
 /** A Coin Rain coin: gold on touch, gone when its timer runs out. */

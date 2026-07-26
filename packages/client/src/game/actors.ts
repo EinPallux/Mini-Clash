@@ -1506,50 +1506,61 @@ class GolemActor implements Actor {
 
   constructor(snap: EntitySnap & { kind: 'golem' }, scene: THREE.Scene, ctx: ActorCtx) {
     this.ctx = ctx;
-    const stone = 0xb9bfcb;
-    const part = (key: string, tint: number): THREE.Group => {
-      const { root } = instantiate(key, { tint, flat: true });
+    /*
+     * Boulders only, and deliberately so. A first pass built the body out of
+     * `arena/block`, and under this map's single low key light (ART_DIRECTION
+     * §2) a big flat-faced box turns one huge unlit face to the camera — the
+     * golem read as a black crate. Broken rock catches the key on a dozen
+     * facets instead, so the silhouette reads as *stone* from the match camera.
+     * Every piece is rotated off-axis so the repeated mesh does not show.
+     */
+    const part = (key: string, tint: number, spin: number): THREE.Group => {
+      const { root } = instantiate(key, { tint });
+      root.rotation.y = spin;
       return root;
     };
+    const STONE = 0xd6dbe4;
+    const DARK = 0xa8b0bd;
 
-    // Legs: two stone stumps that take the stride.
-    this.legL = part('arena/block', stone);
-    this.legR = part('arena/block', stone);
+    // Legs: two squat boulders that take the stride.
+    this.legL = part('castle/rocks-small', DARK, 0.4);
+    this.legR = part('castle/rocks-small', DARK, 2.3);
     for (const [leg, side] of [
       [this.legL, -1],
       [this.legR, 1],
     ] as const) {
-      leg.scale.set(0.42, 1.5, 0.42);
-      leg.position.set(side * 0.32, 0, 0);
+      leg.scale.set(0.62, 1.5, 0.62);
+      leg.position.set(side * 0.34, 0, 0);
       this.body.add(leg);
     }
 
-    // Torso + chest plate.
-    const trunk = part('arena/block', stone);
-    trunk.scale.set(1.15, 1.7, 0.9);
-    this.torso.add(trunk);
-    const plate = part('castle/wall-corner-half', 0x8d95a4);
-    plate.scale.set(0.5, 0.42, 0.5);
-    plate.position.set(0, 0.28, 0.3);
-    this.torso.add(plate);
-    // Shoulders + head, in rougher rock so the silhouette breaks up.
-    for (const [side, arm] of [
-      [-1, this.armL],
-      [1, this.armR],
+    // Torso: two stacked clusters, turned against each other so the shape reads
+    // as a mass of rock rather than one repeated prop.
+    const hips = part('castle/rocks-large', DARK, 0.9);
+    hips.scale.set(1.0, 1.5, 0.95);
+    this.torso.add(hips);
+    const chest = part('castle/rocks-large', STONE, 3.6);
+    chest.scale.set(1.25, 1.8, 1.05);
+    chest.position.y = 0.5;
+    this.torso.add(chest);
+
+    for (const [side, arm, spin] of [
+      [-1, this.armL, 1.2],
+      [1, this.armR, 4.4],
     ] as const) {
-      const shoulder = part('castle/rocks-small', 0xa6adba);
-      shoulder.scale.setScalar(0.75);
+      const shoulder = part('castle/rocks-large', STONE, spin);
+      shoulder.scale.set(0.8, 0.9, 0.8);
       arm.add(shoulder);
-      const fist = part('castle/rocks-large', stone);
-      fist.scale.setScalar(0.62);
-      fist.position.y = -0.85;
+      const fist = part('castle/rocks-large', DARK, spin + 1.7);
+      fist.scale.set(0.78, 0.85, 0.78);
+      fist.position.y = -0.95;
       arm.add(fist);
-      arm.position.set(side * 0.85, 0.62, 0);
+      arm.position.set(side * 0.95, 0.95, 0);
       this.torso.add(arm);
     }
-    const head = part('castle/rocks-small', 0xc6ccd8);
-    head.scale.setScalar(0.62);
-    head.position.y = 0.92;
+    const head = part('castle/rocks-small', STONE, 2.9);
+    head.scale.set(0.8, 0.95, 0.8);
+    head.position.y = 1.35;
     this.torso.add(head);
     this.torso.position.y = 0.78;
     this.body.add(this.torso);
@@ -1568,16 +1579,16 @@ class GolemActor implements Actor {
         depthWrite: false,
       });
     this.core = new THREE.Sprite(spriteMat(OBJECTIVE, 0.85));
-    this.core.scale.setScalar(1.5);
-    this.core.position.set(0, 1.1, 0.42);
+    this.core.scale.setScalar(1.7);
+    this.core.position.set(0, 1.5, 0.5);
     this.root.add(this.core);
     this.eyes = new THREE.Sprite(spriteMat(OBJECTIVE, 0.9));
-    this.eyes.scale.set(0.7, 0.34, 1);
-    this.eyes.position.set(0, 1.95, 0.3);
+    this.eyes.scale.set(0.8, 0.36, 1);
+    this.eyes.position.set(0, 2.5, 0.42);
     this.root.add(this.eyes);
 
     this.bar = new HealthBar(1.9, OBJECTIVE);
-    this.bar.group.position.y = 2.75;
+    this.bar.group.position.y = 3.3;
     this.root.add(this.bar.group);
     this.flasher = new Flasher(this.body);
     this.body.traverse((o) => {

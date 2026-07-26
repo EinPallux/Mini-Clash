@@ -17,6 +17,9 @@ Entry categories: `Added` · `Changed` · `Fixed` · `Balance` · `Content` · `
 - **Bots read the timetable.** Veterans and Elites contest the golem — and an Elite reads its health bar, diving a nearly-dead one from well outside its usual engage range because the killing blow is the whole objective. They detour for Coin Rain gold when it is genuinely on the way, cross the Storm Front the fast way, and never path onto a strip the Collapse has taken. Recruits ignore all of it, which is exactly how a beginner plays.
 - **A sim tick budget test.** The busiest state the game can produce — Overtime, all-Ram waves, a collapsing deck — is now measured per tick against the frame budget, because v0.6 regressed exactly there once (see Fixed).
 
+### Balance
+- **A converted Clash Golem sieges for 90 s and then crumbles.** It had no lifetime: it marched until something killed it, which for the 10:30 Elder usually meant "until the match ended". Across 40 harness matches (78 golem takes) the team that landed the killing blow won **69%** — over the phase's 65% acceptance rail, and the Elder alone ran 72%. Some of that is correlation (the team winning the fight at the altar takes the golem), but a permanent extra unit is not what §9 describes: the golem is a *siege engine*, and a siege is a window. Take it, turn it into towers, or get nothing.
+
 ### Changed
 - **Live event timers ride the frame header, not the match blob.** They tick every frame, so leaving them in the JSON marked the whole of match state — event log included — dirty twenty times a second. Encoded as ~8 bytes of header instead, the wire came down to **9.8 KB/s** mid-game and **8.3 KB/s** through the golem window, against a 12 KB/s budget. The budget test now measures both windows and asserts the golem is actually on the field in the second one, so a quiet sample cannot pass for free.
 - **Event Insurance pays out only inside its window.** The card said "dying within 10 s of a Living Bridge event start" and was implemented as a flat respawn cut, which is a much stronger card than the one the catalog describes.
@@ -28,6 +31,7 @@ Entry categories: `Added` · `Changed` · `Fixed` · `Balance` · `Content` · `
 - **A converted golem marched backwards.** It started at lane step 0, which for the eastern team is its own gate. It now picks up the lane at the waypoint nearest wherever it converted.
 - **The neutral golem could not be attacked by half the map.** It carries a team tag while neutral because the field is not nullable, and attack validation was reading that tag — so team 0 could not hit the objective it was supposed to be racing for. Attackability is decided by ownership now.
 - **The spawn barrier was sized off the nav grid**, so once the world grew for the isles it hung out over open sky. It spans the deck.
+- **The minimap has been invisible since v0.2.** `.match-root canvas { position: absolute; inset: 0 }` is a *descendant* selector, and the lane strip's canvas lives inside the HUD, inside `.match-root` — so it was pinned across the whole screen and collapsed its own container to nothing. Found while asserting the v0.6 acceptance line that every event stays readable with the sound off, which leans on the minimap glow. Scoped to the direct child.
 
 ### Docs
 - GAME_DESIGN §9.1 records the rules the timetable actually runs on: the 30 s reveal window, that a missed announce stays missed, that Overtime ends the timetable and retires any event still holding terrain, where the isles sit and why, and the Storm Front's crossing maths.

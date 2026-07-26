@@ -141,7 +141,7 @@ The map runs a seeded event schedule (all clients/server share the seed; bots pl
 | **Flank Isles** | 2:00 (fixed), later via pool | Two floating platforms (10×6 u) rise N and S of mid for 60 s, connected by light-bridges — opening flank/ambush routes. Each carries a health orb. Rise/fall is fully animated (rumble, dust, chunks). |
 | **Coin Rain** | pool (4:00 / 12:30 windows) | A marked 8 u zone showers ~30 coins over 20 s (2–6 g each, pickup on touch). Risk/reward scramble magnet. |
 | **Storm Front** | pool (4:00 / 8:30 windows) | A crackling storm wall (4 u deep, full width) sweeps the bridge end-to-end over 25 s; standing in it deals 2.5%/s max-HP arcane and slows 15%. Forces the whole map to rotate. |
-| **Clash Golem** | 6:00 and 10:30 | Neutral golem (600→ scaled HP, heavy slam attacks) wakes at the center altar. The team that **lands the killing blow** converts it: it walks their lane as a siege engine (taunts towers, 40% tower-damage resist, buffs nearby Minis). #2 is the Elder Golem: +60% stats, its siege aura also shields allied champions. |
+| **Clash Golem** | 6:00 and 10:30 | Neutral golem (600→ scaled HP, heavy slam attacks) wakes at the center altar. The team that **lands the killing blow** converts it: it walks their lane as a siege engine (taunts towers, 40% tower-damage resist, buffs nearby Minis) for **90 s**, then crumbles. #2 is the Elder Golem: +60% stats, its siege aura also shields allied champions. |
 | **Bridge Collapse (Overtime)** | 15:00 | Every 60 s the outer 3 u of BOTH long edges crumble into the void (animated chunk-fall), narrowing the deck 18→12→8 u. Brush and cover fall away first; escape space vanishes; fights become unavoidable. Simultaneously **Corebreaker**: Cores take +200% damage and every wave carries 5 Rams. |
 | **Sudden Death** | 17:30 | Both Cores decay 1.5%/s. Higher-HP Core wins; exact tie → team with more structure damage dealt. |
 
@@ -155,6 +155,7 @@ Design intent: the schedule gives ARAM the *objective heartbeat* of a full MOBA 
 - **The Flank Isles sit clear of the deck.** Platform centres are 14.5 u out, so the near edge is 2.5 u past the 18 u deck and the light-bridge spans a real gap. A flank route you could already walk is not a flank route. (Implementation: the navgrid is 38 u deep for this — the isles are carved out of void that has to exist before it can be opened.)
 - **The Storm Front is not outrun, it is crossed.** The wall is 4 u deep and sweeps at ~5.3 u/s; a champion moves 3.6. Running with it keeps you inside for ~2.4 s, standing still ~0.76 s, walking *into* the oncoming edge ~0.45 s. Bots from Veteran up know this, and so should players — it is the event's one piece of hidden depth.
 - **The golem starts from where it stands.** A converted golem picks up the owner's lane at the waypoint nearest the altar, not at step 0 — which for the eastern team is its own gate.
+- **A converted golem sieges for 90 s and then crumbles.** It is a *window*, not a permanent extra teammate: take it, turn it into towers, or get nothing. This is a v0.6 balance finding, not an original rule — with no lifetime the team that landed the killing blow won **69%** of the time across 40 harness matches (78 takes), over the 65% acceptance rail, because a golem taken at 10:30 was frequently still marching when the match ended.
 
 ## 10. Combat system
 

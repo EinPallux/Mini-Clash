@@ -854,7 +854,13 @@ input[type="range"] {
   inset: 0;
   overflow: hidden;
 }
-.match-root canvas {
+/*
+ * Direct child only. As a descendant selector this also caught the minimap's
+ * canvas — which lives inside the HUD, inside `.match-root` — pinning it to
+ * `inset: 0` so it stretched across the whole screen and collapsed its own
+ * container to nothing. The lane strip has been invisible since it shipped.
+ */
+.match-root > canvas {
   position: absolute;
   inset: 0;
   display: block;

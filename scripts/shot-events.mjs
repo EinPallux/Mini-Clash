@@ -172,32 +172,21 @@ async function walkNorth(page, seconds) {
     const r = document.querySelector('canvas')?.getBoundingClientRect();
     return r ? { x: r.x, y: r.y, w: r.width, h: r.height } : null;
   });
-  if (!box) return 0;
   const zOf = () => page.evaluate(() => globalThis.__mcDebug?.self?.z ?? 0);
-  const startZ = await zOf();
-  // Aim below the match strip — a right-click on the HUD never reaches the
-  // ground, and the champion politely stands still while the clock ticks.
-  for (const frac of [0.14, 0.22, 0.3]) {
-    const until = Date.now() + (seconds / 3) * 1000;
-    await page.mouse.move(box.x + box.w * 0.5, box.y + box.h * frac);
-    while (Date.now() < until) {
-      await page.mouse.down({ button: 'right' });
-      await page.waitForTimeout(500);
-      await page.mouse.up({ button: 'right' });
-      await page.waitForTimeout(200);
-    }
-    const z = await zOf();
-    if (Math.abs(z - startZ) > 3) {
-      // Moving: stay on this aim point for the rest of the budget.
-      const rest = Date.now() + (seconds / 3) * 1000;
-      while (Date.now() < rest && Math.abs(await zOf()) < 13) {
-        await page.mouse.down({ button: 'right' });
-        await page.waitForTimeout(500);
-        await page.mouse.up({ button: 'right' });
-        await page.waitForTimeout(200);
-      }
-      break;
-    }
+  if (!box) return zOf();
+  // A modest offset up-screen, clicked repeatedly. Aiming near the top edge
+  // looks faster but points the pick ray at the horizon, where it never meets
+  // the ground plane — and there is no WASD to fall back on, W casts an
+  // ability. Each order walks a few units north and the camera follows, so the
+  // champion crosses the light bridge in steps.
+  const target = { x: box.x + box.w * 0.5, y: box.y + box.h * 0.34 };
+  const until = Date.now() + seconds * 1000;
+  while (Date.now() < until && Math.abs(await zOf()) < 13) {
+    await page.mouse.move(target.x, target.y);
+    await page.mouse.down({ button: 'right' });
+    await page.waitForTimeout(600);
+    await page.mouse.up({ button: 'right' });
+    await page.waitForTimeout(250);
   }
   return zOf();
 }
@@ -358,10 +347,6 @@ try {
       errors.push(`never rolled ${kind} in 6 tries at ${clock}s`);
       continue;
     }
-    // At 3:40 the 4:00 window is inside the 30 s reveal, so the ticker must
-    // name it before it starts — that is the line Orb Sense extends.
-    const upNext = (await hud(p)).next;
-    if (!upNext) errors.push(`no "up next" line 20 s before the ${kind} window`);
     await p.waitForTimeout(9500);
     const s = await hud(p);
     if (!s.chips.some((c) => c.name === label)) errors.push(`no live chip for ${label}`);
@@ -370,6 +355,17 @@ try {
     await p.screenshot({ path: `${OUT}/4-${kind}.png` });
     await p.close();
   }
+
+  /* ---------------- 4a. The "up next" line inside its reveal ---------------- */
+  // 30 s before a window the ticker names it; before that the timetable is
+  // something you have to remember (GAME_DESIGN §9.1). This is the line Orb
+  // Sense extends, so it has to exist.
+  page = await openMatch(context, 218);
+  const upNext = (await hud(page)).next;
+  if (!upNext) errors.push('no "up next" line inside the 30 s reveal');
+  else console.info('up next:', upNext);
+  await shotOf(page, '.event-ticker', `${OUT}/4a-upnext.png`);
+  await page.close();
 
   /* ------- 4b. Readable with the sound off and reduced VFX on (a11y) ------- */
   // Particles are the first thing reduced-VFX thins, so the event has to be
@@ -404,9 +400,13 @@ try {
   await walkToMid(page, 40);
   const beforeDeck = (await hud(page)).deck;
   await page.screenshot({ path: `${OUT}/5-overtime.png` });
-  // First stage lands 60 s into Overtime; hold near mid so the shot is deck.
-  await walkToMid(page, 30);
-  await page.waitForTimeout(35000);
+  // First stage lands 60 s into Overtime — wait for the deck to actually go,
+  // rather than guessing how long the walk took.
+  for (let i = 0; i < 45; i++) {
+    state = await hud(page);
+    if (state.deck < beforeDeck) break;
+    await page.waitForTimeout(2000);
+  }
   state = await hud(page);
   if (!(state.deck < beforeDeck)) {
     errors.push(`deck never narrowed (${beforeDeck} → ${state.deck})`);

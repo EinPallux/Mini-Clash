@@ -40,6 +40,16 @@ export function updateGolem(w: World, e: Entity, battle: Battle, dt: number): vo
     updateNeutral(w, e, dt);
     return;
   }
+  // The siege is a window, not a permanent teammate (§9.1). When it runs out
+  // the golem crumbles wherever it stands — no kill credit, no gold; the value
+  // was always the towers you took with it.
+  g.siegeLeft -= dt;
+  if (g.siegeLeft <= 0) {
+    w.emit({ t: 'golemExpired', team: g.owner, elder: g.elder });
+    w.fx('event.golem.death', e.x, e.z, { source: e.id });
+    w.remove(e.id);
+    return;
+  }
   elderShield(w, e, dt);
   updateSiege(w, e, battle, g.owner, dt, p);
 }

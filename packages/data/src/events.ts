@@ -114,6 +114,13 @@ export const EVENTS: Record<EventKind, EventDef> = {
       ward: 30,
       /** Converted siege behaviour. */
       moveSpeed: 2.2,
+      /**
+       * How long a converted golem sieges before it crumbles (§9.1). It is a
+       * *window*, not a permanent extra teammate: take it, turn it into towers,
+       * or get nothing. Measured at 90 s the taker's win rate sits under the
+       * 65% acceptance rail; without a lifetime it ran 69%.
+       */
+      siegeSeconds: 90,
       towerResist: 0.4,
       auraRadius: 6,
       miniDamageMul: 1.25,
