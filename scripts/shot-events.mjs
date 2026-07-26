@@ -231,10 +231,10 @@ try {
   // has to land *before* the 8 s announce (1:52) — the fast-forward treats an
   // announce that has already passed as a window you missed.
   let page = await openMatch(context, 100);
-  // Start the walk to mid *now*, before the announce. The isles window is only
-  // 60 s and the trip from the fountain is most of a minute; the 12 s before
-  // the horn plus the 8 s of announce are the head start that makes it fit.
-  await walkToMid(page, 30, 1.5, 0.4);
+  // A head start on the walk to mid, but only up to the announce — the isles
+  // window is 60 s and the trip from the fountain is most of a minute, yet the
+  // banner is on screen for 8 s and walking through it means missing it.
+  await walkToMid(page, 9, 1.5, 0.4);
   let state = await waitForEvent(page);
   if (!state.banner) errors.push('no announce banner at the 2:00 window');
   else {
@@ -273,8 +273,11 @@ try {
   // 8 s of announce, then the platforms haul themselves up out of the void.
   // Under a software rasterizer that rise takes noticeably longer than the
   // 2 s it is authored for, so poll rather than guess.
-  // Wait out the announce, then count the orbs the moment the platforms are
-  // there — they are contested loot and do not stay long.
+  // Banner captured; now finish the approach. This runs through the rest of the
+  // announce, so the platforms are up about when we reach the deck edge.
+  await walkToMid(page, 22, 1.5, 0.4);
+  // Count the orbs the moment the platforms are there — contested loot that
+  // does not stay long.
   for (let i = 0; i < 30; i++) {
     state = await hud(page);
     if (state.events.some((e) => e.kind === 'flankIsles' && e.phase === 'active')) break;
@@ -291,7 +294,7 @@ try {
   console.info('isles:', JSON.stringify({ ...state.isles, orbsAtOpen }));
   // Walk the flank route: over the light bridge and onto the platform. If a
   // player cannot stand on it, it is scenery rather than a route.
-  const isleZ = await walkNorth(page, 30);
+  const isleZ = await walkNorth(page, 28);
   // Reported, not asserted. That the isles are *reachable* is proven properly
   // in `packages/sim/test/events.test.ts` (an A* path from mid to the platform,
   // and the grid restored afterwards). What this walk is for is framing — the
