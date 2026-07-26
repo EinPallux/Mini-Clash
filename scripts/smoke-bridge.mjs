@@ -8,6 +8,7 @@
 import { spawn } from 'node:child_process';
 import { existsSync, mkdirSync } from 'node:fs';
 import { chromium } from 'playwright';
+import { startApi } from './lib/api-harness.mjs';
 
 const OUT = process.env.SMOKE_OUT ?? 'test-results/smoke-bridge';
 mkdirSync(OUT, { recursive: true });
@@ -39,6 +40,10 @@ async function waitForServer() {
 const LOCAL_CHROME = '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
 const CHROME = process.env.SMOKE_CHROME || (existsSync(LOCAL_CHROME) ? LOCAL_CHROME : undefined);
 
+// The client boots through an account (v0.7), so the smokes run the shipped
+// topology: a real api on the port vite's /api proxy points at.
+const platform = await startApi({ name: 'bridge' });
+
 const errors = [];
 let browser;
 try {
@@ -53,8 +58,11 @@ try {
   let offlinePhase = false;
   page.on('console', (m) => {
     // While offline, resource-load failures are the expected path the SW recovers
-    // from — only surface them as smoke errors when the network is up.
-    if (offlinePhase && m.text().includes('ERR_FAILED')) return;
+    // from — only surface them as smoke errors when the network is up. Any
+    // net:: error counts: the client polls the platform api as well as fetching
+    // assets, and a disconnected fetch reports ERR_INTERNET_DISCONNECTED rather
+    // than the ERR_FAILED the service worker's own requests produce.
+    if (offlinePhase && /ERR_FAILED|net::ERR_/.test(m.text())) return;
     if (m.type() === 'error' && !m.text().includes('WebGL')) {
       errors.push(`console: ${m.text().slice(0, 200)}`);
     }
@@ -165,6 +173,7 @@ try {
   await context.setOffline(false);
 } finally {
   await browser?.close();
+  await platform.stop();
   if (preview) {
     try {
       process.kill(-preview.pid);

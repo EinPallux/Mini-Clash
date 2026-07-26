@@ -23,6 +23,9 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm lint
       - run: pnpm boundaries
+      # A git-sourced dependency installs fine on a machine with SSH keys and
+      # fails on every machine without them. Catch it here, not in a deploy.
+      - run: pnpm lockfile
       - run: pnpm typecheck
 
   test:
@@ -63,6 +66,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      # Cheap, and it fails for a reason you can read — unlike the install step
+      # three minutes into the image build, which only reports a missing binary.
+      - name: Lockfile installs without git
+        run: node scripts/check-lockfile.mjs
       - name: Build the compose images (game + api + web)
         run: docker compose build
         env:

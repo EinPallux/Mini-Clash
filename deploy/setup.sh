@@ -140,11 +140,11 @@ if [[ "$(swapon --show --noheadings | wc -l)" -gt 0 ]]; then
   ok "Swap is configured"
 else
   total_mb="$(awk '/MemTotal/ {print int($2/1024)}' /proc/meminfo)"
-  if [[ "${total_mb}" -lt 2048 ]]; then
-    warn "No swap and only ${total_mb} MB of RAM — the Docker build may be killed."
-    warn "Add 2 GB of swap with:"
-    echo "        fallocate -l 2G /swapfile && chmod 600 /swapfile && mkswap /swapfile"
-    echo "        swapon /swapfile && echo '/swapfile none swap sw 0 0' >> /etc/fstab"
+  if [[ "${total_mb}" -lt "${SWAP_ADVISED_BELOW_MB}" ]]; then
+    warn "No swap and ${total_mb} MB of RAM — the Docker build may be OOM-killed."
+    warn "The asset pipeline and three bundles are what need the headroom."
+    warn "Add 2 GB of swap first:"
+    while read -r line; do echo "        ${line}"; done < <(swap_commands)
   else
     ok "No swap, but ${total_mb} MB of RAM is enough"
   fi

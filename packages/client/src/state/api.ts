@@ -86,6 +86,20 @@ export async function request<T>(path: string, opts: RequestOptions = {}): Promi
     payload = null;
   }
   if (!res.ok) {
+    // "The api is not there" does not always arrive as a failed fetch. In
+    // production `/api` is proxied — Caddy in front of the api container — and a
+    // proxy whose upstream is down answers 502/503/504 itself, so the fetch
+    // succeeds and the socket-level catch above never runs. Treated as an
+    // ordinary error, that turns a restarting api into a wall: the name screen
+    // says "something went wrong" and the player cannot reach Training or
+    // vs-bots, neither of which needs an account at all.
+    //
+    // The api answers JSON for everything it produces, including its own 500
+    // (`{error: 'internal'}`), so a 5xx with no JSON body was not written by the
+    // api. That plus the three gateway codes is the whole test — a genuine api
+    // fault still surfaces as an error, because it says so in JSON.
+    const gateway = res.status === 502 || res.status === 503 || res.status === 504;
+    if (gateway || (res.status >= 500 && payload === null)) throw new OfflineError();
     const body = (payload ?? {}) as { error?: string; message?: string };
     throw new ApiError(res.status, body.error ?? 'request_failed', body.message);
   }

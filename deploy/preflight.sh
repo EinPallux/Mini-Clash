@@ -180,9 +180,19 @@ fi
 
 if [[ "$(swapon --show --noheadings 2>/dev/null | wc -l)" -gt 0 ]]; then
   ok "swap present"
+elif [[ "${mem_mb}" -lt "${SWAP_ADVISED_BELOW_MB}" ]]; then
+  warn "no swap — the build may be OOM-killed"
+  # Say how to fix it here, rather than pointing at another script: setup.sh
+  # applies the same threshold, so a box that reaches this line has already been
+  # told once, and being told twice without the commands is not help.
+  advice+=(
+    "No swap, and ${mem_mb} MB of RAM. The image build is the hungry step, and"
+    "an OOM kill there looks like a build that stopped for no reason. Add 2 GB:"
+    ""
+  )
+  while read -r line; do advice+=("    ${line}"); done < <(swap_commands)
 else
-  [[ "${mem_mb}" -lt 4096 ]] && warn "no swap — the build may be OOM-killed" ||
-    info "no swap (fine at this much RAM)"
+  info "no swap (fine at this much RAM)"
 fi
 
 avail_gb="$(df -BG --output=avail "${REPO_ROOT}" 2>/dev/null | tail -1 | tr -dc '0-9')"

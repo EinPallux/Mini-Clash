@@ -274,8 +274,11 @@ export function BridgeHud({ runtime }: { runtime: () => MatchRuntime | null }): 
 
       <Scoreboard />
 
-      {/* Power Surge draft — docked, never pauses the match (UI_UX §9) */}
-      <DraftOverlay runtime={runtime} />
+      {/* Power Surge draft — docked, never pauses the match (UI_UX §9).
+          Gone the moment the match is, like every other overlay here: a dock
+          still offering cards for a finished match sits on top of the podium
+          and swallows the click on Continue. */}
+      {!match.over && <DraftOverlay runtime={runtime} />}
 
       {/* death screen = the shop */}
       {champ.dead && !match.over && <DeathShop runtime={runtime} />}

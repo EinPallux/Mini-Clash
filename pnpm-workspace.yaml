@@ -1,6 +1,24 @@
 packages:
   - packages/*
 
+# Install what we asked for, and nothing else.
+#
+# `colyseus` lists every transport it can speak to under peerDependencies with
+# no peerDependenciesMeta marking any of them optional, so with auto-install-peers
+# on, pnpm helpfully added @colyseus/uwebsockets-transport — whose own
+# uWebSockets.js dependency resolves to git@github.com:uNetworking/uWebSockets.js
+# over SSH. Nothing here ever loaded it, but `pnpm install --frozen-lockfile`
+# still had to clone it, so every machine without a GitHub SSH key — CI runners,
+# a fresh VPS, the Docker build image — failed at install, while a developer
+# machine sailed through.
+#
+# Off, an unused peer is a warning instead of a dependency. What the game does
+# use is declared where it is used: packages/server depends on @colyseus/core,
+# @colyseus/schema and @colyseus/ws-transport, and imports core directly rather
+# than through the `colyseus` barrel — which is twelve lines that re-export core
+# and statically pull in the Redis driver and presence as well.
+autoInstallPeers: false
+
 onlyBuiltDependencies:
   - esbuild
   - sharp
