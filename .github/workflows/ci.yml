@@ -2,7 +2,12 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    # Feature branches too. `deploy-stack` builds the real Docker images, and
+    # it is the only job that can catch a Dockerfile that works nowhere but a
+    # developer's machine — running it only on main means the first real test
+    # of a deploy is the deploy. That is how a missing `git` in the build image
+    # reached a production box.
+    branches: [main, 'claude/**']
   pull_request:
 
 jobs:
@@ -18,6 +23,9 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm lint
       - run: pnpm boundaries
+      # A git-sourced dependency installs fine on a machine with SSH keys and
+      # fails on every machine without them. Catch it here, not in a deploy.
+      - run: pnpm lockfile
       - run: pnpm typecheck
 
   test:
@@ -58,6 +66,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      # Cheap, and it fails for a reason you can read — unlike the install step
+      # three minutes into the image build, which only reports a missing binary.
+      - name: Lockfile installs without git
+        run: node scripts/check-lockfile.mjs
       - name: Build the compose images (game + api + web)
         run: docker compose build
         env:

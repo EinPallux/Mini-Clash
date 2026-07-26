@@ -72,7 +72,7 @@ mechanically.
 | `deploy/logs.sh [service] [lines]` | Follow the logs. The api and game server write pino JSON; pipe through `jq`. |
 | `deploy/backup.sh [dir]` | `pg_dump` inside the container, gzipped, newest 14 kept. Verifies the dump is not empty before trusting it. Cron-friendly. |
 | `deploy/restore.sh <dump>` | Stops the writers, takes a safety dump of what it is about to replace, then loads the file. |
-| `deploy/selftest.sh` | 56 checks over the scripts themselves — argument handling, config guards, secret generation, compose validity, and the shared-box invariants (project pinned, no unscoped prune, loopback-only status page, live port-detection probe). Touches nothing; safe on a live box. |
+| `deploy/selftest.sh` | 66 checks over the scripts themselves — argument handling, config guards, secret generation, compose validity, and the shared-box invariants (project pinned, no unscoped prune, loopback-only status page, live port-detection probe). Touches nothing; safe on a live box. |
 
 Five services (see `compose.yaml`): **api** — accounts, the coin ledger,
 unlocks, quests and match history (Fastify + Postgres, migrations applied on

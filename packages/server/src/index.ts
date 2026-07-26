@@ -1,6 +1,6 @@
 import { createServer } from 'node:http';
+import { Server } from '@colyseus/core';
 import { WebSocketTransport } from '@colyseus/ws-transport';
-import { Server } from 'colyseus';
 import { lookupLobby } from './lobby-registry';
 import { log } from './log';
 import { registry } from './metrics';

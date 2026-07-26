@@ -283,7 +283,9 @@ describe('draft flow', () => {
     run(sim, 260);
     const drafted = sim.world.entities.filter((e) => (e.champ?.augments.length ?? 0) > 0);
     expect(drafted.length).toBe(8);
-  });
+    // 7800 ticks of a full eight-bot match: the heaviest test in the suite by
+    // some way, and the one case that wants more than the 30 s default.
+  }, 60_000);
 });
 
 describe('augment effects', () => {

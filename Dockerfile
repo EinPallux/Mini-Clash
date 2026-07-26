@@ -1,10 +1,19 @@
-# Mini Clash deploy images (TECH §1): one build stage, two runtime targets —
+# Mini Clash deploy images (TECH §1): one build stage, three runtime targets —
 #   game: the Colyseus server as a single self-contained bundle
-#   web:  Caddy serving the built client + reverse-proxying /ws to the game
+#   api:  the platform service + its .sql migrations
+#   web:  Caddy serving the built client, proxying /ws to game and /api to api
 FROM node:22-alpine AS build
+# No git here on purpose. node:22-alpine does not ship it, and nothing in the
+# dependency tree may need it: a package resolved over git wants an SSH key this
+# image will never have, so `pnpm install` would fail here and on every CI
+# runner and fresh VPS while working fine on a developer machine.
+# `pnpm lockfile` (scripts/check-lockfile.mjs) enforces that in CI.
 RUN corepack enable
 WORKDIR /app
-COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
+# tsconfig.base.json is not optional: every package tsconfig extends it, and
+# vite reads the client's when it transforms, so leaving it out fails the client
+# build with "failed to resolve extends" rather than anything about a copy.
+COPY pnpm-lock.yaml pnpm-workspace.yaml package.json tsconfig.base.json ./
 COPY packages ./packages
 COPY assets ./assets
 COPY scripts ./scripts

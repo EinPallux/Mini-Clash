@@ -204,7 +204,7 @@ another stack's anything.
   while that would cut off a listening port.
 - No writing outside `/srv/mini-clash` except the Docker volumes above.
 
-`./deploy/selftest.sh` checks these mechanically — 56 checks, including that the
+`./deploy/selftest.sh` checks these mechanically — 66 checks, including that the
 project name is pinned, that no unscoped prune exists anywhere in `deploy/`, and
 that the behind-proxy override really does bind neither 80 nor 443.
 
@@ -230,7 +230,8 @@ anywhere in `deploy/` that touches anything outside the project.
 | The api will not start | `./deploy/logs.sh api`. Usually `DATABASE_URL` or a `db` container that has not finished starting — deploy waits 90 s for it. |
 | Matches do not pay out | `MC_INTERNAL_SECRET` differs between the `api` and `game` containers, or is under 16 characters. `./deploy/logs.sh api` logs a rejected internal request with the reason. |
 | Coins look wrong | `./deploy/status.sh` re-derives every balance from the transaction ledger and reports any that disagree. |
-| Build killed | Out of memory. `free -h`; add swap (`setup.sh` prints the commands). |
+| Build killed (no error, just stops) | Out of memory — the asset pipeline and three bundles are the hungry step. Check `free -h`, then add swap and re-run: `sudo fallocate -l 2G /swapfile && sudo chmod 600 /swapfile && sudo mkswap /swapfile && sudo swapon /swapfile`. Make it survive a reboot with `echo '/swapfile none swap sw 0 0' \| sudo tee -a /etc/fstab`. |
+| `ENOENT not found: git`, or `Permission denied (publickey)`, during the build | Fixed — nothing in the dependency tree resolves over git any more. `git pull` and retry. If it comes back, `pnpm lockfile` names the package that reintroduced it. |
 | Out of disk | `docker builder prune` clears build cache only and is safe on a shared box. |
 
 ---

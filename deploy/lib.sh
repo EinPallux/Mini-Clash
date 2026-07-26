@@ -57,6 +57,27 @@ require_docker() {
      Or:   newgrp docker   (after setup.sh added you to the group)"
 }
 
+# ---------------------------------------------------------------------------
+# Swap
+#
+# The image build — asset pipeline plus three bundles — is the memory-hungry
+# step of a deploy, and it is the one that gets OOM-killed on a small box. The
+# threshold lives here so setup.sh and preflight.sh cannot disagree about it: a
+# box that preflight calls at risk must not be a box setup.sh called fine.
+# ---------------------------------------------------------------------------
+readonly SWAP_ADVISED_BELOW_MB=4096
+
+# The fix, spelled out. `sudo` is added only when the caller needs it — setup.sh
+# already runs as root, preflight does not, and a command that fails on a
+# missing `sudo` (or a redundant one) is not advice.
+swap_commands() {
+  local s=""
+  [[ "${EUID}" -eq 0 ]] || s="sudo "
+  echo "${s}fallocate -l 2G /swapfile && ${s}chmod 600 /swapfile && ${s}mkswap /swapfile"
+  echo "${s}swapon /swapfile"
+  echo "echo '/swapfile none swap sw 0 0' | ${s}tee -a /etc/fstab"
+}
+
 # 24 bytes of urandom, base64url — no shell-hostile characters in a .env value.
 generate_secret() {
   local bytes="${1:-32}"

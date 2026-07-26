@@ -31,7 +31,14 @@ export function BootScreen(): React.ReactElement {
           done++;
         });
       }
-      await Promise.allSettled(steps);
+      // Bounded on purpose. Every step here is *warming* — a manifest, fonts,
+      // who we are — and the screens after this one already handle each of them
+      // being missing. Waiting on all three without a cap means any one that
+      // never settles leaves the player watching a progress bar forever, and
+      // offline is exactly where that happens: `document.fonts.ready` and a
+      // request the service worker passes to a network that is not there both
+      // depend on the browser giving up first, which it does not always do.
+      await Promise.race([Promise.allSettled(steps), new Promise((r) => setTimeout(r, 6000))]);
       const elapsed = performance.now() - started;
       await new Promise((r) => setTimeout(r, Math.max(0, 700 - elapsed)));
       if (!alive) return;

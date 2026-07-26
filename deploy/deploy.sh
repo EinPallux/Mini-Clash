@@ -109,6 +109,15 @@ fi
 
 if [[ "${DO_BUILD}" -eq 1 ]]; then
   step "Building images"
+  # A dependency that resolves over git needs an SSH key the build image will
+  # never have, and that failure surfaces minutes in as a missing binary rather
+  # than as the package that wanted it. One second here instead, on any box that
+  # happens to have node — the build itself does not need one.
+  if have_cmd node && [[ -f "${REPO_ROOT}/scripts/check-lockfile.mjs" ]]; then
+    node "${REPO_ROOT}/scripts/check-lockfile.mjs" >/dev/null ||
+      die "The lockfile resolves a package over git, which this image cannot install.
+     For the details: node scripts/check-lockfile.mjs"
+  fi
   info "This runs the asset pipeline and three bundles; the first one takes a while."
   compose build
   ok "Images built"

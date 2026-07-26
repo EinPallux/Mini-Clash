@@ -1,7 +1,7 @@
 import { createServer } from 'node:http';
+import { Server } from '@colyseus/core';
 import { WebSocketTransport } from '@colyseus/ws-transport';
 import { SnapshotDecoder } from '@mini-clash/protocol';
-import { Server } from 'colyseus';
 import { Client as JsClient, type Room as JsRoom } from 'colyseus.js';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { tickP95 } from '../src/metrics';

@@ -16,8 +16,9 @@
     "typecheck": "pnpm -r --sequential run typecheck",
     "lint": "biome check .",
     "lint:fix": "biome check --write .",
-    "check": "pnpm lint && pnpm typecheck && pnpm boundaries",
-    "boundaries": "node scripts/check-boundaries.mjs"
+    "check": "pnpm lint && pnpm typecheck && pnpm boundaries && pnpm lockfile",
+    "boundaries": "node scripts/check-boundaries.mjs",
+    "lockfile": "node scripts/check-lockfile.mjs"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.4.4",

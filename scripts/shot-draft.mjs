@@ -9,6 +9,7 @@
 import { spawn } from 'node:child_process';
 import { existsSync, mkdirSync } from 'node:fs';
 import { chromium } from 'playwright';
+import { startApi } from './lib/api-harness.mjs';
 
 const OUT = process.env.SHOT_OUT ?? 'test-results/draft';
 mkdirSync(OUT, { recursive: true });
@@ -39,6 +40,10 @@ async function waitForServer() {
 
 const LOCAL_CHROME = '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
 const CHROME = process.env.SHOT_CHROME || (existsSync(LOCAL_CHROME) ? LOCAL_CHROME : undefined);
+
+// The client boots through an account (v0.7), so the smokes run the shipped
+// topology: a real api on the port vite's /api proxy points at.
+const platform = await startApi({ name: 'draft' });
 
 const errors = [];
 let browser;
@@ -221,6 +226,7 @@ try {
   errors.push(`fatal: ${e instanceof Error ? e.message : String(e)}`);
 } finally {
   await browser?.close();
+  await platform.stop();
   if (preview) process.kill(-preview.pid, 'SIGTERM');
 }
 

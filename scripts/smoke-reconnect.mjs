@@ -8,6 +8,7 @@
 import { spawn } from 'node:child_process';
 import { existsSync, mkdirSync } from 'node:fs';
 import { chromium } from 'playwright';
+import { startApi } from './lib/api-harness.mjs';
 
 const OUT = process.env.SMOKE_OUT ?? 'test-results/smoke-reconnect';
 mkdirSync(OUT, { recursive: true });
@@ -42,6 +43,10 @@ for (let i = 0; i < 60; i++) {
 
 const LOCAL_CHROME = '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
 const CHROME = process.env.SMOKE_CHROME || (existsSync(LOCAL_CHROME) ? LOCAL_CHROME : undefined);
+// The client boots through an account (v0.7), so the smokes run the shipped
+// topology: a real api on the port vite's /api proxy points at.
+const platform = await startApi({ name: 'reconnect' });
+
 const errors = [];
 let browser;
 
@@ -126,6 +131,7 @@ try {
   errors.push(`smoke flow failed: ${e instanceof Error ? e.message.slice(0, 200) : e}`);
 } finally {
   await browser?.close();
+  await platform.stop();
   if (preview) {
     try {
       process.kill(-preview.pid);

@@ -19,8 +19,8 @@
 import { spawn } from 'node:child_process';
 import { existsSync, mkdirSync } from 'node:fs';
 import { createServer } from 'node:http';
-import { build } from 'esbuild';
 import { chromium } from 'playwright';
+import { startApi as startPlatformApi } from './lib/api-harness.mjs';
 
 const OUT = process.env.SHOT_OUT ?? 'test-results/hub';
 mkdirSync(OUT, { recursive: true });
@@ -65,41 +65,19 @@ async function startClient() {
   throw new Error('client preview never came up');
 }
 
+// The api itself comes from the shared harness — the same one every other smoke
+// boots, so there is one copy of "how to run the service in-process" rather than
+// two that drift. This one keeps its own ports and its own edge, because it is
+// the smoke that tests the *edge*: one origin, `/api/*` proxied with the prefix
+// stripped, exactly as Caddy serves it in production.
+let platform = null;
 let api = null;
 let ledger = null;
 
-/**
- * Bundle the api the same way its dev launcher does.
- *
- * Node's TypeScript support does not resolve extensionless imports, and the
- * service uses them throughout — so this is not a workaround for the test, it
- * is the same esbuild step `packages/api/run.mjs` performs to run for real.
- */
 async function startApi() {
-  process.env.MC_INTERNAL_SECRET = 'hub-smoke-secret-32-characters!!';
-  const outdir = new URL('../packages/api/.dev/smoke/', import.meta.url).pathname;
-  mkdirSync(outdir, { recursive: true });
-  const root = new URL('../', import.meta.url).pathname;
-  await build({
-    entryPoints: [`${root}packages/api/src/app.ts`, `${root}packages/api/src/ledger.ts`],
-    outdir,
-    bundle: true,
-    splitting: true,
-    format: 'esm',
-    platform: 'node',
-    packages: 'external',
-    alias: {
-      '@mini-clash/data': `${root}packages/data/src/index.ts`,
-      '@mini-clash/protocol': `${root}packages/protocol/src/index.ts`,
-    },
-    banner: {
-      js: "import { createRequire } from 'node:module'; const require = createRequire(import.meta.url);",
-    },
-  });
-  const { buildApp } = await import(`${outdir}app.js`);
-  ledger = await import(`${outdir}ledger.js`);
-  api = await buildApp({ quiet: true });
-  await api.listen({ port: API_PORT, host: '127.0.0.1' });
+  platform = await startPlatformApi({ name: 'hub', port: API_PORT });
+  api = platform.app;
+  ledger = platform.ledger;
 }
 
 /**
@@ -429,7 +407,7 @@ async function main() {
   } finally {
     await browser.close();
     edge.close();
-    await api?.close();
+    await platform?.stop();
     if (preview) {
       try {
         process.kill(-preview.pid);

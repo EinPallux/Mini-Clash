@@ -1,9 +1,9 @@
 import { randomBytes } from 'node:crypto';
+import type { Client } from '@colyseus/core';
+import { Room } from '@colyseus/core';
 import { QUICK_CHAT } from '@mini-clash/data';
 import { SnapshotEncoder } from '@mini-clash/protocol';
 import { Sim, stateHash } from '@mini-clash/sim';
-import type { Client } from 'colyseus';
-import { Room } from 'colyseus';
 import { linked, reportMatch, verifyJoinTicket } from '../api-client';
 import { log } from '../log';
 import {

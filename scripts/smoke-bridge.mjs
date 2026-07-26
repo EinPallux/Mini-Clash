@@ -8,6 +8,7 @@
 import { spawn } from 'node:child_process';
 import { existsSync, mkdirSync } from 'node:fs';
 import { chromium } from 'playwright';
+import { startApi } from './lib/api-harness.mjs';
 
 const OUT = process.env.SMOKE_OUT ?? 'test-results/smoke-bridge';
 mkdirSync(OUT, { recursive: true });
@@ -39,7 +40,13 @@ async function waitForServer() {
 const LOCAL_CHROME = '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
 const CHROME = process.env.SMOKE_CHROME || (existsSync(LOCAL_CHROME) ? LOCAL_CHROME : undefined);
 
+// The client boots through an account (v0.7), so the smokes run the shipped
+// topology: a real api on the port vite's /api proxy points at.
+const platform = await startApi({ name: 'bridge' });
+
 const errors = [];
+/** What the page was showing when the offline reload gave up, if it did. */
+let lastScreen = null;
 let browser;
 try {
   await waitForServer();
@@ -53,8 +60,11 @@ try {
   let offlinePhase = false;
   page.on('console', (m) => {
     // While offline, resource-load failures are the expected path the SW recovers
-    // from — only surface them as smoke errors when the network is up.
-    if (offlinePhase && m.text().includes('ERR_FAILED')) return;
+    // from — only surface them as smoke errors when the network is up. Any
+    // net:: error counts: the client polls the platform api as well as fetching
+    // assets, and a disconnected fetch reports ERR_INTERNET_DISCONNECTED rather
+    // than the ERR_FAILED the service worker's own requests produce.
+    if (offlinePhase && /ERR_FAILED|net::ERR_/.test(m.text())) return;
     if (m.type() === 'error' && !m.text().includes('WebGL')) {
       errors.push(`console: ${m.text().slice(0, 200)}`);
     }
@@ -124,9 +134,25 @@ try {
   if (!history?.includes('"result"')) errors.push('match history not written');
 
   // Airplane mode: the SW precaches the full build at install — wait for the
-  // worker to be active and its cache populated, then cut the network.
+  // worker to be active, *controlling this page*, and its cache populated, then
+  // cut the network.
+  //
+  // Controlling matters and `ready` does not prove it: `ready` resolves on an
+  // active worker, but the page that registered it is only claimed once
+  // `activate` runs its `clients.claim()`. Reload before that and the navigation
+  // never reaches the fetch handler — the browser goes to the network, which is
+  // switched off, and the app shell simply does not come back.
   const cached = await page.evaluate(async () => {
     await navigator.serviceWorker.ready;
+    if (!navigator.serviceWorker.controller) {
+      await Promise.race([
+        new Promise((r) =>
+          navigator.serviceWorker.addEventListener('controllerchange', r, { once: true }),
+        ),
+        new Promise((r) => setTimeout(r, 10000)),
+      ]);
+    }
+    if (!navigator.serviceWorker.controller) return 0;
     for (let i = 0; i < 40; i++) {
       const keys = await caches.keys();
       const name = keys.find((k) => k.startsWith('mini-clash-'));
@@ -139,20 +165,33 @@ try {
     }
     return 0;
   });
-  if (!cached) errors.push('service worker never finished precaching');
+  if (!cached) errors.push('service worker never claimed this page or finished precaching');
   offlinePhase = true;
   await context.setOffline(true);
   // The first offline reload can race the service worker's cold start under
-  // CDP-emulated offline (observed on SwiftShader runners) — allow one retry.
+  // CDP-emulated offline (observed on SwiftShader runners) — allow retries, and
+  // poll rather than sleep a fixed amount, because boot on a software rasterizer
+  // is slower than the wait that looks generous on a developer machine.
   let offlineHub = false;
-  for (let attempt = 0; attempt < 2 && !offlineHub; attempt++) {
+  for (let attempt = 0; attempt < 3 && !offlineHub; attempt++) {
     await page.reload().catch(() => {});
-    await page.waitForTimeout(3000);
-    offlineHub = await page.evaluate(
-      () => document.body.textContent?.includes('MINI CLASH') ?? false,
-    );
+    for (let i = 0; i < 20 && !offlineHub; i++) {
+      await page.waitForTimeout(500);
+      offlineHub = await page
+        .evaluate(() => document.body.textContent?.includes('MINI CLASH') ?? false)
+        .catch(() => false);
+    }
   }
-  if (!offlineHub) errors.push('offline reload did not reach the app shell');
+  if (!offlineHub) {
+    // Say what *was* on screen. "Did not reach the app shell" covers a browser
+    // error page, a boot screen that never routed and a name screen, and those
+    // are three different bugs — a CI failure that cannot tell them apart costs
+    // a round trip to find out.
+    lastScreen = await page
+      .evaluate(() => (document.body.textContent ?? '').replace(/\s+/g, ' ').slice(0, 200))
+      .catch(() => '(page unreachable)');
+    errors.push('offline reload did not reach the app shell');
+  }
   try {
     await page.getByText('Bridge Brawl', { exact: true }).click({ timeout: 8000 });
     await page.waitForTimeout(2000);
@@ -165,6 +204,7 @@ try {
   await context.setOffline(false);
 } finally {
   await browser?.close();
+  await platform.stop();
   if (preview) {
     try {
       process.kill(-preview.pid);
@@ -176,6 +216,9 @@ try {
 
 if (errors.length > 0) {
   console.error(`bridge smoke FAILED:\n  ${errors.join('\n  ')}`);
+  // Last, deliberately. A CI log is read from the bottom, and by the time this
+  // matters the question is always the same one: what was actually on screen?
+  if (lastScreen) console.error(`  last screen: "${lastScreen}"`);
   process.exit(1);
 }
 console.info('bridge smoke OK — select, rigged win, podium, summary, history, offline');

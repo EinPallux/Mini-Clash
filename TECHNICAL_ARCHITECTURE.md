@@ -154,7 +154,7 @@ pino structured logs (api+server) → Loki-compatible sink; metrics via prom-cli
 
 ## 15. Scaling path (documented now, executed when metrics demand)
 
-Single VPS through beta → split game server from api/db (room ticket already carries region/host) → multiple game-server hosts behind a room-director (Colyseus presence over Redis) → regional pods (EU first — primary audience), CDN already global. Postgres vertical + read replica for history endpoints. The sharp edge to protect from day one: **rooms are stateless beyond the match** (all persistence flows through api), so game hosts are cattle.
+Single VPS through beta → split game server from api/db (room ticket already carries region/host) → multiple game-server hosts behind a room-director (Colyseus presence over Redis — `@colyseus/redis-presence` and `@colyseus/redis-driver` are deliberately *not* installed today; the server imports `@colyseus/core` directly rather than the `colyseus` barrel, which drags both in for a single-host deploy that uses neither) → regional pods (EU first — primary audience), CDN already global. Postgres vertical + read replica for history endpoints. The sharp edge to protect from day one: **rooms are stateless beyond the match** (all persistence flows through api), so game hosts are cattle.
 
 ## 16. Risks & mitigations
 

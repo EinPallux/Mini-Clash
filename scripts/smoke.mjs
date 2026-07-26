@@ -8,6 +8,7 @@
 import { spawn } from 'node:child_process';
 import { mkdirSync } from 'node:fs';
 import { chromium } from 'playwright';
+import { startApi } from './lib/api-harness.mjs';
 
 const OUT = process.env.SMOKE_OUT ?? 'test-results/smoke';
 mkdirSync(OUT, { recursive: true });
@@ -41,6 +42,10 @@ const LOCAL_CHROME = '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
 const CHROME =
   process.env.SMOKE_CHROME ||
   ((await import('node:fs')).existsSync(LOCAL_CHROME) ? LOCAL_CHROME : undefined);
+
+// The client boots through an account (v0.7), so the smokes run the shipped
+// topology: a real api on the port vite's /api proxy points at.
+const platform = await startApi({ name: 'smoke' });
 
 const errors = [];
 let browser;
@@ -137,6 +142,7 @@ try {
   process.exitCode = 1;
 } finally {
   await browser?.close();
+  await platform.stop();
   if (preview?.pid) {
     try {
       process.kill(-preview.pid, 'SIGTERM'); // whole pnpm→vite tree

@@ -170,6 +170,46 @@ check $? "the advice does not look like a menu waiting for a keypress"
 grep -q 'Run ONE of these' "${REPO_ROOT}/deploy/preflight.sh"
 check $? "…it says to run one of the commands shown"
 
+step "Swap advice"
+# Preflight warning that the build may be OOM-killed while setup.sh calls the
+# same box fine is worse than either message alone: it is a contradiction, and
+# the reader has no way to tell which one is right until the build dies.
+grep -q 'SWAP_ADVISED_BELOW_MB' "${REPO_ROOT}/deploy/setup.sh"
+check $? "setup.sh uses the shared swap threshold"
+grep -q 'SWAP_ADVISED_BELOW_MB' "${REPO_ROOT}/deploy/preflight.sh"
+check $? "preflight.sh uses the same one, so the two cannot disagree"
+# Narrow on purpose: preflight also warns about total RAM, which is a different
+# question with a different number. What must not come back is a second copy of
+# the *swap* threshold.
+! grep -qE '\-lt 4096' "${REPO_ROOT}/deploy/setup.sh" "${REPO_ROOT}/deploy/preflight.sh"
+check $? "…and neither kept a hard-coded copy of it"
+
+swap_commands | grep -q 'fallocate -l 2G /swapfile'
+check $? "the advice creates the swap file"
+swap_commands | grep -q 'swapon /swapfile'
+check $? "…turns it on"
+swap_commands | grep -q '/etc/fstab'
+check $? "…and keeps it across a reboot"
+if [[ "${EUID}" -eq 0 ]]; then
+  ! swap_commands | grep -q 'sudo '
+  check $? "…with no redundant sudo, since this shell is root"
+else
+  swap_commands | grep -q '^sudo '
+  check $? "…prefixed with sudo, since this shell is not root"
+fi
+
+step "Lockfile guard"
+# The deploy that prompted all of this died three minutes into the image build,
+# on a dependency that could never have installed there.
+[[ -f "${REPO_ROOT}/scripts/check-lockfile.mjs" ]]
+check $? "the lockfile check exists"
+if have_cmd node; then
+  node "${REPO_ROOT}/scripts/check-lockfile.mjs" >/dev/null 2>&1
+  check $? "…and this tree has no git-sourced packages"
+fi
+grep -q 'check-lockfile.mjs' "${REPO_ROOT}/deploy/deploy.sh"
+check $? "deploy.sh runs it before spending minutes on a build"
+
 step "Port detection"
 # The guard that protects another service is only worth having if it can
 # actually see. A silent "everything is free" is the failure mode that matters.

@@ -1,4 +1,6 @@
 import { randomBytes } from 'node:crypto';
+import type { Client } from '@colyseus/core';
+import { matchMaker, Room } from '@colyseus/core';
 import { CHAMPION_LIST } from '@mini-clash/data';
 import type {
   BotTier,
@@ -7,8 +9,6 @@ import type {
   LobbySnap,
   MatchPlayerConfig,
 } from '@mini-clash/protocol';
-import type { Client } from 'colyseus';
-import { matchMaker, Room } from 'colyseus';
 import { issueLobbyCode, releaseLobbyCode } from '../lobby-registry';
 
 /**
